@@ -3,7 +3,7 @@ description: |
   Shared CI/CD automation tooling for open-runtime or pieces-app packages. Provides a reusable
   triage pipeline, Gemini CLI integration, audit trail management, release
   automation, and GitHub Actions workflow utilities that any package can depend on.
-version: 0.4.1
+version: 0.5.0
 publish_to: none
 
 executables:

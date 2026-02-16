@@ -10,6 +10,7 @@ Shared CI/CD automation tooling for open-runtime or pieces-app packages. Provide
 - **Audit Trails**: Comprehensive logging of CI/CD actions and decisions.
 - **MCP Integration**: Configuration for Model Context Protocol servers (GitHub, Sentry).
 - **Cross-Platform**: Utilities for tool installation and environment setup.
+- **Documentation**: Comprehensive [setup](SETUP.md) and [usage](USAGE.md) guides.
 
 ## Installation
 
@@ -17,7 +18,7 @@ Add `runtime_ci_tooling` to your `dev_dependencies`:
 
 ```yaml
 dev_dependencies:
-  runtime_ci_tooling: ^0.4.1
+  runtime_ci_tooling: ^0.5.0
 ```
 
 Or run:
@@ -27,6 +28,8 @@ dart pub add dev:runtime_ci_tooling
 ```
 
 ## Configuration
+
+For a detailed setup guide, see [SETUP.md](SETUP.md).
 
 The tooling expects configuration to be present in the `.runtime_ci/` directory.
 You can generate a default configuration and scaffold workflows using:
@@ -41,7 +44,9 @@ This will create:
 
 ## Usage
 
-As of version **v0.4.1**, tools are available as direct executables.
+For a comprehensive usage guide, see [USAGE.md](USAGE.md).
+
+As of version **v0.5.0**, tools are available as direct executables.
 
 ### Manage CI/CD
 
@@ -76,8 +81,8 @@ dart run runtime_ci_tooling:triage_cli <command> [options]
 **Usage Examples:**
 - **Single Issue**: `dart run runtime_ci_tooling:triage_cli <issue_number>`
 - **Auto Triage**: `dart run runtime_ci_tooling:triage_cli --auto`
-- **Pre-Release Scan**: `dart run runtime_ci_tooling:triage_cli --pre-release --prev-tag v0.4.0 --version 0.4.1`
-- **Post-Release Loop**: `dart run runtime_ci_tooling:triage_cli --post-release --version 0.4.1 --release-tag v0.4.1`
+- **Pre-Release Scan**: `dart run runtime_ci_tooling:triage_cli --pre-release --prev-tag v0.4.1 --version 0.5.0`
+- **Post-Release Loop**: `dart run runtime_ci_tooling:triage_cli --post-release --version 0.5.0 --release-tag v0.5.0`
 
 Run `dart run runtime_ci_tooling:triage_cli --help` for full usage details.
 

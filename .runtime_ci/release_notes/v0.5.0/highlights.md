@@ -1,0 +1,3 @@
+- Added comprehensive `SETUP.md` and `USAGE.md` documentation.
+- Enabled Git LFS support in CI workflows to ensure test assets are downloaded.
+- Integrated SendGrid Email Validation API key into CI templates.
