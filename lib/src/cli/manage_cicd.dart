@@ -602,6 +602,17 @@ Future<void> _runCompose(String repoRoot) async {
   if (File('/tmp/issue_manifest.json').existsSync()) {
     includes.add('@/tmp/issue_manifest.json');
   }
+  final changelogFile = File('$repoRoot/CHANGELOG.md');
+  if (!changelogFile.existsSync()) {
+    changelogFile.writeAsStringSync(
+      '# Changelog\n\n'
+      'All notable changes to this project will be documented in this file.\n\n'
+      'The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),\n'
+      'and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n\n'
+      '## [Unreleased]\n',
+    );
+    _info('Created starter CHANGELOG.md for compose stage');
+  }
   includes.add('@CHANGELOG.md');
   includes.add('@README.md');
 
@@ -2035,12 +2046,15 @@ Future<void> _runCreateRelease(String repoRoot, List<String> args) async {
   }
 
   // Add footer with links
+  final changelogLink = File('$repoRoot/CHANGELOG.md').existsSync()
+      ? ' | [CHANGELOG.md](https://github.com/$effectiveRepo/blob/v$newVersion/CHANGELOG.md)'
+      : '';
   final migrationLink = File('${releaseDir.path}/migration_guide.md').existsSync()
       ? ' | [Migration Guide]($kReleaseNotesDir/v$newVersion/migration_guide.md)'
       : '';
   releaseBody +=
       '\n\n---\n[Full Changelog](https://github.com/$effectiveRepo/compare/$prevTag...v$newVersion)'
-      ' | [CHANGELOG.md](CHANGELOG.md)$migrationLink';
+      '$changelogLink$migrationLink';
 
   final ghArgs = ['release', 'create', tag, '--title', 'v$newVersion', '--notes', releaseBody];
   if (effectiveRepo.isNotEmpty) ghArgs.addAll(['--repo', effectiveRepo]);
@@ -3316,7 +3330,19 @@ Future<void> _runInit(String repoRoot) async {
     _success('Created .gitignore with .runtime_ci/runs/');
   }
 
-  // ── 7. Create script wrappers ──────────────────────────────────────────
+  // ── 7. Create starter CHANGELOG.md if missing ──────────────────────────
+  if (!hasChangelog) {
+    File('$repoRoot/CHANGELOG.md').writeAsStringSync(
+      '# Changelog\n\n'
+      'All notable changes to this project will be documented in this file.\n\n'
+      'The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),\n'
+      'and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n\n'
+      '## [Unreleased]\n',
+    );
+    _success('Created starter CHANGELOG.md');
+  }
+
+  // ── 8. Create script wrappers ──────────────────────────────────────────
   final scriptsDir = Directory('$repoRoot/scripts');
   scriptsDir.createSync(recursive: true);
 
@@ -3345,14 +3371,14 @@ Future<void> _runInit(String repoRoot) async {
     _success('Created scripts/triage/triage_cli.dart');
   }
 
-  // ── 8. Summary ─────────────────────────────────────────────────────────
+  // ── 9. Summary ─────────────────────────────────────────────────────────
   print('');
   _header('Init Complete');
   _info('  Config:    $kConfigFileName');
   _info('  Package:   $packageName');
   _info('  Owner:     $repoOwner');
   _info('  Areas:     ${areaLabels.join(", ")}');
-  _info('  Changelog: ${hasChangelog ? "found" : "not found (will be created on first release)"}');
+  _info('  Changelog: ${hasChangelog ? "found" : "created"}');
   _info('  .github/:  ${hasGithub ? "exists (not overwritten)" : "not found"}');
   _info('  .gemini/:  ${hasGemini ? "exists (not overwritten)" : "not found"}');
   print('');
