@@ -3170,11 +3170,8 @@ Future<void> _runInit(String repoRoot) async {
   final configDir = Directory('$repoRoot/$kRuntimeCiDir');
   final configFile = File('$repoRoot/$kConfigFileName');
 
-  if (configFile.existsSync()) {
-    _warn('$kConfigFileName already exists. Skipping init.');
-    _info('Delete it and re-run init to regenerate, or edit it directly.');
-    return;
-  }
+  final configExists = configFile.existsSync();
+  var repaired = 0;
 
   // ── 1. Auto-detect package name from pubspec.yaml ──────────────────────
   String packageName = 'unknown';
@@ -3227,7 +3224,6 @@ Future<void> _runInit(String repoRoot) async {
   }
 
   // ── 3. Scan for existing files ─────────────────────────────────────────
-  final hasChangelog = File('$repoRoot/CHANGELOG.md').existsSync();
   final hasGithub = Directory('$repoRoot/.github').existsSync();
   final hasGemini = Directory('$repoRoot/.gemini').existsSync();
 
@@ -3258,81 +3254,79 @@ Future<void> _runInit(String repoRoot) async {
     }
   }
 
-  // ── 5. Write .runtime_ci/config.json ───────────────────────────────────
-  configDir.createSync(recursive: true);
-  final configData = {
-    'repository': {
-      'name': packageName,
-      'owner': repoOwner,
-      'triaged_label': 'triaged',
-      'changelog_path': hasChangelog ? 'CHANGELOG.md' : 'CHANGELOG.md',
-      'release_notes_path': '$kReleaseNotesDir',
-    },
-    'gcp': {'project': ''},
-    'sentry': {'organization': '', 'projects': <String>[], 'scan_on_pre_release': false, 'recent_errors_hours': 168},
-    'release': {
-      'pre_release_scan_sentry': false,
-      'pre_release_scan_github': true,
-      'post_release_close_own_repo': true,
-      'post_release_close_cross_repo': false,
-      'post_release_comment_cross_repo': true,
-      'post_release_link_sentry': false,
-    },
-    'cross_repo': {
-      'enabled': false,
-      'orgs': [repoOwner],
-      'repos': <Map<String, String>>[],
-      'discovery': {
-        'enabled': true,
-        'search_orgs': [repoOwner],
+  // ── 5. Write .runtime_ci/config.json (skip if already exists) ──────────
+  if (!configExists) {
+    configDir.createSync(recursive: true);
+    final configData = {
+      'repository': {
+        'name': packageName,
+        'owner': repoOwner,
+        'triaged_label': 'triaged',
+        'changelog_path': 'CHANGELOG.md',
+        'release_notes_path': '$kReleaseNotesDir',
       },
-    },
-    'labels': {
-      'type': ['bug', 'feature-request', 'enhancement', 'documentation', 'question'],
-      'priority': ['P0-critical', 'P1-high', 'P2-medium', 'P3-low'],
-      'area': areaLabels,
-    },
-    'thresholds': {'auto_close': 0.9, 'suggest_close': 0.7, 'comment': 0.5},
-    'agents': {
-      'enabled': ['code_analysis', 'pr_correlation', 'duplicate', 'sentiment', 'changelog'],
-      'conditional': {
-        'changelog': {'require_file': 'CHANGELOG.md'},
+      'gcp': {'project': ''},
+      'sentry': {
+        'organization': '',
+        'projects': <String>[],
+        'scan_on_pre_release': false,
+        'recent_errors_hours': 168,
       },
-    },
-    'gemini': {
-      'flash_model': 'gemini-3-flash-preview',
-      'pro_model': 'gemini-3-pro-preview',
-      'max_turns': 100,
-      'max_concurrent': 4,
-      'max_retries': 3,
-    },
-    'secrets': {
-      'gemini_api_key_env': 'GEMINI_API_KEY',
-      'github_token_env': ['GH_TOKEN', 'GITHUB_TOKEN', 'GITHUB_PAT'],
-      'sentry_token_env': 'SENTRY_ACCESS_TOKEN',
-      'gcp_secret_name': '',
-    },
-  };
+      'release': {
+        'pre_release_scan_sentry': false,
+        'pre_release_scan_github': true,
+        'post_release_close_own_repo': true,
+        'post_release_close_cross_repo': false,
+        'post_release_comment_cross_repo': true,
+        'post_release_link_sentry': false,
+      },
+      'cross_repo': {
+        'enabled': false,
+        'orgs': [repoOwner],
+        'repos': <Map<String, String>>[],
+        'discovery': {
+          'enabled': true,
+          'search_orgs': [repoOwner],
+        },
+      },
+      'labels': {
+        'type': ['bug', 'feature-request', 'enhancement', 'documentation', 'question'],
+        'priority': ['P0-critical', 'P1-high', 'P2-medium', 'P3-low'],
+        'area': areaLabels,
+      },
+      'thresholds': {'auto_close': 0.9, 'suggest_close': 0.7, 'comment': 0.5},
+      'agents': {
+        'enabled': ['code_analysis', 'pr_correlation', 'duplicate', 'sentiment', 'changelog'],
+        'conditional': {
+          'changelog': {'require_file': 'CHANGELOG.md'},
+        },
+      },
+      'gemini': {
+        'flash_model': 'gemini-3-flash-preview',
+        'pro_model': 'gemini-3-pro-preview',
+        'max_turns': 100,
+        'max_concurrent': 4,
+        'max_retries': 3,
+      },
+      'secrets': {
+        'gemini_api_key_env': 'GEMINI_API_KEY',
+        'github_token_env': ['GH_TOKEN', 'GITHUB_TOKEN', 'GITHUB_PAT'],
+        'sentry_token_env': 'SENTRY_ACCESS_TOKEN',
+        'gcp_secret_name': '',
+      },
+    };
 
-  configFile.writeAsStringSync('${const JsonEncoder.withIndent('  ').convert(configData)}\n');
-  _success('Created $kConfigFileName');
-
-  // ── 6. Add .runtime_ci/runs/ to .gitignore ─────────────────────────────
-  final gitignoreFile = File('$repoRoot/.gitignore');
-  if (gitignoreFile.existsSync()) {
-    final content = gitignoreFile.readAsStringSync();
-    if (!content.contains('.runtime_ci/runs/')) {
-      gitignoreFile.writeAsStringSync('$content\n# Runtime CI audit trails (local only)\n.runtime_ci/runs/\n');
-      _success('Added .runtime_ci/runs/ to .gitignore');
-    }
+    configFile.writeAsStringSync('${const JsonEncoder.withIndent('  ').convert(configData)}\n');
+    _success('Created $kConfigFileName');
   } else {
-    gitignoreFile.writeAsStringSync('# Runtime CI audit trails (local only)\n.runtime_ci/runs/\n');
-    _success('Created .gitignore with .runtime_ci/runs/');
+    _info('$kConfigFileName already exists (kept as-is)');
   }
 
-  // ── 7. Create starter CHANGELOG.md if missing ──────────────────────────
-  if (!hasChangelog) {
-    File('$repoRoot/CHANGELOG.md').writeAsStringSync(
+  // ── 6. Ensure CHANGELOG.md exists ──────────────────────────────────────
+  final changelogFile = File('$repoRoot/CHANGELOG.md');
+  final hadChangelog = changelogFile.existsSync();
+  if (!hadChangelog) {
+    changelogFile.writeAsStringSync(
       '# Changelog\n\n'
       'All notable changes to this project will be documented in this file.\n\n'
       'The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),\n'
@@ -3340,9 +3334,25 @@ Future<void> _runInit(String repoRoot) async {
       '## [Unreleased]\n',
     );
     _success('Created starter CHANGELOG.md');
+    repaired++;
   }
 
-  // ── 8. Create script wrappers ──────────────────────────────────────────
+  // ── 7. Ensure .runtime_ci/runs/ is in .gitignore ───────────────────────
+  final gitignoreFile = File('$repoRoot/.gitignore');
+  if (gitignoreFile.existsSync()) {
+    final content = gitignoreFile.readAsStringSync();
+    if (!content.contains('.runtime_ci/runs/')) {
+      gitignoreFile.writeAsStringSync('$content\n# Runtime CI audit trails (local only)\n.runtime_ci/runs/\n');
+      _success('Added .runtime_ci/runs/ to .gitignore');
+      repaired++;
+    }
+  } else {
+    gitignoreFile.writeAsStringSync('# Runtime CI audit trails (local only)\n.runtime_ci/runs/\n');
+    _success('Created .gitignore with .runtime_ci/runs/');
+    repaired++;
+  }
+
+  // ── 8. Ensure script wrappers exist ────────────────────────────────────
   final scriptsDir = Directory('$repoRoot/scripts');
   scriptsDir.createSync(recursive: true);
 
@@ -3355,6 +3365,7 @@ Future<void> _runInit(String repoRoot) async {
       'Future<void> main(List<String> args) => cicd.main(args);\n',
     );
     _success('Created scripts/manage_cicd.dart');
+    repaired++;
   }
 
   final triageDir = Directory('$repoRoot/scripts/triage');
@@ -3369,22 +3380,30 @@ Future<void> _runInit(String repoRoot) async {
       'Future<void> main(List<String> args) => triage.main(args);\n',
     );
     _success('Created scripts/triage/triage_cli.dart');
+    repaired++;
   }
 
   // ── 9. Summary ─────────────────────────────────────────────────────────
   print('');
-  _header('Init Complete');
-  _info('  Config:    $kConfigFileName');
+  _header(configExists ? 'Init Repair Complete' : 'Init Complete');
+  if (configExists && repaired == 0) {
+    _info('All items present — nothing to repair.');
+  } else if (configExists) {
+    _info('Repaired $repaired missing item${repaired == 1 ? '' : 's'}.');
+  }
+  _info('  Config:    $kConfigFileName${configExists ? " (existing)" : ""}');
   _info('  Package:   $packageName');
   _info('  Owner:     $repoOwner');
   _info('  Areas:     ${areaLabels.join(", ")}');
-  _info('  Changelog: ${hasChangelog ? "found" : "created"}');
+  _info('  Changelog: ${hadChangelog ? "found" : "created"}');
   _info('  .github/:  ${hasGithub ? "exists (not overwritten)" : "not found"}');
   _info('  .gemini/:  ${hasGemini ? "exists (not overwritten)" : "not found"}');
   print('');
-  _info('Next steps:');
-  _info('  1. Review .runtime_ci/config.json and customize area labels, cross-repo, etc.');
-  _info('  2. Add runtime_ci_tooling as a dev_dependency in pubspec.yaml');
-  _info('  3. Run: dart run scripts/manage_cicd.dart setup');
-  _info('  4. Run: dart run scripts/manage_cicd.dart status');
+  if (!configExists) {
+    _info('Next steps:');
+    _info('  1. Review .runtime_ci/config.json and customize area labels, cross-repo, etc.');
+    _info('  2. Add runtime_ci_tooling as a dev_dependency in pubspec.yaml');
+    _info('  3. Run: dart run scripts/manage_cicd.dart setup');
+    _info('  4. Run: dart run scripts/manage_cicd.dart status');
+  }
 }
