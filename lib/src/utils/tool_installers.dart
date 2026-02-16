@@ -102,8 +102,7 @@ Future<bool> _checkJava() async {
   try {
     // `java -version` writes to stderr, not stdout.
     final javaResult = await Process.run('java', ['-version']);
-    final javaOutput =
-        (javaResult.stderr as String) + (javaResult.stdout as String);
+    final javaOutput = (javaResult.stderr as String) + (javaResult.stdout as String);
 
     // Parse the major version number from strings like:
     //   openjdk version "21.0.5" ...
@@ -244,15 +243,13 @@ Future<bool> _installSmithyFromGitHub() async {
 
   final String artifactName = 'smithy-cli-$os-$arch';
   final String zipName = '$artifactName.zip';
-  final String downloadUrl =
-      'https://github.com/smithy-lang/smithy/releases/download/$kSmithyCliVersion/$zipName';
+  final String downloadUrl = 'https://github.com/smithy-lang/smithy/releases/download/$kSmithyCliVersion/$zipName';
 
   print('    Downloading $zipName from GitHub releases...');
   print('    URL: $downloadUrl');
 
   // Create a temp directory for the download.
-  final Directory tempDir =
-      await Directory.systemTemp.createTemp('smithy_install_');
+  final Directory tempDir = await Directory.systemTemp.createTemp('smithy_install_');
   try {
     final String zipPath = '${tempDir.path}/$zipName';
 
@@ -276,12 +273,7 @@ Future<bool> _installSmithyFromGitHub() async {
 
     // Unzip.
     print('    Extracting...');
-    final ProcessResult unzipResult = await Process.run('unzip', [
-      '-qo',
-      zipPath,
-      '-d',
-      tempDir.path,
-    ]);
+    final ProcessResult unzipResult = await Process.run('unzip', ['-qo', zipPath, '-d', tempDir.path]);
 
     if (unzipResult.exitCode != 0) {
       print('    ERROR: Unzip failed.');
@@ -295,11 +287,7 @@ Future<bool> _installSmithyFromGitHub() async {
 
     if (Platform.isWindows) {
       print('    Running installer...');
-      final installResult = await Process.run(
-        '$extractedDir\\install.bat',
-        [],
-        workingDirectory: extractedDir,
-      );
+      final installResult = await Process.run('$extractedDir\\install.bat', [], workingDirectory: extractedDir);
       if (installResult.exitCode != 0) {
         print('    ERROR: Installer failed.');
         return false;
@@ -312,10 +300,13 @@ Future<bool> _installSmithyFromGitHub() async {
       final String binDir = '$homeDir/.smithy/bin';
 
       print('    Installing to $installDir...');
-      final installResult = await Process.run(
-        '$extractedDir/install',
-        ['--install-dir', installDir, '--bin-dir', binDir, '--update'],
-      );
+      final installResult = await Process.run('$extractedDir/install', [
+        '--install-dir',
+        installDir,
+        '--bin-dir',
+        binDir,
+        '--update',
+      ]);
 
       if (installResult.exitCode != 0) {
         print('    ERROR: User-local install failed (exit code ${installResult.exitCode}).');
@@ -324,10 +315,7 @@ Future<bool> _installSmithyFromGitHub() async {
 
         // Try again with the default location (/usr/local/smithy).
         print('    Retrying with default location (/usr/local/smithy)...');
-        final fallbackResult = await Process.run(
-          '$extractedDir/install',
-          [],
-        );
+        final fallbackResult = await Process.run('$extractedDir/install', []);
         if (fallbackResult.exitCode != 0) {
           print('    ERROR: Installation failed.');
           print('    Install manually: https://smithy.io/2.0/guides/smithy-cli/cli_installation.html');
@@ -359,10 +347,7 @@ Future<bool> _installSmithyFromGitHub() async {
 /// Checks if a command is available on PATH.
 Future<bool> commandExists(String command) async {
   try {
-    final result = await Process.run(
-      Platform.isWindows ? 'where' : 'which',
-      [command],
-    );
+    final result = await Process.run(Platform.isWindows ? 'where' : 'which', [command]);
     return result.exitCode == 0;
   } on ProcessException {
     return false;

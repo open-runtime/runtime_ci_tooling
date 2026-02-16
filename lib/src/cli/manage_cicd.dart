@@ -1873,7 +1873,14 @@ Future<void> _runCreateRelease(String repoRoot, List<String> args) async {
   _exec('git', ['config', 'user.email', 'github-actions[bot]@users.noreply.github.com'], cwd: repoRoot);
 
   // Add files that exist (.runtime_ci/audit/ may not exist on first release)
-  final filesToAdd = ['pubspec.yaml', 'CHANGELOG.md', 'README.md', '$kReleaseNotesDir/', '$kVersionBumpsDir/', 'autodoc.json'];
+  final filesToAdd = [
+    'pubspec.yaml',
+    'CHANGELOG.md',
+    'README.md',
+    '$kReleaseNotesDir/',
+    '$kVersionBumpsDir/',
+    'autodoc.json',
+  ];
   if (Directory('$repoRoot/docs').existsSync()) filesToAdd.add('docs/');
   if (Directory('$repoRoot/$kCicdAuditDir').existsSync()) filesToAdd.add('$kCicdAuditDir/');
   _exec('git', ['add', ...filesToAdd], cwd: repoRoot);
@@ -3064,7 +3071,14 @@ Future<void> _runInit(String repoRoot) async {
   // ── 2. Auto-detect GitHub owner/org via gh CLI ─────────────────────────
   String repoOwner = 'unknown';
   try {
-    final ghResult = Process.runSync('gh', ['repo', 'view', '--json', 'owner', '-q', '.owner.login'], workingDirectory: repoRoot);
+    final ghResult = Process.runSync('gh', [
+      'repo',
+      'view',
+      '--json',
+      'owner',
+      '-q',
+      '.owner.login',
+    ], workingDirectory: repoRoot);
     if (ghResult.exitCode == 0) {
       final owner = (ghResult.stdout as String).trim();
       if (owner.isNotEmpty) {
@@ -3131,12 +3145,7 @@ Future<void> _runInit(String repoRoot) async {
       'changelog_path': hasChangelog ? 'CHANGELOG.md' : 'CHANGELOG.md',
       'release_notes_path': '$kReleaseNotesDir',
     },
-    'sentry': {
-      'organization': '',
-      'projects': <String>[],
-      'scan_on_pre_release': false,
-      'recent_errors_hours': 168,
-    },
+    'sentry': {'organization': '', 'projects': <String>[], 'scan_on_pre_release': false, 'recent_errors_hours': 168},
     'release': {
       'pre_release_scan_sentry': false,
       'pre_release_scan_github': true,
@@ -3149,7 +3158,10 @@ Future<void> _runInit(String repoRoot) async {
       'enabled': false,
       'orgs': [repoOwner],
       'repos': <Map<String, String>>[],
-      'discovery': {'enabled': true, 'search_orgs': [repoOwner]},
+      'discovery': {
+        'enabled': true,
+        'search_orgs': [repoOwner],
+      },
     },
     'labels': {
       'type': ['bug', 'feature-request', 'enhancement', 'documentation', 'question'],
