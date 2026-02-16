@@ -3328,12 +3328,7 @@ Future<void> _runInit(String repoRoot) async {
         'release_notes_path': '$kReleaseNotesDir',
       },
       'gcp': {'project': ''},
-      'sentry': {
-        'organization': '',
-        'projects': <String>[],
-        'scan_on_pre_release': false,
-        'recent_errors_hours': 168,
-      },
+      'sentry': {'organization': '', 'projects': <String>[], 'scan_on_pre_release': false, 'recent_errors_hours': 168},
       'release': {
         'pre_release_scan_sentry': false,
         'pre_release_scan_github': true,
