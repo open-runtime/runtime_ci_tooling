@@ -686,6 +686,11 @@ Future<void> _runCompose(String repoRoot) async {
     }
   }
 
+  // Post-process: add Keep a Changelog reference-style links at the bottom.
+  if (changelogContent.isNotEmpty) {
+    _addChangelogReferenceLinks(repoRoot, changelogContent);
+  }
+
   // NOTE: Release notes are generated separately by Stage 3 (_runReleaseNotes).
   // This stage ONLY handles CHANGELOG.md and README.md updates.
   final clEntryMatch = RegExp(
@@ -3026,6 +3031,63 @@ String _releaseLink(String tag) {
   final server = Platform.environment['GITHUB_SERVER_URL'] ?? 'https://github.com';
   final repo = Platform.environment['GITHUB_REPOSITORY'] ?? '${config.repoOwner}/${config.repoName}';
   return '[v$tag]($server/$repo/releases/tag/$tag)';
+}
+
+/// Add Keep a Changelog reference-style links to the bottom of CHANGELOG.md.
+///
+/// Parses all `## [X.Y.Z]` headers and generates:
+/// ```
+/// [Unreleased]: https://github.com/{repo}/compare/v0.3.0...HEAD
+/// [0.3.0]: https://github.com/{repo}/compare/v0.2.0...v0.3.0
+/// ```
+/// Idempotent: replaces any existing reference-link block.
+void _addChangelogReferenceLinks(String repoRoot, String content) {
+  final server = Platform.environment['GITHUB_SERVER_URL'] ?? 'https://github.com';
+  final repo = Platform.environment['GITHUB_REPOSITORY'] ?? '${config.repoOwner}/${config.repoName}';
+
+  // Extract all version headers: ## [X.Y.Z] or ## [Unreleased]
+  final versionPattern = RegExp(r'^## \[([^\]]+)\]', multiLine: true);
+  final matches = versionPattern.allMatches(content).toList();
+
+  if (matches.isEmpty) return;
+
+  final versions = matches.map((m) => m.group(1)!).toList();
+
+  // Build reference-style links
+  final links = StringBuffer();
+  for (var i = 0; i < versions.length; i++) {
+    final version = versions[i];
+    if (version == 'Unreleased') {
+      // [Unreleased] compares from the latest versioned tag to HEAD
+      final latestVersion = versions.length > 1 ? versions[1] : null;
+      if (latestVersion != null) {
+        links.writeln('[Unreleased]: $server/$repo/compare/v$latestVersion...HEAD');
+      } else {
+        links.writeln('[Unreleased]: $server/$repo/compare/HEAD');
+      }
+    } else if (i + 1 < versions.length) {
+      // Compare from previous version
+      final prevVersion = versions[i + 1];
+      if (prevVersion == 'Unreleased') continue;
+      links.writeln('[$version]: $server/$repo/compare/v$prevVersion...v$version');
+    } else {
+      // Oldest version: link to the tag itself
+      links.writeln('[$version]: $server/$repo/releases/tag/v$version');
+    }
+  }
+
+  final linksStr = links.toString().trimRight();
+  if (linksStr.isEmpty) return;
+
+  // Strip any existing reference-link block (lines matching [X.Y.Z]: http...)
+  final existingLinksPattern = RegExp(r'\n*(\[[\w.\-]+\]: https?://[^\n]+\n?)+$');
+  var cleaned = content.replaceAll(existingLinksPattern, '');
+  cleaned = cleaned.trimRight();
+
+  // Append the new links block
+  final updated = '$cleaned\n\n$linksStr\n';
+  File('$repoRoot/CHANGELOG.md').writeAsStringSync(updated);
+  _success('Added reference-style links to CHANGELOG.md');
 }
 
 /// Wrap content in a collapsible <details> block for step summaries.

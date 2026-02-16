@@ -55,8 +55,18 @@ ${hasIssueManifest ? '- issue_manifest.json (provided via @include) -- Reference
 
 ## Task: Update CHANGELOG.md
 
-Read the existing CHANGELOG.md. Prepend a new version entry IMMEDIATELY after
-the "# Changelog" header line. Follow Keep a Changelog format exactly.
+Read the existing CHANGELOG.md and update it following Keep a Changelog format.
+
+### Handling the [Unreleased] section
+
+If the CHANGELOG contains a `## [Unreleased]` section:
+1. Move any content under `## [Unreleased]` into the new version entry below
+2. Replace `## [Unreleased]` with a fresh EMPTY `## [Unreleased]` section
+3. Place the new version entry immediately after the empty `## [Unreleased]`
+
+If there is no `## [Unreleased]` section, add one above the new version entry.
+
+### New version entry format
 
 The new entry MUST follow this structure:
 ```
@@ -85,7 +95,29 @@ The new entry MUST follow this structure:
 - Description of security fix
 ```
 
-Rules:
+### Resulting structure
+
+The final CHANGELOG.md MUST have this structure:
+```
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [$newVersion] - $today
+
+### Added
+- ...
+
+## [previous version] - previous date
+...
+```
+
+### Rules
 - Only include sections that have entries (omit empty sections)
 - **Breaking Changes** goes FIRST if present
 - Every entry should reference its PR number as (#N)
@@ -95,6 +127,7 @@ Rules:
 - Be specific and concise -- one line per change
 - Group related changes together within each section
 - Do NOT include migration guides or code examples -- that is for release notes
+- Do NOT add reference-style links at the bottom -- those are added automatically by the pipeline
 
 Write the updated CHANGELOG.md directly to ./CHANGELOG.md (overwrite the file).
 Do NOT modify README.md -- that is handled by a separate documentation stage.
