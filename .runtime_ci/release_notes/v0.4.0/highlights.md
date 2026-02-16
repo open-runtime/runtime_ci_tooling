@@ -1,0 +1,3 @@
+- **Zero-Boilerplate Executables** — New `bin/` executables allow direct usage without wrapper scripts.
+- **Improved Release Reliability** — Fixed file staging to prevent partial release failures.
+- **Automated Configuration Migration** — `autodoc.json` now lives in `.runtime_ci/` and auto-migrates.
