@@ -59,6 +59,63 @@ const int kMaxTurns = 100;
 const List<String> kRequiredTools = ['git', 'gh', 'node', 'npm', 'jq'];
 const List<String> kOptionalTools = ['tree', 'gemini'];
 
+/// Cached path to the runtime_ci_tooling package root.
+/// Resolved lazily on first call to [_promptScript].
+String? _toolingPackageRoot;
+
+/// Resolves the absolute path to a prompt script within this package.
+///
+/// Prompt scripts live at `lib/src/prompts/` in the runtime_ci_tooling
+/// package. When this code runs from the package's own repo, that's just
+/// a relative path. When it runs from a consuming repo (e.g., via a thin
+/// wrapper), we resolve the package location from .dart_tool/package_config.json.
+String _promptScript(String scriptName) {
+  _toolingPackageRoot ??= _resolveToolingPackageRoot();
+  return '$_toolingPackageRoot/lib/src/prompts/$scriptName';
+}
+
+/// Find the runtime_ci_tooling package root by checking:
+///   1. package_config.json (works when consumed as a dependency)
+///   2. CWD (works when running from the package's own repo)
+String _resolveToolingPackageRoot() {
+  // Try 1: Look for the package in .dart_tool/package_config.json
+  var dir = Directory.current;
+  for (var i = 0; i < 10; i++) {
+    final configFile = File('${dir.path}/.dart_tool/package_config.json');
+    if (configFile.existsSync()) {
+      try {
+        final configJson = json.decode(configFile.readAsStringSync()) as Map<String, dynamic>;
+        final packages = configJson['packages'] as List<dynamic>? ?? [];
+        for (final pkg in packages) {
+          if (pkg is Map<String, dynamic> && pkg['name'] == 'runtime_ci_tooling') {
+            final rootUri = pkg['rootUri'] as String? ?? '';
+            if (rootUri.startsWith('file://')) {
+              return Uri.parse(rootUri).toFilePath();
+            }
+            // Relative URI -- resolve against the .dart_tool/ directory
+            final resolved = Uri.parse('${dir.path}/.dart_tool/').resolve(rootUri);
+            final resolvedPath = resolved.toFilePath();
+            // Strip trailing slash
+            return resolvedPath.endsWith('/') ? resolvedPath.substring(0, resolvedPath.length - 1) : resolvedPath;
+          }
+        }
+      } catch (_) {}
+    }
+    final parent = dir.parent;
+    if (parent.path == dir.path) break;
+    dir = parent;
+  }
+
+  // Try 2: If we're running from the package's own repo, lib/src/prompts/ is relative
+  if (File('lib/src/prompts/gemini_changelog_prompt.dart').existsSync()) {
+    return Directory.current.path;
+  }
+
+  // Fallback: assume scripts/prompts/ (legacy location in consuming repos)
+  _warn('Could not resolve runtime_ci_tooling package root. Prompt scripts may not be found.');
+  return Directory.current.path;
+}
+
 const List<String> kStage1Artifacts = [
   '$kCicdRunsDir/explore/commit_analysis.json',
   '$kCicdRunsDir/explore/pr_data.json',
@@ -75,11 +132,11 @@ const List<String> kConfigFiles = [
   '.gemini/commands/triage.toml',
   'GEMINI.md',
   'CHANGELOG.md',
-  'scripts/prompts/gemini_changelog_prompt.dart',
-  'scripts/prompts/gemini_changelog_composer_prompt.dart',
-  'scripts/prompts/gemini_release_notes_author_prompt.dart',
-  'scripts/prompts/gemini_documentation_prompt.dart',
-  'scripts/prompts/gemini_triage_prompt.dart',
+  'lib/src/prompts/gemini_changelog_prompt.dart',
+  'lib/src/prompts/gemini_changelog_composer_prompt.dart',
+  'lib/src/prompts/gemini_release_notes_author_prompt.dart',
+  'lib/src/prompts/gemini_documentation_prompt.dart',
+  'lib/src/prompts/gemini_triage_prompt.dart',
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -354,8 +411,18 @@ Future<void> _runExplore(String repoRoot) async {
   _info('Run dir: ${ctx.runDir}');
 
   // Generate prompt via Dart template
-  _info('Generating explorer prompt...');
-  final prompt = _runSync('dart run scripts/prompts/gemini_changelog_prompt.dart "$prevTag" "$newVersion"', repoRoot);
+  final promptScriptPath = _promptScript('gemini_changelog_prompt.dart');
+  _info('Generating explorer prompt from $promptScriptPath...');
+  if (!File(promptScriptPath).existsSync()) {
+    _error('Prompt script not found: $promptScriptPath');
+    _error('Ensure runtime_ci_tooling is properly installed (dart pub get).');
+    exit(1);
+  }
+  final prompt = _runSync('dart run $promptScriptPath "$prevTag" "$newVersion"', repoRoot);
+  if (prompt.isEmpty) {
+    _error('Prompt generator produced empty output. Check $promptScriptPath');
+    exit(1);
+  }
   ctx.savePrompt('explore', prompt);
 
   if (_dryRun) {
@@ -500,11 +567,17 @@ Future<void> _runCompose(String repoRoot) async {
   _info('Run dir: ${ctx.runDir}');
 
   // Generate prompt via Dart template
-  _info('Generating composer prompt...');
-  final prompt = _runSync(
-    'dart run scripts/prompts/gemini_changelog_composer_prompt.dart "$prevTag" "$newVersion"',
-    repoRoot,
-  );
+  final composerScript = _promptScript('gemini_changelog_composer_prompt.dart');
+  _info('Generating composer prompt from $composerScript...');
+  if (!File(composerScript).existsSync()) {
+    _error('Prompt script not found: $composerScript');
+    exit(1);
+  }
+  final prompt = _runSync('dart run $composerScript "$prevTag" "$newVersion"', repoRoot);
+  if (prompt.isEmpty) {
+    _error('Composer prompt generator produced empty output.');
+    exit(1);
+  }
   ctx.savePrompt('compose', prompt);
 
   if (_dryRun) {
@@ -698,11 +771,17 @@ Future<void> _runReleaseNotes(String repoRoot) async {
   _info('Verified issues: ${verifiedIssues.length}');
 
   // Generate prompt
-  _info('Generating release notes prompt...');
-  final prompt = _runSync(
-    'dart run scripts/prompts/gemini_release_notes_author_prompt.dart "$prevTag" "$newVersion" "$bumpType"',
-    repoRoot,
-  );
+  final rnScript = _promptScript('gemini_release_notes_author_prompt.dart');
+  _info('Generating release notes prompt from $rnScript...');
+  if (!File(rnScript).existsSync()) {
+    _error('Prompt script not found: $rnScript');
+    exit(1);
+  }
+  final prompt = _runSync('dart run $rnScript "$prevTag" "$newVersion" "$bumpType"', repoRoot);
+  if (prompt.isEmpty) {
+    _error('Release notes prompt generator produced empty output.');
+    exit(1);
+  }
   ctx.savePrompt('release-notes', prompt);
 
   if (_dryRun) {
@@ -2172,11 +2251,17 @@ Future<void> _runDocumentation(String repoRoot) async {
   final prevTag = _prevTagOverride ?? _detectPrevTag(repoRoot);
   final newVersion = _versionOverride ?? _detectNextVersion(repoRoot, prevTag);
 
-  _info('Generating documentation update prompt...');
-  final prompt = _runSync(
-    'dart run scripts/prompts/gemini_documentation_prompt.dart "$prevTag" "$newVersion"',
-    repoRoot,
-  );
+  final docScript = _promptScript('gemini_documentation_prompt.dart');
+  _info('Generating documentation update prompt from $docScript...');
+  if (!File(docScript).existsSync()) {
+    _error('Prompt script not found: $docScript');
+    exit(1);
+  }
+  final prompt = _runSync('dart run $docScript "$prevTag" "$newVersion"', repoRoot);
+  if (prompt.isEmpty) {
+    _error('Documentation prompt generator produced empty output.');
+    exit(1);
+  }
   ctx.savePrompt('documentation', prompt);
 
   if (_dryRun) {
