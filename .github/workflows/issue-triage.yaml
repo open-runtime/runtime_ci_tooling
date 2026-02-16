@@ -93,4 +93,4 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.CICD_GEMINI_API_KEY_OPEN_RUNTIME }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: dart run scripts/triage/triage_cli.dart ${{ github.event.issue.number }}
+        run: dart run runtime_ci_tooling:triage_cli ${{ github.event.issue.number }}

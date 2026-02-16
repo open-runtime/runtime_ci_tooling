@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy this file to .runtime_ci/config.json at your repo root and fill in the values. Any repo with this file opts into the shared CI tooling. Run 'dart run scripts/manage_cicd.dart init' to auto-generate.",
+  "_comment": "Copy this file to .runtime_ci/config.json at your repo root and fill in the values. Any repo with this file opts into the shared CI tooling. Run 'dart run runtime_ci_tooling:manage_cicd init' to auto-generate.",
   "repository": {
     "name": "YOUR_PACKAGE_NAME",
     "owner": "YOUR_GITHUB_ORG",

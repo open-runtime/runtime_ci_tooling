@@ -28,11 +28,11 @@ import 'utils/mcp_config.dart' as mcp;
 ///   Phase 5b: CROSS-REPO -- Link related issues in dependent repos
 ///
 /// Usage:
-///   dart run scripts/triage/triage_cli.dart <issue_number>
-///   dart run scripts/triage/triage_cli.dart --auto
-///   dart run scripts/triage/triage_cli.dart --auto --dry-run
-///   dart run scripts/triage/triage_cli.dart --resume <run_id>
-///   dart run scripts/triage/triage_cli.dart --status
+///   dart run runtime_ci_tooling:triage_cli <issue_number>
+///   dart run runtime_ci_tooling:triage_cli --auto
+///   dart run runtime_ci_tooling:triage_cli --auto --dry-run
+///   dart run runtime_ci_tooling:triage_cli --resume <run_id>
+///   dart run runtime_ci_tooling:triage_cli --status
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Constants
@@ -464,7 +464,7 @@ void _saveCheckpoint(String runDir, GamePlan plan, String lastPhase) {
     }),
   );
   print('Checkpoint saved to $runDir/checkpoint.json');
-  print('Resume with: dart run scripts/triage/triage_cli.dart --resume ${runDir.split('/').last}');
+  print('Resume with: dart run runtime_ci_tooling:triage_cli --resume ${runDir.split('/').last}');
 }
 
 Map<int, List<InvestigationResult>> _loadCachedResults(String runDir, GamePlan plan) {
@@ -658,12 +658,12 @@ void _printUsage() {
 Triage CLI for ${config.repoName}
 
 Usage:
-  dart run scripts/triage/triage_cli.dart <issue_number>    Triage a single issue
-  dart run scripts/triage/triage_cli.dart --auto            Auto-triage all open issues
-  dart run scripts/triage/triage_cli.dart --pre-release     Scan issues for upcoming release
-  dart run scripts/triage/triage_cli.dart --post-release    Close loop after release
-  dart run scripts/triage/triage_cli.dart --resume <run_id> Resume an interrupted run
-  dart run scripts/triage/triage_cli.dart --status          Show triage status
+  dart run runtime_ci_tooling:triage_cli <issue_number>    Triage a single issue
+  dart run runtime_ci_tooling:triage_cli --auto            Auto-triage all open issues
+  dart run runtime_ci_tooling:triage_cli --pre-release     Scan issues for upcoming release
+  dart run runtime_ci_tooling:triage_cli --post-release    Close loop after release
+  dart run runtime_ci_tooling:triage_cli --resume <run_id> Resume an interrupted run
+  dart run runtime_ci_tooling:triage_cli --status          Show triage status
 
 Release Triage:
   --pre-release --prev-tag <tag> --version <ver>
@@ -699,10 +699,10 @@ Cross-Repo (${config.crossRepoEnabled ? "enabled" : "disabled"}):
 ${config.crossRepoRepos.map((r) => '  - ${r.fullName} (${r.relationship})').join('\n')}
 
 Examples:
-  dart run scripts/triage/triage_cli.dart 42
-  dart run scripts/triage/triage_cli.dart --auto --dry-run
-  dart run scripts/triage/triage_cli.dart --pre-release --prev-tag v0.0.1 --version 0.0.2
-  dart run scripts/triage/triage_cli.dart --post-release --version 0.0.2 --release-tag v0.0.2
-  dart run scripts/triage/triage_cli.dart --resume 12345_1707900000000
+  dart run runtime_ci_tooling:triage_cli 42
+  dart run runtime_ci_tooling:triage_cli --auto --dry-run
+  dart run runtime_ci_tooling:triage_cli --pre-release --prev-tag v0.0.1 --version 0.0.2
+  dart run runtime_ci_tooling:triage_cli --post-release --version 0.0.2 --release-tag v0.0.2
+  dart run runtime_ci_tooling:triage_cli --resume 12345_1707900000000
 ''');
 }

@@ -6,6 +6,10 @@ description: |
 version: 0.1.0
 publish_to: none
 
+executables:
+  manage_cicd: manage_cicd
+  triage_cli: triage_cli
+
 environment:
   sdk: ^3.9.0
 

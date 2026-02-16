@@ -116,10 +116,10 @@ jobs:
           restore-keys: ${{ runner.os }}-dart-analysis-
 
       - name: Verify proto files
-        run: dart run scripts/manage_cicd.dart verify-protos
+        run: dart run runtime_ci_tooling:manage_cicd verify-protos
 
       - name: Analyze (root)
-        run: dart run scripts/manage_cicd.dart analyze
+        run: dart run runtime_ci_tooling:manage_cicd analyze
 
       - name: Analyze (proto_enhancements_plugin)
         working-directory: packages/proto_enhancements_plugin
@@ -133,4 +133,4 @@ jobs:
           fi
 
       - name: Test
-        run: dart run scripts/manage_cicd.dart test
+        run: dart run runtime_ci_tooling:manage_cicd test
