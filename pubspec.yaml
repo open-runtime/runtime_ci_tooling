@@ -1,0 +1,18 @@
+name: runtime_ci_tooling
+description: |
+  Shared CI/CD automation tooling for the Pieces monorepo. Provides a reusable
+  triage pipeline, Gemini CLI integration, audit trail management, release
+  automation, and GitHub Actions workflow utilities that any package can depend on.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+
+resolution: workspace
+
+dependencies:
+  yaml: ^3.1.3
+
+dev_dependencies:
+  test: ^1.28.0

@@ -1,0 +1,13 @@
+# Dart
+.dart_tool/
+.packages
+pubspec.lock
+build/
+
+# CI/CD run audit trails (local development artifacts, not committed)
+.runtime_ci/runs/
+
+# IDE
+.idea/
+*.iml
+.vscode/

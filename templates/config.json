@@ -1,0 +1,62 @@
+{
+  "_comment": "Copy this file to .runtime_ci/config.json at your repo root and fill in the values. Any repo with this file opts into the shared CI tooling. Run 'dart run scripts/manage_cicd.dart init' to auto-generate.",
+  "repository": {
+    "name": "YOUR_PACKAGE_NAME",
+    "owner": "YOUR_GITHUB_ORG",
+    "triaged_label": "triaged",
+    "changelog_path": "CHANGELOG.md",
+    "release_notes_path": "release_notes"
+  },
+  "sentry": {
+    "organization": "",
+    "projects": [],
+    "scan_on_pre_release": true,
+    "recent_errors_hours": 1440
+  },
+  "release": {
+    "pre_release_scan_sentry": true,
+    "pre_release_scan_github": true,
+    "post_release_close_own_repo": true,
+    "post_release_close_cross_repo": false,
+    "post_release_comment_cross_repo": true,
+    "post_release_link_sentry": true
+  },
+  "cross_repo": {
+    "enabled": true,
+    "orgs": ["YOUR_GITHUB_ORG"],
+    "repos": [],
+    "discovery": {
+      "enabled": true,
+      "search_orgs": ["YOUR_GITHUB_ORG"]
+    }
+  },
+  "labels": {
+    "type": ["bug", "feature-request", "enhancement", "documentation", "question"],
+    "priority": ["P0-critical", "P1-high", "P2-medium", "P3-low"],
+    "area": ["area/core", "area/ci-cd", "area/docs"]
+  },
+  "thresholds": {
+    "auto_close": 0.9,
+    "suggest_close": 0.7,
+    "comment": 0.5
+  },
+  "agents": {
+    "enabled": ["code_analysis", "pr_correlation", "duplicate", "sentiment", "changelog"],
+    "conditional": {
+      "changelog": {"require_file": "CHANGELOG.md"}
+    }
+  },
+  "gemini": {
+    "flash_model": "gemini-3-flash-preview",
+    "pro_model": "gemini-3-pro-preview",
+    "max_turns": 100,
+    "max_concurrent": 4,
+    "max_retries": 3
+  },
+  "secrets": {
+    "gemini_api_key_env": "GEMINI_API_KEY",
+    "github_token_env": ["GH_TOKEN", "GITHUB_TOKEN", "GITHUB_PAT"],
+    "sentry_token_env": "SENTRY_ACCESS_TOKEN",
+    "gcp_secret_name": ""
+  }
+}

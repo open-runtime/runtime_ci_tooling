@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# =============================================================================
+# AVAILABLE SECRETS (via open-runtime org, visibility: ALL)
+# =============================================================================
+# ML Provider API Keys (used by generate_unified_spec.dart model catalog):
+#   - CICD_GEMINI_API_KEY_OPEN_RUNTIME               → GEMINI_API_KEY
+#   - OPEN_AI_API_KEY_GLOBAL_CLOUD_RUNTIME            → OPENAI_API_KEY
+#   - ANTHROPIC_API_KEY_GLOBAL_CLOUD_RUNTIME          → ANTHROPIC_API_KEY
+#   - OPEN_RUNTIME_OPEN_ROUTER_INFERENCE_API_KEY      → OPENROUTER_API_KEY
+#   - OPEN_RUNTIME_AWS_BEDROCK_API_KEY                → AWS_BEARER_TOKEN_BEDROCK
+#
+# These are also stored in GCP Secrets Manager (global-cloud-runtime project):
+#   - aot-gemini-api-test-key     → GEMINI_API_KEY
+#   - aot-openai-api-key          → OPENAI_API_KEY
+#   - aot-anthropic-api-key       → ANTHROPIC_API_KEY
+# =============================================================================
+
+jobs:
+  # Gate job: checks if this is a release bot commit and sets output
+  # for downstream jobs to use. Runs in <10s.
+  pre-check:
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.bot_check.outputs.should_run }}
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      # Layer 3: Infinite loop prevention
+      # Check the actual git commit (not event properties which may be
+      # unavailable for some trigger types like pull_request).
+      - name: Check for release bot commit
+        id: bot_check
+        run: |
+          AUTHOR=$(git log -1 --format='%an')
+          MSG=$(git log -1 --format='%s')
+          echo "Commit author: $AUTHOR"
+          echo "Commit subject: $MSG"
+          if [[ "$AUTHOR" == "github-actions[bot]" ]] || [[ "$MSG" == *"[skip ci]"* ]]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Release bot commit detected — skipping CI."
+          else
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  analyze-and-test:
+    needs: pre-check
+    if: needs.pre-check.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    env:
+      GEMINI_API_KEY: ${{ secrets.CICD_GEMINI_API_KEY_OPEN_RUNTIME }}
+      OPENAI_API_KEY: ${{ secrets.OPEN_AI_API_KEY_GLOBAL_CLOUD_RUNTIME }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY_GLOBAL_CLOUD_RUNTIME }}
+      AWS_BEARER_TOKEN_BEDROCK: ${{ secrets.OPEN_RUNTIME_AWS_BEDROCK_API_KEY }}
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Configure Git for HTTPS with Token
+        shell: bash
+        run: |
+          TOKEN="${{ secrets.TSAVO_AT_PIECES_PERSONAL_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "git@github.com:"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
+
+      - uses: dart-lang/setup-dart@v1.7.1
+        with:
+          sdk: "stable"
+
+      - name: Cache Dart pub dependencies
+        uses: actions/cache@v5.0.3
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
+          restore-keys: ${{ runner.os }}-dart-pub-
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3.0.0
+
+      - run: dart pub global activate protoc_plugin 25.0.0
+
+      - run: dart pub get
+
+      - name: Cache Dart analysis
+        uses: actions/cache@v5.0.3
+        with:
+          path: ~/.dartServer
+          key: ${{ runner.os }}-dart-analysis-${{ hashFiles('**/*.dart', '**/pubspec.yaml') }}
+          restore-keys: ${{ runner.os }}-dart-analysis-
+
+      - name: Verify proto files
+        run: dart run scripts/manage_cicd.dart verify-protos
+
+      - name: Analyze (root)
+        run: dart run scripts/manage_cicd.dart analyze
+
+      - name: Analyze (proto_enhancements_plugin)
+        working-directory: packages/proto_enhancements_plugin
+        run: |
+          dart pub get
+          # Only fail on errors/warnings, not info-level lints (style issues in generated test code)
+          dart analyze 2>&1 | tee /tmp/sub_analysis.txt
+          if grep -q "^  error -" /tmp/sub_analysis.txt; then
+            echo "::error::Errors found in proto_enhancements_plugin"
+            exit 1
+          fi
+
+      - name: Test
+        run: dart run scripts/manage_cicd.dart test
