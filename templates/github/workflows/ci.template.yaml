@@ -13,17 +13,24 @@ concurrency:
 # =============================================================================
 # AVAILABLE SECRETS (via open-runtime org, visibility: ALL)
 # =============================================================================
-# ML Provider API Keys (used by generate_unified_spec.dart model catalog):
-#   - CICD_GEMINI_API_KEY_OPEN_RUNTIME               → GEMINI_API_KEY
-#   - OPEN_AI_API_KEY_GLOBAL_CLOUD_RUNTIME            → OPENAI_API_KEY
-#   - ANTHROPIC_API_KEY_GLOBAL_CLOUD_RUNTIME          → ANTHROPIC_API_KEY
-#   - OPEN_RUNTIME_OPEN_ROUTER_INFERENCE_API_KEY      → OPENROUTER_API_KEY
-#   - OPEN_RUNTIME_AWS_BEDROCK_API_KEY                → AWS_BEARER_TOKEN_BEDROCK
+# ML Provider API Keys:
+#   - CICD_GEMINI_API_KEY_OPEN_RUNTIME                              → GEMINI_API_KEY
+#   - AOT_OPENAI_TESTING_KEY                                        → OPENAI_API_KEY
+#   - ANTHROPIC_API_KEY_GLOBAL_CLOUD_RUNTIME                        → ANTHROPIC_API_KEY
+#   - OPEN_RUNTIME_OPEN_ROUTER_INFERENCE_API_KEY                    → OPENROUTER_API_KEY
+#   - AOT_OPEN_ROUTER_PROVISIONING_KEY                              → OPENROUTER_PROVISIONING_KEY
+#   - OPEN_RUNTIME_OPEN_ROUTER_CLIENT_SIDE_PER_USER_PROVISIONING_KEY → OPENROUTER_CLIENT_PROVISIONING_KEY
+#   - OPEN_RUNTIME_AWS_BEDROCK_API_KEY                              → AWS_BEARER_TOKEN_BEDROCK
 #
-# These are also stored in GCP Secrets Manager (global-cloud-runtime project):
-#   - aot-gemini-api-test-key     → GEMINI_API_KEY
-#   - aot-openai-api-key          → OPENAI_API_KEY
-#   - aot-anthropic-api-key       → ANTHROPIC_API_KEY
+# Service API Keys:
+#   - OPEN_RUNTIME_SENDGRID_API_KEY                                 → SENDGRID_API_KEY
+#
+# GCP Secrets Manager (global-cloud-runtime project):
+#   - aot-gemini-api-test-key                          → GEMINI_API_KEY
+#   - aot-openai-testing-key                           → OPENAI_API_KEY
+#   - aot-open-router-provisioning-key                 → OPENROUTER_PROVISIONING_KEY
+#   - OPEN_RUNTIME_OPEN_ROUTER_INFERENCE_API_KEY       → OPENROUTER_API_KEY
+#   - aot-sendgrid-api-key                             → SENDGRID_API_KEY
 # =============================================================================
 
 jobs:
@@ -62,9 +69,13 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GEMINI_API_KEY: ${{ secrets.CICD_GEMINI_API_KEY_OPEN_RUNTIME }}
-      OPENAI_API_KEY: ${{ secrets.OPEN_AI_API_KEY_GLOBAL_CLOUD_RUNTIME }}
+      OPENAI_API_KEY: ${{ secrets.AOT_OPENAI_TESTING_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY_GLOBAL_CLOUD_RUNTIME }}
       AWS_BEARER_TOKEN_BEDROCK: ${{ secrets.OPEN_RUNTIME_AWS_BEDROCK_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPEN_RUNTIME_OPEN_ROUTER_INFERENCE_API_KEY }}
+      OPENROUTER_PROVISIONING_KEY: ${{ secrets.AOT_OPEN_ROUTER_PROVISIONING_KEY }}
+      OPENROUTER_CLIENT_PROVISIONING_KEY: ${{ secrets.OPEN_RUNTIME_OPEN_ROUTER_CLIENT_SIDE_PER_USER_PROVISIONING_KEY }}
+      SENDGRID_API_KEY: ${{ secrets.OPEN_RUNTIME_SENDGRID_API_KEY }}
     steps:
       - uses: actions/checkout@v6.0.2
         with:
