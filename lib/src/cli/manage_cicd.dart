@@ -1764,7 +1764,18 @@ Future<void> _runDetermineVersion(String repoRoot, List<String> args) async {
   final prevTag = _prevTagOverride ?? _detectPrevTag(repoRoot);
   final newVersion = _versionOverride ?? _detectNextVersion(repoRoot, prevTag);
   final currentVersion = _runSync("awk '/^version:/{print \$2}' pubspec.yaml", repoRoot);
-  final shouldRelease = newVersion != currentVersion;
+
+  // Determine if we should release
+  var shouldRelease = newVersion != currentVersion;
+
+  // Safety net: if the tag already exists, skip release regardless
+  if (shouldRelease) {
+    final tagCheck = Process.runSync('git', ['rev-parse', 'v$newVersion'], workingDirectory: repoRoot);
+    if (tagCheck.exitCode == 0) {
+      _warn('Tag v$newVersion already exists. Skipping release.');
+      shouldRelease = false;
+    }
+  }
 
   _info('Current version: $currentVersion');
   _info('Previous tag: $prevTag');
@@ -2036,7 +2047,12 @@ Future<void> _runCreateRelease(String repoRoot, List<String> args) async {
     _info('No changes to commit');
   }
 
-  // Step 5: Create git tag
+  // Step 5: Create git tag (verify it doesn't already exist)
+  final tagCheck = Process.runSync('git', ['rev-parse', tag], workingDirectory: repoRoot);
+  if (tagCheck.exitCode == 0) {
+    _error('Tag $tag already exists. Cannot create release.');
+    exit(1);
+  }
   _exec('git', ['tag', '-a', tag, '-m', 'Release v$newVersion'], cwd: repoRoot, fatal: true);
   _exec('git', ['push', 'origin', tag], cwd: repoRoot, fatal: true);
   _success('Created tag: $tag');
@@ -2718,8 +2734,18 @@ String _detectPrevTag(String repoRoot) {
 
 String _detectNextVersion(String repoRoot, String prevTag) {
   final currentVersion = _runSync("awk '/^version:/{print \$2}' pubspec.yaml", repoRoot);
-  final parts = currentVersion.split('.');
-  if (parts.length != 3) return currentVersion;
+
+  // Derive bump base from prevTag (not pubspec.yaml) to avoid stale-version collisions.
+  final tagVersion = prevTag.startsWith('v') ? prevTag.substring(1) : prevTag;
+  final parts = tagVersion.split('.');
+  if (parts.length != 3 || parts.any((p) => int.tryParse(p) == null)) {
+    // prevTag is not a semver tag (e.g., a commit SHA for first release) — fall back to pubspec
+    final pubParts = currentVersion.split('.');
+    if (pubParts.length != 3) return currentVersion;
+    parts
+      ..clear()
+      ..addAll(pubParts);
+  }
 
   var major = int.tryParse(parts[0]) ?? 0;
   var minor = int.tryParse(parts[1]) ?? 0;
@@ -2727,12 +2753,21 @@ String _detectNextVersion(String repoRoot, String prevTag) {
 
   // ── Pass 1: Fast regex heuristic (fallback if Gemini unavailable) ──
   final commits = _runSync('git log "$prevTag"..HEAD --pretty=format:"%s%n%b" 2>/dev/null', repoRoot);
+  final commitSubjects = _runSync('git log "$prevTag"..HEAD --pretty=format:"%s" --no-merges 2>/dev/null', repoRoot);
 
   var bump = 'patch';
   if (RegExp(r'(BREAKING CHANGE|^[a-z]+(\(.+\))?!:)', multiLine: true).hasMatch(commits)) {
     bump = 'major';
   } else if (RegExp(r'^feat(\(.+\))?:', multiLine: true).hasMatch(commits)) {
     bump = 'minor';
+  } else if (commitSubjects.isNotEmpty &&
+      commitSubjects
+          .split('\n')
+          .every(
+            (line) =>
+                line.trim().isEmpty || RegExp(r'^(chore|style|ci|docs|test|build)(\(.+\))?:').hasMatch(line.trim()),
+          )) {
+    bump = 'none';
   }
 
   _info('  Regex heuristic: $bump');
@@ -2742,6 +2777,7 @@ String _detectNextVersion(String repoRoot, String prevTag) {
     final commitCount = _runSync('git rev-list --count "$prevTag"..HEAD 2>/dev/null', repoRoot);
     final changedFiles = _runSync('git diff --name-only "$prevTag"..HEAD 2>/dev/null | head -30', repoRoot);
     final diffStat = _runSync('git diff --stat "$prevTag"..HEAD 2>/dev/null | tail -5', repoRoot);
+    final existingTags = _runSync("git tag -l 'v*' --sort=-version:refname | head -10", repoRoot);
     final commitSummary = commits.split('\n').take(50).join('\n');
 
     // Create a version analysis output directory within the CWD (sandbox-safe)
@@ -2751,7 +2787,9 @@ String _detectNextVersion(String repoRoot, String prevTag) {
     final prompt =
         'You are a semantic versioning expert analyzing the ${config.repoName} '
         'Dart package.\n\n'
-        'Current version: $currentVersion\n'
+        'Current version (pubspec.yaml): $currentVersion\n'
+        'Previous release tag: $prevTag\n'
+        'Existing tags:\n$existingTags\n\n'
         'Commits since last release: $commitCount\n\n'
         'Commit messages:\n$commitSummary\n\n'
         'Changed files:\n$changedFiles\n\n'
@@ -2763,10 +2801,10 @@ String _detectNextVersion(String repoRoot, String prevTag) {
         '4. Assess the overall scope\n\n'
         '## Write TWO files:\n\n'
         '### File 1: .runtime_ci/runs/version_analysis/version_bump.json\n'
-        '```json\n{"bump": "major|minor|patch"}\n```\n\n'
+        '```json\n{"bump": "major|minor|patch|none"}\n```\n\n'
         '### File 2: .runtime_ci/runs/version_analysis/version_bump_rationale.md\n'
         'A markdown document explaining the decision with:\n'
-        '- **Decision**: major/minor/patch and why\n'
+        '- **Decision**: major/minor/patch/none and why\n'
         '- **Key Changes**: Bullet list of significant changes\n'
         '- **Breaking Changes** (if any)\n'
         '- **New Features** (if any)\n'
@@ -2774,7 +2812,12 @@ String _detectNextVersion(String repoRoot, String prevTag) {
         'Rules:\n'
         '- MAJOR: Breaking changes to public APIs, removed functions, changed signatures\n'
         '- MINOR: New features, new proto messages, new exports, additive API changes\n'
-        '- PATCH: Bug fixes, docs, refactoring, dependency updates, CI, tests\n';
+        '- PATCH: Bug fixes, dependency updates with user-facing impact\n'
+        '- NONE: No release needed -- chore, style, CI, docs-only, test-only, '
+        'build config changes with no user-facing impact\n\n'
+        'IMPORTANT: The next version will be computed by bumping from the '
+        'previous tag ($prevTag), NOT from the pubspec.yaml version. '
+        'Your job is ONLY to decide the bump type.\n';
 
     final promptPath = '${versionAnalysisDir.path}/prompt.txt';
     File(promptPath).writeAsStringSync(prompt);
@@ -2796,7 +2839,7 @@ String _detectNextVersion(String repoRoot, String prevTag) {
       try {
         final bumpData = json.decode(File(bumpJsonPath).readAsStringSync()) as Map<String, dynamic>;
         final rawBump = (bumpData['bump'] as String?)?.trim().toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
-        if (rawBump == 'major' || rawBump == 'minor' || rawBump == 'patch') {
+        if (rawBump == 'major' || rawBump == 'minor' || rawBump == 'patch' || rawBump == 'none') {
           _info('  Gemini analysis: $rawBump (overriding regex: $bump)');
           bump = rawBump!;
         } else {
@@ -2812,7 +2855,13 @@ String _detectNextVersion(String repoRoot, String prevTag) {
     _info('  Gemini not available for version analysis, using regex heuristic');
   }
 
-  // Apply the bump
+  // If no release is needed, return the current version unchanged
+  if (bump == 'none') {
+    _info('  No release needed (bump=none)');
+    return currentVersion;
+  }
+
+  // Apply the bump to the version derived from prevTag
   switch (bump) {
     case 'major':
       major++;
@@ -2827,13 +2876,13 @@ String _detectNextVersion(String repoRoot, String prevTag) {
 
   final nextVersion = '$major.$minor.$patch';
 
-  // Guard: ensure version never goes backward
+  // Guard: ensure version never goes backward from what pubspec.yaml already has
   if (_compareVersions(nextVersion, currentVersion) < 0) {
     _warn('Version regression detected: $nextVersion < $currentVersion. Using $currentVersion.');
     return currentVersion;
   }
 
-  _info('  Bump type: $bump -> $nextVersion');
+  _info('  Bump type: $bump (from $prevTag) -> $nextVersion');
   return nextVersion;
 }
 
