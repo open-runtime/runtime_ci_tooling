@@ -106,7 +106,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.CICD_GEMINI_API_KEY_OPEN_RUNTIME }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: dart run scripts/manage_cicd.dart determine-version --output-github-actions
+        run: dart run runtime_ci_tooling:manage_cicd determine-version --output-github-actions
 
       - name: Upload version bump rationale
         if: steps.version.outputs.should_release == 'true'
@@ -177,7 +177,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.CICD_GEMINI_API_KEY_OPEN_RUNTIME }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          dart run scripts/manage_cicd.dart pre-release-triage \
+          dart run runtime_ci_tooling:manage_cicd pre-release-triage \
             --prev-tag "${{ needs.determine-version.outputs.prev_tag }}" \
             --version "${{ needs.determine-version.outputs.new_version }}"
 
@@ -260,7 +260,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.CICD_GEMINI_API_KEY_OPEN_RUNTIME }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          dart run scripts/manage_cicd.dart explore \
+          dart run runtime_ci_tooling:manage_cicd explore \
             --prev-tag "${{ needs.determine-version.outputs.prev_tag }}" \
             --version "${{ needs.determine-version.outputs.new_version }}"
 
@@ -352,7 +352,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.CICD_GEMINI_API_KEY_OPEN_RUNTIME }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          dart run scripts/manage_cicd.dart compose \
+          dart run runtime_ci_tooling:manage_cicd compose \
             --prev-tag "${{ needs.determine-version.outputs.prev_tag }}" \
             --version "${{ needs.determine-version.outputs.new_version }}"
 
@@ -361,7 +361,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.CICD_GEMINI_API_KEY_OPEN_RUNTIME }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          dart run scripts/manage_cicd.dart documentation \
+          dart run runtime_ci_tooling:manage_cicd documentation \
             --prev-tag "${{ needs.determine-version.outputs.prev_tag }}" \
             --version "${{ needs.determine-version.outputs.new_version }}"
 
@@ -369,7 +369,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.CICD_GEMINI_API_KEY_OPEN_RUNTIME }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: dart run scripts/manage_cicd.dart autodoc
+        run: dart run runtime_ci_tooling:manage_cicd autodoc
 
       - uses: actions/upload-artifact@v6.0.0
         with:
@@ -378,7 +378,7 @@ jobs:
             CHANGELOG.md
             README.md
             docs/
-            autodoc.json
+            .runtime_ci/autodoc.json
           if-no-files-found: warn
           retention-days: 1
 
@@ -477,7 +477,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.CICD_GEMINI_API_KEY_OPEN_RUNTIME }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          dart run scripts/manage_cicd.dart release-notes \
+          dart run runtime_ci_tooling:manage_cicd release-notes \
             --prev-tag "${{ needs.determine-version.outputs.prev_tag }}" \
             --version "${{ needs.determine-version.outputs.new_version }}"
 
@@ -608,7 +608,7 @@ jobs:
       - name: Merge CI/CD audit trails
         continue-on-error: true
         run: |
-          dart run scripts/manage_cicd.dart merge-audit-trails \
+          dart run runtime_ci_tooling:manage_cicd merge-audit-trails \
             --incoming-dir .runtime_ci/runs_incoming \
             --output-dir .runtime_ci/runs
 
@@ -617,7 +617,7 @@ jobs:
       # never work because .runtime_ci/runs/ didn't exist on the fresh runner.
       - name: Archive audit trail
         run: |
-          dart run scripts/manage_cicd.dart archive-run \
+          dart run runtime_ci_tooling:manage_cicd archive-run \
             --version "${{ needs.determine-version.outputs.new_version }}"
 
       - name: Create release
@@ -625,7 +625,7 @@ jobs:
           GH_TOKEN: ${{ secrets.TSAVO_AT_PIECES_PERSONAL_ACCESS_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.TSAVO_AT_PIECES_PERSONAL_ACCESS_TOKEN }}
         run: |
-          dart run scripts/manage_cicd.dart create-release \
+          dart run runtime_ci_tooling:manage_cicd create-release \
             --version "${{ needs.determine-version.outputs.new_version }}" \
             --prev-tag "${{ needs.determine-version.outputs.prev_tag }}" \
             --artifacts-dir ./artifacts \
@@ -689,7 +689,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.CICD_GEMINI_API_KEY_OPEN_RUNTIME }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          dart run scripts/manage_cicd.dart post-release-triage \
+          dart run runtime_ci_tooling:manage_cicd post-release-triage \
             --version "${{ needs.determine-version.outputs.new_version }}" \
             --release-tag "v${{ needs.determine-version.outputs.new_version }}" \
             --release-url "https://github.com/${{ github.repository }}/releases/tag/v${{ needs.determine-version.outputs.new_version }}" \

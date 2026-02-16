@@ -1164,20 +1164,30 @@ Future<void> _runAutodoc(String repoRoot, List<String> args) async {
   final modIdx = args.indexOf('--module');
   if (modIdx != -1 && modIdx + 1 < args.length) targetModule = args[modIdx + 1];
 
-  final configPath = '$repoRoot/autodoc.json';
+  final configPath = '$repoRoot/$kRuntimeCiDir/autodoc.json';
+
+  // Support legacy location at repo root — migrate if found
+  final legacyPath = '$repoRoot/autodoc.json';
+  if (!File(configPath).existsSync() && File(legacyPath).existsSync()) {
+    Directory('$repoRoot/$kRuntimeCiDir').createSync(recursive: true);
+    File(legacyPath).copySync(configPath);
+    File(legacyPath).deleteSync();
+    _success('Migrated autodoc.json to $kRuntimeCiDir/autodoc.json');
+  }
 
   if (init) {
     _info('--init: autodoc.json should be created manually or already exists.');
     if (File(configPath).existsSync()) {
       _success('autodoc.json exists at $configPath');
     } else {
-      _error('autodoc.json not found. Create it at $configPath');
+      _error('autodoc.json not found. Create it at $kRuntimeCiDir/autodoc.json');
     }
     return;
   }
 
   if (!File(configPath).existsSync()) {
-    _error('autodoc.json not found. Run: dart run runtime_ci_tooling:manage_cicd autodoc --init');
+    _error('autodoc.json not found at $kRuntimeCiDir/autodoc.json');
+    _error('Run: dart run runtime_ci_tooling:manage_cicd autodoc --init');
     return;
   }
 
@@ -1286,7 +1296,7 @@ Future<void> _runAutodoc(String repoRoot, List<String> args) async {
   File(configPath).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(config));
 
   _success('Generated docs for ${updatedModules.length} modules, skipped $skippedCount unchanged.');
-  _info('Updated hashes saved to autodoc.json');
+  _info('Updated hashes saved to $kRuntimeCiDir/autodoc.json');
 
   _writeStepSummary('''
 ## Autodoc: Documentation Generation
@@ -2012,7 +2022,7 @@ Future<void> _runCreateRelease(String repoRoot, List<String> args) async {
     'README.md',
     '$kReleaseNotesDir/',
     '$kVersionBumpsDir/',
-    'autodoc.json',
+    '$kRuntimeCiDir/autodoc.json',
   ];
   if (Directory('$repoRoot/docs').existsSync()) filesToAdd.add('docs/');
   if (Directory('$repoRoot/$kCicdAuditDir').existsSync()) filesToAdd.add('$kCicdAuditDir/');
@@ -3466,38 +3476,7 @@ Future<void> _runInit(String repoRoot) async {
     repaired++;
   }
 
-  // ── 8. Ensure script wrappers exist ────────────────────────────────────
-  final scriptsDir = Directory('$repoRoot/scripts');
-  scriptsDir.createSync(recursive: true);
-
-  final manageCicdWrapper = File('$repoRoot/scripts/manage_cicd.dart');
-  if (!manageCicdWrapper.existsSync()) {
-    manageCicdWrapper.writeAsStringSync(
-      '/// Thin wrapper that delegates to the shared runtime_ci_tooling package.\n'
-      '// ignore_for_file: depend_on_referenced_packages\n'
-      "import 'package:runtime_ci_tooling/src/cli/manage_cicd.dart' as cicd;\n\n"
-      'Future<void> main(List<String> args) => cicd.main(args);\n',
-    );
-    _success('Created scripts/manage_cicd.dart');
-    repaired++;
-  }
-
-  final triageDir = Directory('$repoRoot/scripts/triage');
-  triageDir.createSync(recursive: true);
-
-  final triageWrapper = File('$repoRoot/scripts/triage/triage_cli.dart');
-  if (!triageWrapper.existsSync()) {
-    triageWrapper.writeAsStringSync(
-      '/// Thin wrapper that delegates to the shared runtime_ci_tooling package.\n'
-      '// ignore_for_file: depend_on_referenced_packages\n'
-      "import 'package:runtime_ci_tooling/src/triage/triage_cli.dart' as triage;\n\n"
-      'Future<void> main(List<String> args) => triage.main(args);\n',
-    );
-    _success('Created scripts/triage/triage_cli.dart');
-    repaired++;
-  }
-
-  // ── 9. Summary ─────────────────────────────────────────────────────────
+  // ── 8. Summary ──────────────────────────────────────────────────────────
   print('');
   _header(configExists ? 'Init Repair Complete' : 'Init Complete');
   if (configExists && repaired == 0) {
