@@ -38,15 +38,15 @@ import '../triage/utils/config.dart';
 ///   --version <ver>    Override version (skip auto-detection)
 ///
 /// Usage:
-///   dart run scripts/manage_cicd.dart setup
-///   dart run scripts/manage_cicd.dart validate
-///   dart run scripts/manage_cicd.dart explore --prev-tag v0.0.1 --version 0.0.2
-///   dart run scripts/manage_cicd.dart compose --prev-tag v0.0.1 --version 0.0.2
-///   dart run scripts/manage_cicd.dart triage 42
-///   dart run scripts/manage_cicd.dart triage --auto
-///   dart run scripts/manage_cicd.dart triage --status
-///   dart run scripts/manage_cicd.dart release
-///   dart run scripts/manage_cicd.dart configure-mcp
+///   dart run runtime_ci_tooling:manage_cicd setup
+///   dart run runtime_ci_tooling:manage_cicd validate
+///   dart run runtime_ci_tooling:manage_cicd explore --prev-tag v0.0.1 --version 0.0.2
+///   dart run runtime_ci_tooling:manage_cicd compose --prev-tag v0.0.1 --version 0.0.2
+///   dart run runtime_ci_tooling:manage_cicd triage 42
+///   dart run runtime_ci_tooling:manage_cicd triage --auto
+///   dart run runtime_ci_tooling:manage_cicd triage --status
+///   dart run runtime_ci_tooling:manage_cicd release
+///   dart run runtime_ci_tooling:manage_cicd configure-mcp
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Constants
@@ -1177,7 +1177,7 @@ Future<void> _runAutodoc(String repoRoot, List<String> args) async {
   }
 
   if (!File(configPath).existsSync()) {
-    _error('autodoc.json not found. Run: dart run scripts/manage_cicd.dart autodoc --init');
+    _error('autodoc.json not found. Run: dart run runtime_ci_tooling:manage_cicd autodoc --init');
     return;
   }
 
@@ -1505,7 +1505,7 @@ String _computeModuleHash(String repoRoot, List<String> sourcePaths) {
 }
 
 /// Run issue triage on a specific issue.
-/// Delegate triage to the modular triage CLI (scripts/triage/triage_cli.dart).
+/// Delegate triage to the modular triage CLI (runtime_ci_tooling:triage_cli).
 ///
 /// Supports:
 ///   triage <N>       -- Triage a single issue
@@ -1517,9 +1517,9 @@ Future<void> _runTriageCli(String repoRoot, List<String> triageArgs) async {
 
   if (triageArgs.isEmpty) {
     _error('Usage:');
-    _error('  dart run scripts/manage_cicd.dart triage <issue_number>');
-    _error('  dart run scripts/manage_cicd.dart triage --auto');
-    _error('  dart run scripts/manage_cicd.dart triage --status');
+    _error('  dart run runtime_ci_tooling:manage_cicd triage <issue_number>');
+    _error('  dart run runtime_ci_tooling:manage_cicd triage --auto');
+    _error('  dart run runtime_ci_tooling:manage_cicd triage --status');
     exit(1);
   }
 
@@ -1528,11 +1528,11 @@ Future<void> _runTriageCli(String repoRoot, List<String> triageArgs) async {
   if (_dryRun) forwardedArgs.add('--dry-run');
   if (_verbose) forwardedArgs.add('--verbose');
 
-  _info('Delegating to triage CLI: dart run scripts/triage/triage_cli.dart ${forwardedArgs.join(" ")}');
+  _info('Delegating to triage CLI: dart run runtime_ci_tooling:triage_cli ${forwardedArgs.join(" ")}');
 
   final result = await Process.run(
     'dart',
-    ['run', 'scripts/triage/triage_cli.dart', ...forwardedArgs],
+    ['run', 'runtime_ci_tooling:triage_cli', ...forwardedArgs],
     workingDirectory: repoRoot,
     environment: {...Platform.environment},
   );
@@ -1722,7 +1722,7 @@ Future<void> _runStatus(String repoRoot) async {
         _success('  $server: configured');
       }
     } else {
-      _info('  No MCP servers configured. Run: dart run scripts/manage_cicd.dart configure-mcp');
+      _info('  No MCP servers configured. Run: dart run runtime_ci_tooling:manage_cicd configure-mcp');
     }
   } catch (_) {
     _info('  Could not read MCP configuration');
@@ -2002,7 +2002,10 @@ Future<void> _runCreateRelease(String repoRoot, List<String> args) async {
   _exec('git', ['config', 'user.name', 'github-actions[bot]'], cwd: repoRoot);
   _exec('git', ['config', 'user.email', 'github-actions[bot]@users.noreply.github.com'], cwd: repoRoot);
 
-  // Add files that exist (.runtime_ci/audit/ may not exist on first release)
+  // Add files individually — git add is all-or-nothing and will fail the
+  // entire command if any path doesn't exist (e.g., autodoc.json on first
+  // release), which silently prevents pubspec.yaml and CHANGELOG.md from
+  // being staged.
   final filesToAdd = [
     'pubspec.yaml',
     'CHANGELOG.md',
@@ -2013,7 +2016,12 @@ Future<void> _runCreateRelease(String repoRoot, List<String> args) async {
   ];
   if (Directory('$repoRoot/docs').existsSync()) filesToAdd.add('docs/');
   if (Directory('$repoRoot/$kCicdAuditDir').existsSync()) filesToAdd.add('$kCicdAuditDir/');
-  _exec('git', ['add', ...filesToAdd], cwd: repoRoot);
+  for (final path in filesToAdd) {
+    final fullPath = '$repoRoot/$path';
+    if (File(fullPath).existsSync() || Directory(fullPath).existsSync()) {
+      _exec('git', ['add', path], cwd: repoRoot);
+    }
+  }
 
   final diffResult = Process.runSync('git', ['diff', '--cached', '--quiet'], workingDirectory: repoRoot);
   if (diffResult.exitCode != 0) {
@@ -2366,11 +2374,11 @@ Future<void> _runPreReleaseTriage(String repoRoot, List<String> args) async {
   final triageArgs = ['--pre-release', '--prev-tag', prevTag, '--version', newVersion, '--force'];
   if (_verbose) triageArgs.add('--verbose');
 
-  _info('Delegating to triage CLI: dart run scripts/triage/triage_cli.dart ${triageArgs.join(" ")}');
+  _info('Delegating to triage CLI: dart run runtime_ci_tooling:triage_cli ${triageArgs.join(" ")}');
 
   final result = await Process.run(
     'dart',
-    ['run', 'scripts/triage/triage_cli.dart', ...triageArgs],
+    ['run', 'runtime_ci_tooling:triage_cli', ...triageArgs],
     workingDirectory: repoRoot,
     environment: {...Platform.environment},
   );
@@ -2423,11 +2431,11 @@ Future<void> _runPostReleaseTriage(String repoRoot, List<String> args) async {
   ];
   if (_verbose) triageArgs.add('--verbose');
 
-  _info('Delegating to triage CLI: dart run scripts/triage/triage_cli.dart ${triageArgs.join(" ")}');
+  _info('Delegating to triage CLI: dart run runtime_ci_tooling:triage_cli ${triageArgs.join(" ")}');
 
   final result = await Process.run(
     'dart',
-    ['run', 'scripts/triage/triage_cli.dart', ...triageArgs],
+    ['run', 'runtime_ci_tooling:triage_cli', ...triageArgs],
     workingDirectory: repoRoot,
     environment: {...Platform.environment},
   );
@@ -3164,7 +3172,7 @@ void _exec(String executable, List<String> args, {String? cwd, bool fatal = fals
 
 void _requireGeminiCli() {
   if (!_commandExists('gemini')) {
-    _error('Gemini CLI is not installed. Run: dart run scripts/manage_cicd.dart setup');
+    _error('Gemini CLI is not installed. Run: dart run runtime_ci_tooling:manage_cicd setup');
     exit(1);
   }
 }
@@ -3186,7 +3194,7 @@ bool _geminiAvailable({bool warnOnly = false}) {
       _warn('Gemini CLI not installed — skipping Gemini-powered step.');
       return false;
     }
-    _error('Gemini CLI is not installed. Run: dart run scripts/manage_cicd.dart setup');
+    _error('Gemini CLI is not installed. Run: dart run runtime_ci_tooling:manage_cicd setup');
     exit(1);
   }
   final key = Platform.environment['GEMINI_API_KEY'];
@@ -3247,14 +3255,14 @@ Options:
   --help, -h         Show this help message
 
 Examples:
-  dart run scripts/manage_cicd.dart setup
-  dart run scripts/manage_cicd.dart validate
-  dart run scripts/manage_cicd.dart explore --prev-tag v0.0.1 --version 0.0.2
-  dart run scripts/manage_cicd.dart compose --prev-tag v0.0.1 --version 0.0.2
-  dart run scripts/manage_cicd.dart triage 42
-  dart run scripts/manage_cicd.dart release
-  dart run scripts/manage_cicd.dart configure-mcp
-  dart run scripts/manage_cicd.dart status
+  dart run runtime_ci_tooling:manage_cicd setup
+  dart run runtime_ci_tooling:manage_cicd validate
+  dart run runtime_ci_tooling:manage_cicd explore --prev-tag v0.0.1 --version 0.0.2
+  dart run runtime_ci_tooling:manage_cicd compose --prev-tag v0.0.1 --version 0.0.2
+  dart run runtime_ci_tooling:manage_cicd triage 42
+  dart run runtime_ci_tooling:manage_cicd release
+  dart run runtime_ci_tooling:manage_cicd configure-mcp
+  dart run runtime_ci_tooling:manage_cicd status
 
 Prerequisites:
   Required: git, gh (GitHub CLI), node, npm, jq
@@ -3509,7 +3517,7 @@ Future<void> _runInit(String repoRoot) async {
     _info('Next steps:');
     _info('  1. Review .runtime_ci/config.json and customize area labels, cross-repo, etc.');
     _info('  2. Add runtime_ci_tooling as a dev_dependency in pubspec.yaml');
-    _info('  3. Run: dart run scripts/manage_cicd.dart setup');
-    _info('  4. Run: dart run scripts/manage_cicd.dart status');
+    _info('  3. Run: dart run runtime_ci_tooling:manage_cicd setup');
+    _info('  4. Run: dart run runtime_ci_tooling:manage_cicd status');
   }
 }
