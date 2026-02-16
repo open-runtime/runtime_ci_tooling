@@ -4,4 +4,4 @@
 /// Configuration is loaded from `runtime.ci.config.json` at the repo root.
 import '../lib/src/cli/manage_cicd.dart' as cicd;
 
-Future<void> main(List<String> args) => cicd.main(args);
+void main(List<String> args) => cicd.main(args);

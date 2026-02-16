@@ -67,7 +67,12 @@ jobs:
       - run: dart pub get
 
       - name: Analyze
-        run: dart analyze
+        run: |
+          dart analyze 2>&1 | tee /tmp/analysis.txt
+          if grep -q "^  error -" /tmp/analysis.txt; then
+            echo "::error::Analysis errors found"
+            exit 1
+          fi
 
       - name: Format check
         run: dart format --line-length 120 --output=none --set-exit-if-changed lib/

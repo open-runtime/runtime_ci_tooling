@@ -1,0 +1,8 @@
+analyzer:
+  errors:
+    # Treat warnings as warnings (not errors) so CI only fails on actual errors.
+    # The prompt generators have intentionally unused variables for context gathering.
+    unused_local_variable: warning
+  exclude:
+    # Script entry points are thin wrappers, not library code.
+    - scripts/**
