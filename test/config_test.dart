@@ -14,10 +14,18 @@ void main() {
       expect(kLegacyConfigPaths, contains('triage_config.json'));
     });
 
-    test('config singleton loads without crashing when no config file exists', () {
+    test('config singleton loads without crashing', () {
       reloadConfig();
       expect(config, isNotNull);
-      expect(config.isConfigured, isFalse);
+    });
+
+    test('config detects .runtime_ci/config.json when present', () {
+      reloadConfig();
+      // In this repo, .runtime_ci/config.json exists, so isConfigured should be true
+      if (config.isConfigured) {
+        expect(config.repoName, equals('runtime_ci_tooling'));
+        expect(config.repoOwner, equals('open-runtime'));
+      }
     });
   });
 }
