@@ -1,0 +1,1 @@
+- Removed the `[Unreleased]` section from the changelog generation process to streamline releases.

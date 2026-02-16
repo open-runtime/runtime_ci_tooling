@@ -1,0 +1,82 @@
+{
+  "command": "merged-audit",
+  "started_at": "2026-02-16T20:12:21.970692",
+  "merged_from": [
+    {
+      "artifact": "cicd-audit-compose",
+      "command": "compose",
+      "args": [],
+      "started_at": "2026-02-16T20:04:41.667367",
+      "pid": 2614,
+      "platform": "linux",
+      "dart_version": "3.11.0",
+      "repo_root": "/home/runner/work/runtime_ci_tooling/runtime_ci_tooling",
+      "run_dir": "/home/runner/work/runtime_ci_tooling/runtime_ci_tooling/.runtime_ci/runs/run_2026-02-16T20-04-41_2614",
+      "ci": true,
+      "completed_at": "2026-02-16T20:06:59.555503",
+      "duration_seconds": 137,
+      "artifacts": [
+        "meta.json",
+        "compose/gemini_response.json",
+        "compose/prompt.txt"
+      ]
+    },
+    {
+      "artifact": "cicd-audit-compose",
+      "command": "documentation",
+      "args": [],
+      "started_at": "2026-02-16T20:06:59.763843",
+      "pid": 4916,
+      "platform": "linux",
+      "dart_version": "3.11.0",
+      "repo_root": "/home/runner/work/runtime_ci_tooling/runtime_ci_tooling",
+      "run_dir": "/home/runner/work/runtime_ci_tooling/runtime_ci_tooling/.runtime_ci/runs/run_2026-02-16T20-06-59_4916",
+      "ci": true
+    },
+    {
+      "artifact": "cicd-audit-release-notes",
+      "command": "release-notes",
+      "args": [],
+      "started_at": "2026-02-16T20:10:45.666912",
+      "pid": 2748,
+      "platform": "linux",
+      "dart_version": "3.11.0",
+      "repo_root": "/home/runner/work/runtime_ci_tooling/runtime_ci_tooling",
+      "run_dir": "/home/runner/work/runtime_ci_tooling/runtime_ci_tooling/.runtime_ci/runs/run_2026-02-16T20-10-45_2748",
+      "ci": true,
+      "completed_at": "2026-02-16T20:12:01.893294",
+      "duration_seconds": 76,
+      "artifacts": [
+        "meta.json",
+        "release-notes/release_notes.md",
+        "release-notes/gemini_response.json",
+        "release-notes/prompt.txt"
+      ]
+    },
+    {
+      "artifact": "cicd-audit-explore",
+      "command": "explore",
+      "args": [],
+      "started_at": "2026-02-16T20:01:23.192907",
+      "pid": 2620,
+      "platform": "linux",
+      "dart_version": "3.11.0",
+      "repo_root": "/home/runner/work/runtime_ci_tooling/runtime_ci_tooling",
+      "run_dir": "/home/runner/work/runtime_ci_tooling/runtime_ci_tooling/.runtime_ci/runs/run_2026-02-16T20-01-23_2620",
+      "ci": true,
+      "completed_at": "2026-02-16T20:03:42.389072",
+      "duration_seconds": 139,
+      "exit_code": 0,
+      "artifacts": [
+        "meta.json",
+        "explore/gemini_response.json",
+        "explore/prompt.txt"
+      ]
+    }
+  ],
+  "artifact_count": 4,
+  "total_files": 13,
+  "ci": true,
+  "platform": "linux",
+  "dart_version": "3.11.0"
+}

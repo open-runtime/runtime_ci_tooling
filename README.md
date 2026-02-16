@@ -6,6 +6,7 @@ Shared CI/CD automation tooling for open-runtime or pieces-app packages. Provide
 
 - **Gemini-Powered Triage**: Automated issue analysis, labeling, and response generation.
 - **Release Automation**: Automated versioning, changelog generation, and release notes authoring.
+- **Documentation Generation**: Automated documentation maintenance using Gemini.
 - **Audit Trails**: Comprehensive logging of CI/CD actions and decisions.
 - **MCP Integration**: Configuration for Model Context Protocol servers (GitHub, Sentry).
 - **Cross-Platform**: Utilities for tool installation and environment setup.
@@ -16,7 +17,7 @@ Add `runtime_ci_tooling` to your `dev_dependencies`:
 
 ```yaml
 dev_dependencies:
-  runtime_ci_tooling: ^0.4.0
+  runtime_ci_tooling: ^0.4.1
 ```
 
 Or run:
@@ -40,7 +41,7 @@ This will create:
 
 ## Usage
 
-As of version **v0.4.0**, tools are available as direct executables.
+As of version **v0.4.1**, tools are available as direct executables.
 
 ### Manage CI/CD
 
@@ -58,6 +59,8 @@ dart run runtime_ci_tooling:manage_cicd <command> [options]
 - `triage <N>`: Run issue triage for a single issue.
 - `explore`: Run Stage 1 Explorer Agent.
 - `compose`: Run Stage 2 Changelog Composer.
+- `release-notes`: Run Stage 3 Release Notes Author.
+- `autodoc`: Generate/update module documentation.
 - `status`: Show current CI/CD configuration status.
 
 Run `dart run runtime_ci_tooling:manage_cicd --help` for full usage details.
@@ -73,8 +76,8 @@ dart run runtime_ci_tooling:triage_cli <command> [options]
 **Usage Examples:**
 - **Single Issue**: `dart run runtime_ci_tooling:triage_cli <issue_number>`
 - **Auto Triage**: `dart run runtime_ci_tooling:triage_cli --auto`
-- **Pre-Release Scan**: `dart run runtime_ci_tooling:triage_cli --pre-release --prev-tag v0.3.0 --version 0.4.0`
-- **Post-Release Loop**: `dart run runtime_ci_tooling:triage_cli --post-release --version 0.4.0 --release-tag v0.4.0`
+- **Pre-Release Scan**: `dart run runtime_ci_tooling:triage_cli --pre-release --prev-tag v0.4.0 --version 0.4.1`
+- **Post-Release Loop**: `dart run runtime_ci_tooling:triage_cli --post-release --version 0.4.1 --release-tag v0.4.1`
 
 Run `dart run runtime_ci_tooling:triage_cli --help` for full usage details.
 

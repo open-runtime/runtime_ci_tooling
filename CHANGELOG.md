@@ -5,7 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.1] - 2026-02-16
+
+### Changed
+- Removed support for the `[Unreleased]` changelog section to streamline automated releases (commit ea5608f)
 
 ## [0.4.0] - 2026-02-16
 
@@ -16,5 +19,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed `git add` failure in release process by adding files individually (commit 1d45361)
 
-[Unreleased]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.4.0...HEAD
+[0.4.1]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/open-runtime/runtime_ci_tooling/releases/tag/v0.4.0
