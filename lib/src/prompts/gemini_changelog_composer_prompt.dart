@@ -57,14 +57,14 @@ ${hasIssueManifest ? '- issue_manifest.json (provided via @include) -- Reference
 
 Read the existing CHANGELOG.md and update it following Keep a Changelog format.
 
-### Handling the [Unreleased] section
+### Handling existing content
 
-If the CHANGELOG contains a `## [Unreleased]` section:
-1. Move any content under `## [Unreleased]` into the new version entry below
-2. Replace `## [Unreleased]` with a fresh EMPTY `## [Unreleased]` section
-3. Place the new version entry immediately after the empty `## [Unreleased]`
+If the CHANGELOG contains a `## [Unreleased]` section, move any content under
+it into the new version entry and REMOVE the `## [Unreleased]` header entirely.
+Do NOT keep or add an `[Unreleased]` section -- they are not used in this project.
 
-If there is no `## [Unreleased]` section, add one above the new version entry.
+Prepend the new version entry immediately after the preamble (the "# Changelog"
+header and description text).
 
 ### New version entry format
 
@@ -106,8 +106,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
 ## [$newVersion] - $today
 
 ### Added
@@ -116,6 +114,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [previous version] - previous date
 ...
 ```
+
+There is NO [Unreleased] section. The newest version entry comes immediately
+after the preamble.
 
 ### Rules
 - Only include sections that have entries (omit empty sections)

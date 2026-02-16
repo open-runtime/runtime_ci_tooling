@@ -608,8 +608,7 @@ Future<void> _runCompose(String repoRoot) async {
       '# Changelog\n\n'
       'All notable changes to this project will be documented in this file.\n\n'
       'The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),\n'
-      'and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n\n'
-      '## [Unreleased]\n',
+      'and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n',
     );
     _info('Created starter CHANGELOG.md for compose stage');
   }
@@ -3104,38 +3103,31 @@ String _releaseLink(String tag) {
 ///
 /// Parses all `## [X.Y.Z]` headers and generates:
 /// ```
-/// [Unreleased]: https://github.com/{repo}/compare/v0.3.0...HEAD
 /// [0.3.0]: https://github.com/{repo}/compare/v0.2.0...v0.3.0
+/// [0.2.0]: https://github.com/{repo}/releases/tag/v0.2.0
 /// ```
 /// Idempotent: replaces any existing reference-link block.
 void _addChangelogReferenceLinks(String repoRoot, String content) {
   final server = Platform.environment['GITHUB_SERVER_URL'] ?? 'https://github.com';
   final repo = Platform.environment['GITHUB_REPOSITORY'] ?? '${config.repoOwner}/${config.repoName}';
 
-  // Extract all version headers: ## [X.Y.Z] or ## [Unreleased]
+  // Extract all version headers: ## [X.Y.Z] (skip any [Unreleased] entries)
   final versionPattern = RegExp(r'^## \[([^\]]+)\]', multiLine: true);
   final matches = versionPattern.allMatches(content).toList();
 
   if (matches.isEmpty) return;
 
-  final versions = matches.map((m) => m.group(1)!).toList();
+  final versions = matches.map((m) => m.group(1)!).where((v) => v != 'Unreleased').toList();
+
+  if (versions.isEmpty) return;
 
   // Build reference-style links
   final links = StringBuffer();
   for (var i = 0; i < versions.length; i++) {
     final version = versions[i];
-    if (version == 'Unreleased') {
-      // [Unreleased] compares from the latest versioned tag to HEAD
-      final latestVersion = versions.length > 1 ? versions[1] : null;
-      if (latestVersion != null) {
-        links.writeln('[Unreleased]: $server/$repo/compare/v$latestVersion...HEAD');
-      } else {
-        links.writeln('[Unreleased]: $server/$repo/compare/HEAD');
-      }
-    } else if (i + 1 < versions.length) {
+    if (i + 1 < versions.length) {
       // Compare from previous version
       final prevVersion = versions[i + 1];
-      if (prevVersion == 'Unreleased') continue;
       links.writeln('[$version]: $server/$repo/compare/v$prevVersion...v$version');
     } else {
       // Oldest version: link to the tag itself
@@ -3454,8 +3446,7 @@ Future<void> _runInit(String repoRoot) async {
       '# Changelog\n\n'
       'All notable changes to this project will be documented in this file.\n\n'
       'The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),\n'
-      'and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n\n'
-      '## [Unreleased]\n',
+      'and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n',
     );
     _success('Created starter CHANGELOG.md');
     repaired++;
