@@ -256,6 +256,8 @@ jobs:
           path: /tmp/
 
       - name: Stage 1 Explorer
+        id: explore
+        continue-on-error: true
         env:
           GEMINI_API_KEY: ${{ secrets.CICD_GEMINI_API_KEY_OPEN_RUNTIME }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -265,12 +267,14 @@ jobs:
             --version "${{ needs.determine-version.outputs.new_version }}"
 
       - name: Create fallback stage1 artifacts if missing
+        if: always()
         run: |
           [ -f /tmp/commit_analysis.json ] || echo '{"commits":[],"note":"Gemini unavailable - no analysis generated"}' > /tmp/commit_analysis.json
           [ -f /tmp/pr_data.json ] || echo '{"pull_requests":[],"note":"Gemini unavailable"}' > /tmp/pr_data.json
           [ -f /tmp/breaking_changes.json ] || echo '{"breaking_changes":[],"note":"Gemini unavailable"}' > /tmp/breaking_changes.json
 
       - uses: actions/upload-artifact@v6.0.0
+        if: always()
         with:
           name: stage1-artifacts
           path: |
@@ -281,6 +285,7 @@ jobs:
           retention-days: 1
 
       - name: Upload CI/CD audit trail
+        if: always()
         uses: actions/upload-artifact@v6.0.0
         with:
           name: cicd-audit-explore
@@ -348,6 +353,8 @@ jobs:
           path: /tmp/
 
       - name: Stage 2 Composer
+        id: compose
+        continue-on-error: true
         env:
           GEMINI_API_KEY: ${{ secrets.CICD_GEMINI_API_KEY_OPEN_RUNTIME }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -357,6 +364,7 @@ jobs:
             --version "${{ needs.determine-version.outputs.new_version }}"
 
       - name: Documentation update
+        continue-on-error: true
         env:
           GEMINI_API_KEY: ${{ secrets.CICD_GEMINI_API_KEY_OPEN_RUNTIME }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -366,12 +374,14 @@ jobs:
             --version "${{ needs.determine-version.outputs.new_version }}"
 
       - name: Autodoc (module documentation)
+        continue-on-error: true
         env:
           GEMINI_API_KEY: ${{ secrets.CICD_GEMINI_API_KEY_OPEN_RUNTIME }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: dart run scripts/manage_cicd.dart autodoc
 
       - uses: actions/upload-artifact@v6.0.0
+        if: always()
         with:
           name: composed-artifacts
           path: |
@@ -383,6 +393,7 @@ jobs:
           retention-days: 1
 
       - name: Upload CI/CD audit trail
+        if: always()
         uses: actions/upload-artifact@v6.0.0
         with:
           name: cicd-audit-compose
@@ -473,6 +484,8 @@ jobs:
           fi
 
       - name: Stage 3 Release Notes Author
+        id: release-notes
+        continue-on-error: true
         env:
           GEMINI_API_KEY: ${{ secrets.CICD_GEMINI_API_KEY_OPEN_RUNTIME }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -485,15 +498,24 @@ jobs:
       # Mixing relative and absolute paths in upload-artifact causes path
       # resolution issues. Keep everything under one root.
       - name: Consolidate release notes
+        if: always()
         run: |
           VERSION="${{ needs.determine-version.outputs.new_version }}"
           mkdir -p ".runtime_ci/release_notes/v${VERSION}"
           cp /tmp/release_notes_body.md ".runtime_ci/release_notes/v${VERSION}/" 2>/dev/null || true
           cp /tmp/migration_guide.md ".runtime_ci/release_notes/v${VERSION}/" 2>/dev/null || true
+          # Create fallback release notes if Gemini didn't produce any
+          if [ ! -f ".runtime_ci/release_notes/v${VERSION}/release_notes_body.md" ]; then
+            echo "# runtime_ci_tooling v${VERSION}" > ".runtime_ci/release_notes/v${VERSION}/release_notes_body.md"
+            echo "" >> ".runtime_ci/release_notes/v${VERSION}/release_notes_body.md"
+            echo "See CHANGELOG.md for details." >> ".runtime_ci/release_notes/v${VERSION}/release_notes_body.md"
+            echo "Created fallback release notes"
+          fi
           echo "Contents of .runtime_ci/release_notes/v${VERSION}/:"
           ls -la ".runtime_ci/release_notes/v${VERSION}/" 2>/dev/null || echo "(empty)"
 
       - uses: actions/upload-artifact@v6.0.0
+        if: always()
         with:
           name: release-notes-artifacts
           path: .runtime_ci/release_notes/
@@ -501,6 +523,7 @@ jobs:
           retention-days: 1
 
       - name: Upload CI/CD audit trail
+        if: always()
         uses: actions/upload-artifact@v6.0.0
         with:
           name: cicd-audit-release-notes

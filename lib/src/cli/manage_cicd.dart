@@ -380,28 +380,43 @@ Future<void> _runExplore(String repoRoot) async {
     environment: {...Platform.environment},
   );
 
+  // Gemini CLI may exit non-zero even when it produces valid JSON output.
+  // Common stderr messages like "YOLO mode is enabled" are informational,
+  // not errors. We try to extract valid JSON from stdout regardless of
+  // the exit code, and only fall back to empty artifacts if that also fails.
+  final rawStdout = result.stdout as String;
+  final rawStderr = (result.stderr as String).trim();
+
   if (result.exitCode != 0) {
-    _error('Gemini CLI failed: ${result.stderr}');
-    exit(1);
+    _warn('Gemini CLI exited with code ${result.exitCode}');
+    if (rawStderr.isNotEmpty) _warn('  stderr: ${rawStderr.split('\n').first}');
   }
 
-  // Save raw response to audit trail
-  final rawStdout = result.stdout as String;
-  ctx.saveResponse('explore', rawStdout);
+  // Save raw response to audit trail (even on non-zero exit -- stdout may have valid data)
+  if (rawStdout.isNotEmpty) {
+    ctx.saveResponse('explore', rawStdout);
+  }
 
+  // Try to parse JSON response from stdout regardless of exit code
+  bool geminiSucceeded = false;
   try {
-    final jsonStr = _extractJson(rawStdout);
-    final response = json.decode(jsonStr) as Map<String, dynamic>;
-    final stats = response['stats'] as Map<String, dynamic>?;
-    _success('Stage 1 completed.');
-    if (stats != null) {
-      _info('  Tool calls: ${stats['tools']?['totalCalls']}');
+    if (rawStdout.contains('{')) {
+      final jsonStr = _extractJson(rawStdout);
+      final response = json.decode(jsonStr) as Map<String, dynamic>;
+      final stats = response['stats'] as Map<String, dynamic>?;
+      geminiSucceeded = true;
+      _success('Stage 1 completed.');
+      if (stats != null) {
+        _info('  Tool calls: ${stats['tools']?['totalCalls']}');
+      }
+    } else if (result.exitCode != 0) {
+      _warn('Gemini CLI produced no JSON output. Using fallback artifacts.');
     }
   } catch (e) {
     _warn('Could not parse Gemini response as JSON: $e');
   }
 
-  ctx.finalize();
+  ctx.finalize(exitCode: geminiSucceeded ? 0 : result.exitCode);
 
   // Validate artifacts — Gemini may write to the RunContext dir or to
   // the working directory. Check both locations and copy to /tmp/ for
@@ -426,14 +441,14 @@ Future<void> _runExplore(String repoRoot) async {
         final content = source.readAsStringSync();
         json.decode(content);
         _success('Valid: ${source.path} (${source.lengthSync()} bytes)');
-        // Copy to /tmp/ for artifact upload
         source.copySync(tmpPath);
       } catch (e) {
-        _error('Invalid JSON: ${source.path} -- $e');
+        _warn('Invalid JSON: ${source.path} -- $e');
         File(tmpPath).writeAsStringSync('{}');
       }
     } else {
       _warn('Missing: $name (Gemini may not have generated this artifact)');
+      // Write empty fallback so downstream stages have something to work with
       File(tmpPath).writeAsStringSync('{}');
     }
   }
@@ -534,22 +549,31 @@ Future<void> _runCompose(String repoRoot) async {
     environment: {...Platform.environment},
   );
 
+  // Handle non-zero exit gracefully -- try to extract JSON regardless
+  final rawCompose = result.stdout as String;
+  final composeStderr = (result.stderr as String).trim();
+
   if (result.exitCode != 0) {
-    _error('Gemini CLI failed: ${result.stderr}');
-    exit(1);
+    _warn('Gemini CLI exited with code ${result.exitCode}');
+    if (composeStderr.isNotEmpty) _warn('  stderr: ${composeStderr.split('\n').first}');
   }
 
-  final rawCompose = result.stdout as String;
-  ctx.saveResponse('compose', rawCompose);
+  if (rawCompose.isNotEmpty) {
+    ctx.saveResponse('compose', rawCompose);
+  }
 
   try {
-    final jsonStr = _extractJson(rawCompose);
-    final response = json.decode(jsonStr) as Map<String, dynamic>;
-    final stats = response['stats'] as Map<String, dynamic>?;
-    _success('Stage 2 completed.');
-    if (stats != null) {
-      _info('  Tool calls: ${stats['tools']?['totalCalls']}');
-      _info('  Duration: ${stats['session']?['duration']}ms');
+    if (rawCompose.contains('{')) {
+      final jsonStr = _extractJson(rawCompose);
+      final response = json.decode(jsonStr) as Map<String, dynamic>;
+      final stats = response['stats'] as Map<String, dynamic>?;
+      _success('Stage 2 completed.');
+      if (stats != null) {
+        _info('  Tool calls: ${stats['tools']?['totalCalls']}');
+        _info('  Duration: ${stats['session']?['duration']}ms');
+      }
+    } else if (result.exitCode != 0) {
+      _warn('Gemini CLI produced no JSON output for compose stage.');
     }
   } catch (e) {
     _warn('Could not parse Gemini response as JSON: $e');
