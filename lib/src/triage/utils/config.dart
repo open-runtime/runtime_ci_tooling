@@ -122,6 +122,15 @@ class TriageConfig {
   String get releaseNotesPath => _str(['repository', 'release_notes_path'], 'release_notes');
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // GCP
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// GCP project ID for Secret Manager and other cloud resources.
+  /// Read from the per-repo config rather than a secret, since it's
+  /// not sensitive and varies per repo.
+  String get gcpProject => _str(['gcp', 'project'], '');
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // Sentry
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -295,10 +304,13 @@ class TriageConfig {
   }
 
   /// Try to fetch a secret from GCP Secret Manager.
+  /// Uses `gcp.project` from config if set, otherwise relies on gcloud default project.
   String? _resolveFromGcp(String? secretName) {
     if (secretName == null || secretName.isEmpty) return null;
     try {
-      final result = Process.runSync('gcloud', ['secrets', 'versions', 'access', 'latest', '--secret=$secretName']);
+      final args = ['secrets', 'versions', 'access', 'latest', '--secret=$secretName'];
+      if (gcpProject.isNotEmpty) args.add('--project=$gcpProject');
+      final result = Process.runSync('gcloud', args);
       if (result.exitCode == 0) {
         return (result.stdout as String).trim();
       }

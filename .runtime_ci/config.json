@@ -6,6 +6,9 @@
     "changelog_path": "CHANGELOG.md",
     "release_notes_path": "release_notes"
   },
+  "gcp": {
+    "project": "global-cloud-runtime"
+  },
   "sentry": {
     "organization": "",
     "projects": [],

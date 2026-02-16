@@ -3145,6 +3145,7 @@ Future<void> _runInit(String repoRoot) async {
       'changelog_path': hasChangelog ? 'CHANGELOG.md' : 'CHANGELOG.md',
       'release_notes_path': '$kReleaseNotesDir',
     },
+    'gcp': {'project': ''},
     'sentry': {'organization': '', 'projects': <String>[], 'scan_on_pre_release': false, 'recent_errors_hours': 168},
     'release': {
       'pre_release_scan_sentry': false,

@@ -7,6 +7,9 @@
     "changelog_path": "CHANGELOG.md",
     "release_notes_path": "release_notes"
   },
+  "gcp": {
+    "project": "YOUR_GCP_PROJECT_ID"
+  },
   "sentry": {
     "organization": "",
     "projects": [],
