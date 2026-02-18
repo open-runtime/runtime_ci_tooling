@@ -2782,8 +2782,10 @@ String _detectNextVersion(String repoRoot, String prevTag) {
           .split('\n')
           .every(
             (line) =>
-                line.trim().isEmpty || RegExp(r'^(chore|style|ci|docs|test|build)(\(.+\))?:').hasMatch(line.trim()),
+                line.trim().isEmpty || RegExp(r'^(chore|style|ci|docs|build)(\(.+\))?:').hasMatch(line.trim()),
           )) {
+    // Only pure infra/docs/style/build commits with no code changes → no release.
+    // fix:, test:, perf:, and refactor: all default to at least patch.
     bump = 'none';
   }
 
@@ -2829,9 +2831,10 @@ String _detectNextVersion(String repoRoot, String prevTag) {
         'Rules:\n'
         '- MAJOR: Breaking changes to public APIs, removed functions, changed signatures\n'
         '- MINOR: New features, new proto messages, new exports, additive API changes\n'
-        '- PATCH: Bug fixes, dependency updates with user-facing impact\n'
-        '- NONE: No release needed -- chore, style, CI, docs-only, test-only, '
-        'build config changes with no user-facing impact\n\n'
+        '- PATCH: Bug fixes, test improvements, dependency updates, refactors, '
+        'performance improvements — anything that changes code in lib/ or test/\n'
+        '- NONE: No release needed — pure chore, style, CI workflow, '
+        'docs-only, or build config changes that touch ZERO code in lib/ or test/\n\n'
         'IMPORTANT: The next version will be computed by bumping from the '
         'previous tag ($prevTag), NOT from the pubspec.yaml version. '
         'Your job is ONLY to decide the bump type.\n';
