@@ -146,6 +146,7 @@ const List<String> kConfigFiles = [
 
 bool _dryRun = false;
 bool _verbose = false;
+bool _outputGithubActions = false;
 String? _prevTagOverride;
 String? _versionOverride;
 
@@ -163,6 +164,7 @@ void main(List<String> args) async {
   final opts = parseManageCicdOptions(args);
   _dryRun = opts.dryRun;
   _verbose = opts.verbose;
+  _outputGithubActions = opts.outputGithubActions;
   _prevTagOverride = opts.prevTag;
   _versionOverride = opts.version;
 
@@ -1768,7 +1770,7 @@ Future<void> _runStatus(String repoRoot) async {
 Future<void> _runDetermineVersion(String repoRoot, List<String> args) async {
   _header('Determine Version');
 
-  final outputGha = args.contains('--output-github-actions');
+  final outputGha = _outputGithubActions;
 
   final prevTag = _prevTagOverride ?? _detectPrevTag(repoRoot);
   final newVersion = _versionOverride ?? _detectNextVersion(repoRoot, prevTag);

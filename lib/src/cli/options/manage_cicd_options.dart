@@ -32,5 +32,19 @@ class ManageCicdOptions {
   @CliOption(help: 'Override version (skip auto-detection)')
   final String? version;
 
-  const ManageCicdOptions({this.dryRun = false, this.verbose = false, this.prevTag, this.version});
+  // =========================================================================
+  // CI/CD Options
+  // =========================================================================
+
+  /// Write prev_tag, new_version, should_release to \$GITHUB_OUTPUT.
+  @CliOption(help: 'Write version outputs to \$GITHUB_OUTPUT for GitHub Actions')
+  final bool outputGithubActions;
+
+  const ManageCicdOptions({
+    this.dryRun = false,
+    this.verbose = false,
+    this.prevTag,
+    this.version,
+    this.outputGithubActions = false,
+  });
 }
