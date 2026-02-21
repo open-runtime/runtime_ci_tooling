@@ -172,15 +172,23 @@ void main(List<String> args) async {
     _versionOverride = args[verIdx + 1];
   }
 
-  // Find repo root
+  final command = args.first;
+
+  // Handle 'init' before _findRepoRoot() — init bootstraps the config that
+  // _findRepoRoot() depends on, so it must use CWD directly.
+  if (command == 'init') {
+    await _runInit(Directory.current.path);
+    return;
+  }
+
+  // Find repo root (requires .runtime_ci/config.json to exist)
   final repoRoot = _findRepoRoot();
   if (repoRoot == null) {
     _error('Could not find ${config.repoName} repo root.');
     _error('Run this script from inside the repository.');
+    _error('If this is a new project, run "init" first to create .runtime_ci/config.json.');
     exit(1);
   }
-
-  final command = args.first;
 
   switch (command) {
     case 'setup':
@@ -227,8 +235,6 @@ void main(List<String> args) async {
       await _runArchiveRun(repoRoot, args);
     case 'merge-audit-trails':
       await _runMergeAuditTrails(repoRoot, args);
-    case 'init':
-      await _runInit(repoRoot);
     default:
       _error('Unknown command: $command');
       _printUsage();
