@@ -5,6 +5,7 @@ import 'dart:io';
 
 import '../triage/utils/run_context.dart';
 import '../triage/utils/config.dart';
+import 'options/manage_cicd_options.dart';
 
 // Re-export path constants from run_context for use throughout this file.
 // All CI artifacts live under .runtime_ci/ at the repo root:
@@ -158,19 +159,12 @@ void main(List<String> args) async {
     return;
   }
 
-  // Parse flags
-  _dryRun = args.contains('--dry-run');
-  _verbose = args.contains('--verbose') || args.contains('-v');
-
-  final tagIdx = args.indexOf('--prev-tag');
-  if (tagIdx != -1 && tagIdx + 1 < args.length) {
-    _prevTagOverride = args[tagIdx + 1];
-  }
-
-  final verIdx = args.indexOf('--version');
-  if (verIdx != -1 && verIdx + 1 < args.length) {
-    _versionOverride = args[verIdx + 1];
-  }
+  // Parse all options using composite options class (idiomatic build_cli pattern)
+  final opts = parseManageCicdOptions(args);
+  _dryRun = opts.dryRun;
+  _verbose = opts.verbose;
+  _prevTagOverride = opts.prevTag;
+  _versionOverride = opts.version;
 
   final command = args.first;
 

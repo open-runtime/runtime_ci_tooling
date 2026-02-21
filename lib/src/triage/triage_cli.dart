@@ -3,6 +3,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../cli/options/triage_cli_options.dart';
 import 'models/game_plan.dart';
 import 'models/investigation_result.dart';
 import 'models/triage_decision.dart';
@@ -51,29 +52,23 @@ Future<void> main(List<String> args) async {
     return;
   }
 
-  final verbose = args.contains('--verbose') || args.contains('-v');
-  final dryRun = args.contains('--dry-run');
-  final autoMode = args.contains('--auto');
-  final statusMode = args.contains('--status');
-  final forceMode = args.contains('--force');
-  final preReleaseMode = args.contains('--pre-release');
-  final postReleaseMode = args.contains('--post-release');
+  // Parse all options using composite options class (idiomatic build_cli pattern)
+  final opts = parseTriageCliOptions(args);
 
-  // Check for --resume <run_id>
-  final resumeIdx = args.indexOf('--resume');
-  final resumeRunId = (resumeIdx != -1 && resumeIdx + 1 < args.length) ? args[resumeIdx + 1] : null;
+  final verbose = opts.verbose;
+  final dryRun = opts.dryRun;
+  final autoMode = opts.auto;
+  final statusMode = opts.status;
+  final forceMode = opts.force;
+  final preReleaseMode = opts.preRelease;
+  final postReleaseMode = opts.postRelease;
+  final resumeRunId = opts.resume;
 
-  // Parse named arguments
-  String? _getArg(String name) {
-    final idx = args.indexOf(name);
-    return (idx != -1 && idx + 1 < args.length) ? args[idx + 1] : null;
-  }
-
-  final prevTagArg = _getArg('--prev-tag');
-  final versionArg = _getArg('--version');
-  final releaseTagArg = _getArg('--release-tag');
-  final releaseUrlArg = _getArg('--release-url');
-  final manifestArg = _getArg('--manifest');
+  final prevTagArg = opts.prevTag;
+  final versionArg = opts.version;
+  final releaseTagArg = opts.releaseTag;
+  final releaseUrlArg = opts.releaseUrl;
+  final manifestArg = opts.manifest;
 
   // Find repo root
   final repoRoot = _findRepoRoot();
