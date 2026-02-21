@@ -202,14 +202,7 @@ These rules are NON-NEGOTIABLE. Violating them produces incorrect release notes.
 ''');
 }
 
-String _releaseNotesTemplate(
-  String bumpType,
-  String version,
-  String prevTag,
-  String today,
-  String pkg,
-  String owner,
-) {
+String _releaseNotesTemplate(String bumpType, String version, String prevTag, String today, String pkg, String owner) {
   if (bumpType == 'patch') {
     return '''
 Structure for PATCH release notes:

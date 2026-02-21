@@ -32,10 +32,5 @@ class ManageCicdOptions {
   @CliOption(help: 'Override version (skip auto-detection)')
   final String? version;
 
-  const ManageCicdOptions({
-    this.dryRun = false,
-    this.verbose = false,
-    this.prevTag,
-    this.version,
-  });
+  const ManageCicdOptions({this.dryRun = false, this.verbose = false, this.prevTag, this.version});
 }

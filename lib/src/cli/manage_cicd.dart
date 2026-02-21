@@ -2781,8 +2781,7 @@ String _detectNextVersion(String repoRoot, String prevTag) {
       commitSubjects
           .split('\n')
           .every(
-            (line) =>
-                line.trim().isEmpty || RegExp(r'^(chore|style|ci|docs|build)(\(.+\))?:').hasMatch(line.trim()),
+            (line) => line.trim().isEmpty || RegExp(r'^(chore|style|ci|docs|build)(\(.+\))?:').hasMatch(line.trim()),
           )) {
     // Only pure infra/docs/style/build commits with no code changes → no release.
     // fix:, test:, perf:, and refactor: all default to at least patch.

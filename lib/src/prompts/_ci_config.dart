@@ -27,8 +27,7 @@ class CiConfig {
       final configFile = File('${dir.path}/.runtime_ci/config.json');
       if (configFile.existsSync()) {
         try {
-          final json_ =
-              json.decode(configFile.readAsStringSync()) as Map<String, dynamic>;
+          final json_ = json.decode(configFile.readAsStringSync()) as Map<String, dynamic>;
           final repo = json_['repository'] as Map<String, dynamic>? ?? {};
           return CiConfig._(
             packageName: (repo['name'] as String?) ?? fallbackName,
