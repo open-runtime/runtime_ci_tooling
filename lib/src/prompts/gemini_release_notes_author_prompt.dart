@@ -2,6 +2,8 @@
 
 import 'dart:io';
 
+import '_ci_config.dart';
+
 /// Stage 3 Release Notes Author prompt generator.
 ///
 /// Produces rich, narrative release notes distinct from the CHANGELOG.
@@ -28,6 +30,9 @@ void main(List<String> args) {
   final newVersion = args[1];
   final bumpType = args.length > 2 ? args[2] : _inferBumpType(prevTag, newVersion);
 
+  final pkg = CiConfig.current.packageName;
+  final owner = CiConfig.current.repoOwner;
+
   final today = DateTime.now().toIso8601String().substring(0, 10);
   final ghContributors = _runSync('git log $prevTag..HEAD --format="%an" --no-merges | sort -u');
   final totalCommits = _runSync('git rev-list --count $prevTag..HEAD');
@@ -47,13 +52,13 @@ void main(List<String> args) {
   final hasVersionBump = _fileExists('version_bumps/v$newVersion.md');
 
   print('''
-You are a Release Notes Author for the runtime_isomorphic_library Dart package.
+You are a Release Notes Author for the $pkg Dart package.
 Your job is to write RICH, DETAILED, USER-FRIENDLY release notes that will appear
 on the GitHub Release page. These are DIFFERENT from the CHANGELOG -- the CHANGELOG
 is a concise list; your release notes tell the STORY of this release.
 
 ## Release Context
-- **Package**: runtime_isomorphic_library
+- **Package**: $pkg
 - **Version**: v$newVersion (${bumpType.toUpperCase()} release)
 - **Previous**: $prevTag
 - **Date**: $today
@@ -96,7 +101,7 @@ Write the following files. Create directories as needed.
 
 This is the MAIN output -- what users see on the GitHub Release page.
 
-${_releaseNotesTemplate(bumpType, newVersion, prevTag, today)}
+${_releaseNotesTemplate(bumpType, newVersion, prevTag, today, pkg, owner)}
 
 ### 2. release_notes/v$newVersion/migration_guide.md (if breaking changes exist)
 
@@ -131,8 +136,8 @@ Why this change was made (1-2 sentences).
 ```
 
 ### References
-- Issue: [#N](https://github.com/open-runtime/runtime_isomorphic_library/issues/N)
-- PR: [#N](https://github.com/open-runtime/runtime_isomorphic_library/pull/N)
+- Issue: [#N](https://github.com/$owner/$pkg/issues/N)
+- PR: [#N](https://github.com/$owner/$pkg/pull/N)
 ```
 
 Use `git diff $prevTag..HEAD` and `cat` to find the REAL before/after code.
@@ -197,13 +202,20 @@ These rules are NON-NEGOTIABLE. Violating them produces incorrect release notes.
 ''');
 }
 
-String _releaseNotesTemplate(String bumpType, String version, String prevTag, String today) {
+String _releaseNotesTemplate(
+  String bumpType,
+  String version,
+  String prevTag,
+  String today,
+  String pkg,
+  String owner,
+) {
   if (bumpType == 'patch') {
     return '''
 Structure for PATCH release notes:
 
 ```markdown
-# runtime_isomorphic_library v$version
+# $pkg v$version
 
 > Bug fix release — $today
 
@@ -214,12 +226,12 @@ Structure for PATCH release notes:
 ## Upgrade
 
 ```bash
-dart pub upgrade runtime_isomorphic_library
+dart pub upgrade $pkg
 ```
 
 ## Full Changelog
 
-[$prevTag...v$version](https://github.com/open-runtime/runtime_isomorphic_library/compare/$prevTag...v$version)
+[$prevTag...v$version](https://github.com/$owner/$pkg/compare/$prevTag...v$version)
 ```
 ''';
   }
@@ -229,7 +241,7 @@ dart pub upgrade runtime_isomorphic_library
 Structure for MAJOR release notes (comprehensive):
 
 ```markdown
-# runtime_isomorphic_library v$version
+# $pkg v$version
 
 > Brief 2-3 sentence executive summary of this major release.
 
@@ -287,7 +299,7 @@ Description with context about why it was added and how to use it.
 ## Upgrade
 
 ```bash
-dart pub upgrade runtime_isomorphic_library
+dart pub upgrade $pkg
 dart fix --apply  # Automated fixes for breaking changes
 ```
 
@@ -301,7 +313,7 @@ Thanks to everyone who contributed to this release:
 
 ## Full Changelog
 
-[$prevTag...v$version](https://github.com/open-runtime/runtime_isomorphic_library/compare/$prevTag...v$version)
+[$prevTag...v$version](https://github.com/$owner/$pkg/compare/$prevTag...v$version)
 ```
 ''';
   }
@@ -311,7 +323,7 @@ Thanks to everyone who contributed to this release:
 Structure for MINOR release notes:
 
 ```markdown
-# runtime_isomorphic_library v$version
+# $pkg v$version
 
 > Brief 2-3 sentence summary of this release.
 
@@ -344,7 +356,7 @@ Description with context. Include a brief usage example if the API is user-facin
 ## Upgrade
 
 ```bash
-dart pub upgrade runtime_isomorphic_library
+dart pub upgrade $pkg
 ```
 
 ## Contributors
@@ -354,7 +366,7 @@ Thanks to everyone who contributed:
 
 ## Full Changelog
 
-[$prevTag...v$version](https://github.com/open-runtime/runtime_isomorphic_library/compare/$prevTag...v$version)
+[$prevTag...v$version](https://github.com/$owner/$pkg/compare/$prevTag...v$version)
 ```
 ''';
 }

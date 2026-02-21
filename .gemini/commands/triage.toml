@@ -1,7 +1,7 @@
 description = "Triage a GitHub issue: classify, prioritize, detect duplicates. Usage: /triage 42"
 
 prompt = """
-Triage GitHub issue #{{args}} for the runtime_isomorphic_library package.
+Triage GitHub issue #{{args}} for the !{grep '^name:' pubspec.yaml | sed 's/name: //'} package.
 
 ## Issue Details
 ```

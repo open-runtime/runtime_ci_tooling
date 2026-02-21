@@ -2,6 +2,8 @@
 
 import 'dart:io';
 
+import '_ci_config.dart';
+
 /// Stage 1 Explorer Agent prompt generator.
 ///
 /// Generates the changelog analysis prompt with interpolated context including
@@ -23,6 +25,7 @@ void main(List<String> args) {
 
   final prevTag = args[0];
   final newVersion = args[1];
+  final pkg = CiConfig.current.packageName;
 
   // Gather context via shell commands
   final tree = _runSync('tree lib/ -L 2 --dirsfirst -I "*.pb.dart|*.pbenum.dart|*.pbjson.dart|*.pbgrpc.dart"');
@@ -34,7 +37,7 @@ void main(List<String> args) {
   final commitCount = _runSync('git rev-list --count $prevTag..HEAD');
 
   print('''
-You are a Stage 1 Explorer Agent analyzing the runtime_isomorphic_library Dart package
+You are a Stage 1 Explorer Agent analyzing the $pkg Dart package
 for release v$newVersion (previous: $prevTag).
 
 Your job is to DEEPLY explore this repository and write structured JSON artifacts to .cicd_runs/explore/.

@@ -2,6 +2,8 @@
 
 import 'dart:io';
 
+import '_ci_config.dart';
+
 /// Issue Triage prompt generator.
 ///
 /// Generates a prompt for Gemini Pro to analyze a GitHub issue and perform
@@ -26,6 +28,7 @@ void main(List<String> args) {
     exit(1);
   }
 
+  final pkg = CiConfig.current.packageName;
   final issueNumber = args[0];
   final issueTitle = args[1];
   final issueAuthor = args[2];
@@ -38,7 +41,7 @@ void main(List<String> args) {
   final protoTree = _runSync('tree proto/src/ -L 2 --dirsfirst -d');
 
   print('''
-You are an Issue Triage Agent for the runtime_isomorphic_library Dart package.
+You are an Issue Triage Agent for the $pkg Dart package.
 
 Analyze the following GitHub issue and perform comprehensive triage. You have access
 to the gh (GitHub CLI) tool to read additional issue context or apply labels/comments.

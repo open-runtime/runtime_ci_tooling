@@ -2,6 +2,8 @@
 
 import 'dart:io';
 
+import '_ci_config.dart';
+
 /// Stage 2 Changelog Composer Agent prompt generator.
 ///
 /// Focused ONLY on updating CHANGELOG.md with a concise Keep-a-Changelog entry.
@@ -18,6 +20,7 @@ void main(List<String> args) {
 
   final prevTag = args[0];
   final newVersion = args[1];
+  final pkg = CiConfig.current.packageName;
 
   final today = DateTime.now().toIso8601String().substring(0, 10);
   final contributors = _runSync('git log $prevTag..HEAD --format="%an" --no-merges | sort -u');
@@ -33,7 +36,7 @@ void main(List<String> args) {
       File('/tmp/issue_manifest.json').existsSync() || File('.cicd_runs/triage/issue_manifest.json').existsSync();
 
   print('''
-You are a Changelog Composer Agent for the runtime_isomorphic_library Dart package.
+You are a Changelog Composer Agent for the $pkg Dart package.
 
 Your ONLY job is to update CHANGELOG.md with a new version entry following
 the Keep a Changelog format. You do NOT write release notes -- that is a

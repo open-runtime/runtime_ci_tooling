@@ -1,7 +1,7 @@
 description = "Generate a Keep a Changelog entry for a version. Usage: /changelog 0.1.0"
 
 prompt = """
-Generate a Keep a Changelog entry for version {{args}} of runtime_isomorphic_library.
+Generate a Keep a Changelog entry for version {{args}} of !{grep '^name:' pubspec.yaml | sed 's/name: //'}.
 
 ## Project Structure
 ```

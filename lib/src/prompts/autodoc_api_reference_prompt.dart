@@ -2,6 +2,8 @@
 
 import 'dart:io';
 
+import '_ci_config.dart';
+
 /// Autodoc: API_REFERENCE.md generator for a proto module.
 ///
 /// Usage:
@@ -13,6 +15,7 @@ void main(List<String> args) {
     exit(1);
   }
 
+  final pkg = CiConfig.current.packageName;
   final moduleName = args[0];
   final sourceDir = args[1];
   final libDir = args.length > 2 ? args[2] : '';
@@ -30,7 +33,7 @@ void main(List<String> args) {
 
   print('''
 You are a documentation writer generating an API reference for the
-**$moduleName** module of the runtime_isomorphic_library Dart package.
+**$moduleName** module of the $pkg Dart package.
 
 ## Proto Definitions
 

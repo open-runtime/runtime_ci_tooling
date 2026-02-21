@@ -2,6 +2,8 @@
 
 import 'dart:io';
 
+import '_ci_config.dart';
+
 /// Autodoc: EXAMPLES.md generator for a proto module.
 ///
 /// Usage:
@@ -13,6 +15,7 @@ void main(List<String> args) {
     exit(1);
   }
 
+  final pkg = CiConfig.current.packageName;
   final moduleName = args[0];
   final sourceDir = args[1];
   final libDir = args.length > 2 ? args[2] : '';
@@ -40,7 +43,7 @@ void main(List<String> args) {
 
   print('''
 You are writing practical code examples for the **$moduleName** module
-of the runtime_isomorphic_library Dart package.
+of the $pkg Dart package.
 
 ## Available Services and RPCs
 ```
@@ -90,7 +93,7 @@ Generate an EXAMPLES.md with practical, copy-paste-ready code examples:
 ## Rules
 - Use ONLY real class/method names from the proto definitions
 - Every code block must be valid, compilable Dart
-- Import from package:runtime_isomorphic_library/...
+- Import from package:$pkg/...
 - Show complete, runnable examples (not fragments)
 - Include comments explaining what each step does
 

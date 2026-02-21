@@ -2,6 +2,8 @@
 
 import 'dart:io';
 
+import '_ci_config.dart';
+
 /// Autodoc: QUICKSTART.md generator for a proto module.
 ///
 /// Usage:
@@ -13,6 +15,7 @@ void main(List<String> args) {
     exit(1);
   }
 
+  final pkg = CiConfig.current.packageName;
   final moduleName = args[0];
   final sourceDir = args[1];
   final libDir = args.length > 2 ? args[2] : '';
@@ -48,7 +51,7 @@ void main(List<String> args) {
 
   print('''
 You are a documentation writer for the **$moduleName** module of the
-runtime_isomorphic_library Dart package.
+$pkg Dart package.
 
 Your job is to write a QUICKSTART.md that helps a developer get started
 with this module in under 5 minutes.
@@ -92,7 +95,7 @@ Write a QUICKSTART.md with these sections:
 
 ### 2. Import
 ```dart
-import 'package:runtime_isomorphic_library/...';
+import 'package:$pkg/...';
 ```
 Use the REAL import paths based on the lib directory structure.
 
@@ -111,14 +114,14 @@ Use REAL class names from the proto definitions.
 Common error patterns and how to handle them.
 
 ### 6. Related Modules
-List any related modules in the runtime_isomorphic_library.
+List any related modules in the $pkg.
 
 ## Rules
 - Use ONLY real class/method/field names from the proto definitions
 - Do NOT fabricate API names or import paths
 - Code examples must be valid Dart that would compile
 - Keep it concise -- this is a QUICKSTART, not a full reference
-- Use the package import style: package:runtime_isomorphic_library/...
+- Use the package import style: package:$pkg/...
 
 Generate the complete QUICKSTART.md content and write it to the file path
 specified by the build system.

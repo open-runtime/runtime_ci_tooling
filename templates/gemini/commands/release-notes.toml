@@ -1,7 +1,7 @@
 description = "Generate comprehensive release notes with PR links and contributors. Usage: /release-notes 0.1.0"
 
 prompt = """
-Generate comprehensive release notes for runtime_isomorphic_library version {{args}}.
+Generate comprehensive release notes for !{grep '^name:' pubspec.yaml | sed 's/name: //'} version {{args}}.
 
 ## Merged Pull Requests
 ```
@@ -32,7 +32,7 @@ Generate comprehensive release notes for runtime_isomorphic_library version {{ar
 
 Create rich, detailed release notes suitable for a GitHub Release page. Include:
 
-1. **Title**: "runtime_isomorphic_library v{{args}}"
+1. **Title**: "!{grep '^name:' pubspec.yaml | sed 's/name: //'} v{{args}}"
 2. **Executive Summary**: 2-3 sentences highlighting the most impactful changes
 3. **What's New**: Detailed feature descriptions linked to PRs (#N)
 4. **Bug Fixes**: What was broken and how it's fixed

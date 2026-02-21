@@ -2,6 +2,8 @@
 
 import 'dart:io';
 
+import '_ci_config.dart';
+
 /// Stage 2 Documentation Update prompt generator.
 ///
 /// Generates a prompt that instructs Gemini Pro to analyze proto/API changes
@@ -24,6 +26,7 @@ void main(List<String> args) {
 
   final prevTag = args[0];
   final newVersion = args[1];
+  final pkg = CiConfig.current.packageName;
 
   // Gather context about what changed
   final libTree = _runSync('tree lib/ -L 3 --dirsfirst -I "*.pb.dart|*.pbenum.dart|*.pbjson.dart|*.pbgrpc.dart"');
@@ -37,7 +40,7 @@ void main(List<String> args) {
   final scriptNames = _runSync('ls scripts/*.dart 2>/dev/null');
 
   print('''
-You are a Documentation Update Agent for the runtime_isomorphic_library Dart package.
+You are a Documentation Update Agent for the $pkg Dart package.
 
 Your job is to update README.md to reflect changes in version v$newVersion.
 The commit analysis JSON is provided via @include for understanding what changed.
