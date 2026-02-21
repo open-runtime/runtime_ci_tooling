@@ -16,7 +16,6 @@ environment:
 # NOTE: When used inside the aot_monorepo workspace, add
 # `resolution: workspace` here. It is intentionally omitted so this
 # package can also resolve standalone (e.g., in its own CI pipeline).
-resolution: workspace
 
 dependencies:
   args: ^2.7.0
