@@ -6,6 +6,7 @@ import 'dart:io';
 import '../utils/config.dart';
 import '../utils/gemini_runner.dart';
 import '../utils/json_schemas.dart';
+import '../utils/run_context.dart';
 
 /// Pre-Release Triage Phase
 ///
@@ -120,9 +121,13 @@ Future<String> preReleaseTriage({
       'This release likely addresses $ghCount GitHub issues, '
       '$crossCount cross-repo issues, and $sentryCount Sentry errors';
 
-  // Save manifest
+  // Save manifest to run-specific dir
   final manifestPath = '$runDir/issue_manifest.json';
   writeJson(manifestPath, manifest);
+
+  // Also write to a fixed location so Stage 1 Explorer can find it without knowing the run ID.
+  final fixedManifestPath = '$repoRoot/$kCicdRunsDir/issue_manifest.json';
+  writeJson(fixedManifestPath, manifest);
 
   stopwatch.stop();
   print('  Manifest saved: $manifestPath');

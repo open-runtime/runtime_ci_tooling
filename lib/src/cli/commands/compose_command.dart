@@ -115,6 +115,7 @@ class ComposeCommand extends Command<void> {
     Logger.info('Running Gemini 3 Pro for CHANGELOG composition...');
     Logger.info('File context: ${includes.join(", ")}');
 
+    final stopwatch = Stopwatch()..start();
     final result = Process.runSync(
       'sh',
       [
@@ -144,6 +145,8 @@ class ComposeCommand extends Command<void> {
       ctx.saveResponse('compose', rawCompose);
     }
 
+    stopwatch.stop();
+
     try {
       if (rawCompose.contains('{')) {
         final jsonStr = GeminiUtils.extractJson(rawCompose);
@@ -152,8 +155,8 @@ class ComposeCommand extends Command<void> {
         Logger.success('Stage 2 completed.');
         if (stats != null) {
           Logger.info('  Tool calls: ${stats['tools']?['totalCalls']}');
-          Logger.info('  Duration: ${stats['session']?['duration']}ms');
         }
+        Logger.info('  Duration: ${stopwatch.elapsed.inSeconds}s');
       } else if (result.exitCode != 0) {
         Logger.warn('Gemini CLI produced no JSON output for compose stage.');
       }

@@ -40,8 +40,8 @@ void main(List<String> args) {
 You are a Stage 1 Explorer Agent analyzing the $pkg Dart package
 for release v$newVersion (previous: $prevTag).
 
-Your job is to DEEPLY explore this repository and write structured JSON artifacts to .cicd_runs/explore/.
-You have access to git and gh (GitHub CLI) tools. Use them extensively.
+Your job is to DEEPLY explore this repository and write structured JSON artifacts to .runtime_ci/runs/explore/.
+You have access to git, gh (GitHub CLI), and write_file tools. Use them extensively.
 
 ## Project Structure (lib/)
 ```
@@ -75,7 +75,7 @@ $changedFiles
 
 ## Issue Manifest (Pre-Release Triage)
 
-If .cicd_runs/triage/issue_manifest.json exists, READ IT. It contains GitHub issues and Sentry errors
+If .runtime_ci/runs/issue_manifest.json exists, READ IT. It contains GitHub issues and Sentry errors
 that this release likely addresses, with confidence scores. Use this to:
 - Include issue references (#N) in the commit_analysis.json categories
 - Mark issues as "fixed" in the appropriate category
@@ -91,13 +91,13 @@ You MUST autonomously explore and gather data. Do all of the following:
 4. For breaking or significant commits, run `git show <sha>` to understand the change deeply
 5. Run `gh pr list --state merged --json number,author --jq '.[].author.login' | sort -u` for unique contributors
 6. Look at any changed test files to understand what new behavior is being tested
-7. If .cicd_runs/triage/issue_manifest.json exists, read it and cross-reference issues with your findings
+7. If .runtime_ci/runs/issue_manifest.json exists, read it and cross-reference issues with your findings
 
 ## Output Requirements
 
 Write EXACTLY these JSON files (create the directories if needed):
 
-### .cicd_runs/explore/commit_analysis.json
+### .runtime_ci/runs/explore/commit_analysis.json
 ```json
 {
   "version": "$newVersion",
@@ -120,7 +120,7 @@ Write EXACTLY these JSON files (create the directories if needed):
 }
 ```
 
-### .cicd_runs/explore/pr_data.json
+### .runtime_ci/runs/explore/pr_data.json
 ```json
 {
   "pull_requests": [
@@ -136,7 +136,7 @@ Write EXACTLY these JSON files (create the directories if needed):
 }
 ```
 
-### .cicd_runs/explore/breaking_changes.json
+### .runtime_ci/runs/explore/breaking_changes.json
 ```json
 {
   "has_breaking_changes": false,

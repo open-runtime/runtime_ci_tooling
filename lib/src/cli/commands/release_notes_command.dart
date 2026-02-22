@@ -162,6 +162,7 @@ class ReleaseNotesCommand extends Command<void> {
     Logger.info('Bump type: $bumpType');
     Logger.info('File context: ${includes.join(", ")}');
 
+    final stopwatch = Stopwatch()..start();
     final result = Process.runSync(
       'sh',
       [
@@ -175,6 +176,7 @@ class ReleaseNotesCommand extends Command<void> {
       workingDirectory: repoRoot,
       environment: {...Platform.environment},
     );
+    stopwatch.stop();
 
     if (result.exitCode != 0) {
       Logger.warn('Gemini CLI failed for release notes: ${result.stderr}');
@@ -195,7 +197,7 @@ class ReleaseNotesCommand extends Command<void> {
       Logger.success('Stage 3 completed.');
       if (stats != null) {
         Logger.info('  Tool calls: ${stats['tools']?['totalCalls']}');
-        Logger.info('  Duration: ${stats['session']?['duration']}ms');
+        Logger.info('  Duration: ${stopwatch.elapsed.inSeconds}s');
       }
     } catch (e) {
       Logger.warn('Could not parse Gemini response stats: $e');
