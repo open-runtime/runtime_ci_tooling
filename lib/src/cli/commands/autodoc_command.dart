@@ -87,7 +87,7 @@ class AutodocCommand extends Command<void> {
     }
 
     // Build task queue based on hash comparison
-    final tasks = <Future<void>>[];
+    final tasks = <Future<void> Function()>[];
     final updatedModules = <String>[];
     var skippedCount = 0;
 
@@ -131,7 +131,7 @@ class AutodocCommand extends Command<void> {
         }
 
         tasks.add(
-          _generateAutodocFile(
+          () => _generateAutodocFile(
             repoRoot: repoRoot,
             moduleId: id,
             moduleName: name,
@@ -168,14 +168,11 @@ class AutodocCommand extends Command<void> {
       return;
     }
 
-    // Execute in parallel batches
+    // Execute with a true worker pool — starts the next task as soon as any slot frees.
     Logger.info('');
     Logger.info('Running ${tasks.length} Gemini doc generation tasks (max $maxConcurrent parallel)...');
 
-    for (var i = 0; i < tasks.length; i += maxConcurrent) {
-      final batch = tasks.skip(i).take(maxConcurrent).toList();
-      await Future.wait(batch);
-    }
+    await _forEachConcurrent(tasks, maxConcurrent);
 
     // Save updated config with new hashes
     File(configPath).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(autodocConfig));
@@ -277,11 +274,10 @@ Cover EVERY message, service, enum, and field defined in the proto files.
 Do not skip any -- completeness is more important than brevity.
 ''');
 
-    final pass1Result = Process.runSync(
-      'sh',
-      ['-c', 'cat ${pass1Prompt.path} | gemini --yolo -m $_kGeminiProModel ${includes.join(" ")}'],
+    final pass1Result = await _runGeminiWithRetry(
+      command: 'cat ${pass1Prompt.path} | gemini --yolo -m $_kGeminiProModel ${includes.join(" ")}',
       workingDirectory: repoRoot,
-      environment: {...Platform.environment},
+      taskLabel: '$moduleId/pass1',
     );
 
     if (pass1Prompt.existsSync()) pass1Prompt.deleteSync();
@@ -366,11 +362,10 @@ to make all necessary corrections and enhancements in-place.
 Write the corrected file to the same path: $absOutputFile
 ''');
 
-    final pass2Result = Process.runSync(
-      'sh',
-      ['-c', 'cat ${pass2Prompt.path} | gemini --yolo -m $_kGeminiProModel ${includes.join(" ")}'],
+    final pass2Result = await _runGeminiWithRetry(
+      command: 'cat ${pass2Prompt.path} | gemini --yolo -m $_kGeminiProModel ${includes.join(" ")}',
       workingDirectory: repoRoot,
-      environment: {...Platform.environment},
+      taskLabel: '$moduleId/pass2',
     );
 
     if (pass2Prompt.existsSync()) pass2Prompt.deleteSync();
@@ -389,6 +384,63 @@ Write the corrected file to the same path: $absOutputFile
     }
 
     Logger.warn('  [$moduleId] No $outputFileName produced');
+  }
+
+  /// Executes [tasks] (closures returning futures) with at most [concurrency] running at once.
+  ///
+  /// Unlike fixed-size batching, this starts the next task as soon as any slot frees,
+  /// so the pool stays at capacity without idle gaps between waves.
+  Future<void> _forEachConcurrent(List<Future<void> Function()> tasks, int concurrency) async {
+    var index = 0;
+    final active = <Future<void>>[];
+
+    while (index < tasks.length || active.isNotEmpty) {
+      while (active.length < concurrency && index < tasks.length) {
+        final f = tasks[index++]();
+        active.add(f);
+        // ignore: unawaited_futures
+        f.whenComplete(() => active.remove(f));
+      }
+      if (active.isNotEmpty) await Future.any(active);
+    }
+  }
+
+  static const _maxRetries = 3;
+  static const _retryDelays = [Duration(seconds: 5), Duration(seconds: 15), Duration(seconds: 45)];
+  static final _rateLimitPattern = RegExp(r'(429|RESOURCE_EXHAUSTED|rate.?limit|quota)', caseSensitive: false);
+
+  /// Runs a Gemini CLI shell command, retrying on rate-limit errors with exponential backoff.
+  ///
+  /// Returns a [ProcessResult] identical in structure to [Process.runSync] output.
+  Future<ProcessResult> _runGeminiWithRetry({
+    required String command,
+    required String workingDirectory,
+    required String taskLabel,
+  }) async {
+    for (var attempt = 0; attempt <= _maxRetries; attempt++) {
+      final result = await Process.run(
+        'sh',
+        ['-c', command],
+        workingDirectory: workingDirectory,
+        environment: Platform.environment,
+      );
+
+      if (result.exitCode == 0) return result;
+
+      final stderr = result.stderr as String;
+      final attemptsLeft = _maxRetries - attempt;
+
+      if (_rateLimitPattern.hasMatch(stderr) && attemptsLeft > 0) {
+        final delay = _retryDelays[attempt.clamp(0, _retryDelays.length - 1)];
+        Logger.warn('  [$taskLabel] Rate limited — retrying in ${delay.inSeconds}s ($attemptsLeft left)');
+        await Future.delayed(delay);
+        continue;
+      }
+
+      return result; // non-retryable or retries exhausted
+    }
+    // Unreachable but required by Dart control flow analysis.
+    return await Process.run('sh', ['-c', 'exit 1'], workingDirectory: workingDirectory);
   }
 
   /// Compute SHA256 hash of all source files in the given paths.
