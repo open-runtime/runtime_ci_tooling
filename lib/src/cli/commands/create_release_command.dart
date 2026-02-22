@@ -242,6 +242,15 @@ class CreateReleaseCommand extends Command<void> {
           verbose: global.verbose,
         );
       }
+      // Pull with rebase to handle concurrent pipeline jobs (e.g. Autodoc) that may have
+      // pushed to main between our checkout and now, causing a non-fast-forward push failure.
+      CiProcessRunner.exec(
+        'git',
+        ['pull', '--rebase', 'origin', 'main'],
+        cwd: repoRoot,
+        fatal: true,
+        verbose: global.verbose,
+      );
       CiProcessRunner.exec('git', ['push', 'origin', 'main'], cwd: repoRoot, fatal: true, verbose: global.verbose);
       Logger.success('Committed and pushed changes');
     } else {
