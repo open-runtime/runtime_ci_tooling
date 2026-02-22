@@ -18,7 +18,7 @@ import '../utils/repo_utils.dart';
 import '../utils/step_summary.dart';
 import '../utils/version_detection.dart';
 
-const String _kGeminiProModel = 'gemini-3-pro-preview';
+const String _kGeminiProModel = 'gemini-3.1-pro-preview';
 
 /// Run the full release pipeline locally (version + explore + compose).
 class ReleaseCommand extends Command<void> {

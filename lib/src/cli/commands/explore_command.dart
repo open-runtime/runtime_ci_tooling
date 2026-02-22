@@ -16,7 +16,7 @@ import '../utils/repo_utils.dart';
 import '../utils/step_summary.dart';
 import '../utils/version_detection.dart';
 
-const String _kGeminiProModel = 'gemini-3-pro-preview';
+const String _kGeminiProModel = 'gemini-3.1-pro-preview';
 
 /// Run Stage 1 Explorer Agent locally.
 /// Gracefully skips if Gemini is unavailable.

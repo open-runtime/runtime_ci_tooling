@@ -54,7 +54,7 @@ import 'options/manage_cicd_options.dart';
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const String kGeminiModel = 'gemini-3-flash-preview';
-const String kGeminiProModel = 'gemini-3-pro-preview';
+const String kGeminiProModel = 'gemini-3.1-pro-preview';
 const int kMaxTurns = 100;
 
 const List<String> kRequiredTools = ['git', 'gh', 'node', 'npm', 'jq'];
@@ -3435,7 +3435,7 @@ Future<void> _runInit(String repoRoot) async {
       },
       'gemini': {
         'flash_model': 'gemini-3-flash-preview',
-        'pro_model': 'gemini-3-pro-preview',
+        'pro_model': 'gemini-3.1-pro-preview',
         'max_turns': 100,
         'max_concurrent': 4,
         'max_retries': 3,

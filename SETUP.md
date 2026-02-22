@@ -439,7 +439,7 @@ The `.runtime_ci/config.json` file controls all behavior. Here is the complete s
   },
   "gemini": {
     "flash_model": "gemini-3-flash-preview",
-    "pro_model": "gemini-3-pro-preview",
+    "pro_model": "gemini-3.1-pro-preview",
     "max_turns": 100,
     "max_concurrent": 4,
     "max_retries": 3
@@ -490,7 +490,7 @@ Available agents: `code_analysis`, `pr_correlation`, `duplicate`, `sentiment`, `
 | Key | Default | Description |
 |---|---|---|
 | `flash_model` | `"gemini-3-flash-preview"` | Fast model for agent investigations |
-| `pro_model` | `"gemini-3-pro-preview"` | Powerful model for complex analysis (explore, compose, release notes) |
+| `pro_model` | `"gemini-3.1-pro-preview"` | Powerful model for complex analysis (explore, compose, release notes) |
 | `max_turns` | `100` | Maximum conversation turns per Gemini invocation |
 | `max_concurrent` | `4` | Maximum parallel Gemini processes |
 | `max_retries` | `3` | Retry count with exponential backoff |

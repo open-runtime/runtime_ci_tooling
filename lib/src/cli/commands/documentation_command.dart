@@ -14,7 +14,7 @@ import '../utils/prompt_resolver.dart';
 import '../utils/repo_utils.dart';
 import '../utils/version_detection.dart';
 
-const String _kGeminiProModel = 'gemini-3-pro-preview';
+const String _kGeminiProModel = 'gemini-3.1-pro-preview';
 
 /// Run documentation update via Gemini.
 /// Gracefully skips if Gemini is unavailable.
