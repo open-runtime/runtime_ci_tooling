@@ -112,6 +112,14 @@ class ConsumersCommand extends Command<void> {
     return tagName.trim();
   }
 
+  /// Snapshot identity is filename-based so resume survives workspace relocations.
+  static String snapshotIdentityFromPath(String path) {
+    final normalized = path.replaceAll('\\', '/');
+    final segments = normalized.split('/').where((segment) => segment.isNotEmpty).toList();
+    if (segments.isEmpty) return normalized;
+    return segments.last;
+  }
+
   /// Returns the expected release output path for a repo/tag combination.
   static String buildReleaseOutputPath({required String outputDir, required String repoName, required String tagName}) {
     return _joinPath(outputDir, [repoName, resolveVersionFolderName(tagName)]);
@@ -123,7 +131,17 @@ class ConsumersCommand extends Command<void> {
     required bool includePrerelease,
     RegExp? tagPattern,
   }) {
-    for (final release in releases) {
+    final orderedReleases = List<Map<String, dynamic>>.from(releases)
+      ..sort((a, b) {
+        final aPublished = DateTime.tryParse(a['publishedAt']?.toString() ?? '');
+        final bPublished = DateTime.tryParse(b['publishedAt']?.toString() ?? '');
+        if (aPublished == null && bPublished == null) return 0;
+        if (aPublished == null) return 1;
+        if (bPublished == null) return -1;
+        return bPublished.compareTo(aPublished);
+      });
+
+    for (final release in orderedReleases) {
       if (release['isDraft'] == true) continue;
       final isPrerelease = release['isPrerelease'] == true;
       if (!includePrerelease && isPrerelease) continue;
@@ -630,7 +648,7 @@ class ConsumersCommand extends Command<void> {
     required bool verbose,
   }) async {
     final fullName = descriptor.fullName;
-    var pubspec = _fetchPubspec(repoRoot: repoRoot, fullName: fullName, verbose: verbose);
+    var pubspec = await _fetchPubspec(repoRoot: repoRoot, fullName: fullName, verbose: verbose);
     var dependencyConstraint = _readDependencyConstraint(
       pubspec?.content,
       packageName: packageName,
@@ -649,48 +667,76 @@ class ConsumersCommand extends Command<void> {
       matchedPath = pubspec?.path ?? 'pubspec.yaml';
       usageSignals.add('pubspec_dependency');
     } else {
-      final targetedSearch = _searchCode(
-        repoRoot: repoRoot,
-        query: '$packageName repo:$fullName filename:pubspec.yaml',
-        verbose: verbose,
-      );
-      if (targetedSearch.totalCount > 0) {
-        matchedPath = targetedSearch.firstPath;
-        usageSignals.add('code_search_pubspec');
+      final prefilterPubspecPaths = prefilterPaths.where((path) => path.endsWith('pubspec.yaml')).toList();
+      if (prefilterPubspecPaths.isNotEmpty) {
+        matchedPath = prefilterPubspecPaths.first;
+        usageSignals.add('org_search_pubspec');
+      } else if (orgSearchUsed && prefilterPaths.isNotEmpty) {
+        matchedPath = prefilterPaths.first;
+        usageSignals.add('org_search_general');
+      }
 
-        final searchPath = matchedPath;
-        if (searchPath != null &&
-            searchPath.endsWith('pubspec.yaml') &&
-            (pubspec == null || searchPath != pubspec.path)) {
-          final nestedPubspec = _fetchPubspec(
-            repoRoot: repoRoot,
-            fullName: fullName,
-            verbose: verbose,
-            path: searchPath,
+      if (prefilterPaths.contains(_kRuntimeCiConfigPath)) {
+        runtimeCiConfigPath = _kRuntimeCiConfigPath;
+        if (matchedPath == null) {
+          matchedPath = _kRuntimeCiConfigPath;
+        }
+        usageSignals.add('runtime_ci_config');
+      }
+
+      if (matchedPath != null &&
+          matchedPath.endsWith('pubspec.yaml') &&
+          (pubspec == null || matchedPath != pubspec.path)) {
+        final nestedPubspec = await _fetchPubspec(
+          repoRoot: repoRoot,
+          fullName: fullName,
+          verbose: verbose,
+          path: matchedPath,
+        );
+        if (nestedPubspec != null) {
+          pubspec = nestedPubspec;
+          dependencyConstraint = _readDependencyConstraint(
+            nestedPubspec.content,
+            packageName: packageName,
+            section: 'dependencies',
           );
-          if (nestedPubspec != null) {
-            pubspec = nestedPubspec;
-            dependencyConstraint = _readDependencyConstraint(
-              nestedPubspec.content,
-              packageName: packageName,
-              section: 'dependencies',
-            );
-            devDependencyConstraint = _readDependencyConstraint(
-              nestedPubspec.content,
-              packageName: packageName,
-              section: 'dev_dependencies',
-            );
-            if (dependencyConstraint != null || devDependencyConstraint != null) {
-              usageSignals.add('pubspec_dependency_nested');
-            }
+          devDependencyConstraint = _readDependencyConstraint(
+            nestedPubspec.content,
+            packageName: packageName,
+            section: 'dev_dependencies',
+          );
+          if (dependencyConstraint != null || devDependencyConstraint != null) {
+            usageSignals.add('pubspec_dependency_nested');
           }
         }
-      } else {
-        final broadSearch = _searchCode(repoRoot: repoRoot, query: '$packageName repo:$fullName', verbose: verbose);
+      }
+
+      if (dependencyConstraint == null && devDependencyConstraint == null && matchedPath == null && allowRepoSearch) {
+        final targetedSearch = await _searchCode(
+          repoRoot: repoRoot,
+          query: '$packageName repo:$fullName filename:pubspec.yaml',
+          verbose: verbose,
+        );
+        if (targetedSearch.totalCount > 0) {
+          matchedPath = targetedSearch.firstPath;
+          usageSignals.add('code_search_pubspec');
+        }
+      }
+
+      if (dependencyConstraint == null &&
+          devDependencyConstraint == null &&
+          matchedPath == null &&
+          runtimeCiConfigPath == null &&
+          allowRepoSearch) {
+        final broadSearch = await _searchCode(
+          repoRoot: repoRoot,
+          query: '$packageName repo:$fullName',
+          verbose: verbose,
+        );
         if (broadSearch.totalCount > 0) {
           matchedPath = broadSearch.firstPath;
           usageSignals.add('code_search_general');
-        } else if (_repoFileExists(
+        } else if (await _repoFileExists(
           repoRoot: repoRoot,
           fullName: fullName,
           path: _kRuntimeCiConfigPath,
@@ -723,12 +769,15 @@ class ConsumersCommand extends Command<void> {
     );
   }
 
-  _CodeSearchResult _searchCode({required String repoRoot, required String query, required bool verbose}) {
+  Future<_CodeSearchResult> _searchCode({
+    required String repoRoot,
+    required String query,
+    required bool verbose,
+  }) async {
     final encodedQuery = Uri.encodeQueryComponent(query);
-    final result = _runProcess(
-      executable: 'gh',
+    final result = await _searchCodeApiRequest(
+      repoRoot: repoRoot,
       args: ['api', 'search/code?q=$encodedQuery&per_page=1'],
-      cwd: repoRoot,
       verbose: verbose,
     );
     if (result.exitCode != 0) {
@@ -755,13 +804,61 @@ class ConsumersCommand extends Command<void> {
     }
   }
 
-  bool _repoFileExists({
+  Future<ProcessResult> _searchCodeApiRequest({
+    required String repoRoot,
+    required List<String> args,
+    required bool verbose,
+  }) {
+    final completer = Completer<ProcessResult>();
+
+    _searchSerialQueue = _searchSerialQueue
+        .then((_) async {
+          if (_lastSearchRequestAt != null) {
+            final elapsed = DateTime.now().difference(_lastSearchRequestAt!);
+            final remaining = _kSearchRequestMinInterval - elapsed;
+            if (!remaining.isNegative) {
+              await Future<void>.delayed(remaining);
+            }
+          }
+
+          ProcessResult? finalResult;
+          for (var attempt = 0; attempt < 3; attempt++) {
+            final result = await _runProcess(executable: 'gh', args: args, cwd: repoRoot, verbose: verbose);
+            finalResult = result;
+            if (result.exitCode == 0) {
+              break;
+            }
+
+            final stderr = (result.stderr as String?)?.toLowerCase() ?? '';
+            final looksRateLimited = stderr.contains('rate limit') || stderr.contains('secondary rate');
+            if (!looksRateLimited || attempt == 2) {
+              break;
+            }
+
+            final backoffSeconds = 5 * (attempt + 1);
+            Logger.warn('Code search rate-limited; retrying in ${backoffSeconds}s...');
+            await Future<void>.delayed(Duration(seconds: backoffSeconds));
+          }
+
+          _lastSearchRequestAt = DateTime.now();
+          completer.complete(finalResult ?? ProcessResult(0, 1, '', 'Unable to execute search request.'));
+        })
+        .catchError((Object error, StackTrace stackTrace) {
+          if (!completer.isCompleted) {
+            completer.completeError(error, stackTrace);
+          }
+        });
+
+    return completer.future;
+  }
+
+  Future<bool> _repoFileExists({
     required String repoRoot,
     required String fullName,
     required String path,
     required bool verbose,
-  }) {
-    final result = _runProcess(
+  }) async {
+    final result = await _runProcess(
       executable: 'gh',
       args: ['api', 'repos/$fullName/contents/$path'],
       cwd: repoRoot,
@@ -770,13 +867,13 @@ class ConsumersCommand extends Command<void> {
     return result.exitCode == 0;
   }
 
-  _PubspecFile? _fetchPubspec({
+  Future<_PubspecFile?> _fetchPubspec({
     required String repoRoot,
     required String fullName,
     required bool verbose,
     String path = 'pubspec.yaml',
-  }) {
-    final result = _runProcess(
+  }) async {
+    final result = await _runProcess(
       executable: 'gh',
       args: ['api', 'repos/$fullName/contents/$path'],
       cwd: repoRoot,
@@ -880,8 +977,7 @@ class ConsumersCommand extends Command<void> {
     };
 
     if (!dryRun) {
-      File(snapshotPath).parent.createSync(recursive: true);
-      File(snapshotPath).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(snapshot));
+      _atomicWriteJson(snapshotPath, snapshot);
     }
 
     return _SnapshotResult(snapshotPath: snapshotPath, consumers: discovery.consumers, runStatus: runStatus);
@@ -997,6 +1093,7 @@ class ConsumersCommand extends Command<void> {
       'generated_at_local': nowLocal.toIso8601String(),
       'generated_at_utc': nowLocal.toUtc().toIso8601String(),
       'source_snapshot': sourceSnapshotPath,
+      'source_snapshot_identity': snapshotIdentityFromPath(sourceSnapshotPath),
       'package': packageName,
       'criteria': criteria.toJson(),
       'repo_count': repoCount,
@@ -1008,9 +1105,7 @@ class ConsumersCommand extends Command<void> {
       'repos': sortedSummaries.map((summary) => summary.toJson()).toList(),
     };
 
-    final file = File(releaseSummaryPath);
-    file.parent.createSync(recursive: true);
-    file.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(releaseSummary));
+    _atomicWriteJson(releaseSummaryPath, releaseSummary);
   }
 
   Map<String, _ReleaseSyncSummary> _loadExistingReleaseSummaries({
@@ -1027,7 +1122,15 @@ class ConsumersCommand extends Command<void> {
       if (parsed is! Map<String, dynamic>) return {};
 
       final sourceSnapshot = parsed['source_snapshot']?.toString();
-      if (sourceSnapshot != expectedSnapshotPath) return {};
+      final sourceSnapshotIdentity =
+          _normalizeNullableString(parsed['source_snapshot_identity']) ??
+          (sourceSnapshot == null ? null : snapshotIdentityFromPath(sourceSnapshot));
+      final expectedSnapshotIdentity = snapshotIdentityFromPath(expectedSnapshotPath);
+      final sourceSnapshotNormalized = sourceSnapshot == null ? null : _normalizePathForComparison(sourceSnapshot);
+      final expectedSnapshotNormalized = _normalizePathForComparison(expectedSnapshotPath);
+      final identityMatches = sourceSnapshotIdentity == expectedSnapshotIdentity;
+      final normalizedPathMatches = sourceSnapshotNormalized == expectedSnapshotNormalized;
+      if (!identityMatches && !normalizedPathMatches) return {};
 
       final criteriaMap = parsed['criteria'];
       if (criteriaMap is! Map<String, dynamic>) return {};
@@ -1063,6 +1166,27 @@ class ConsumersCommand extends Command<void> {
         existingCriteria['include_prerelease'] == expectedCriteria.includePrerelease;
   }
 
+  String _normalizePathForComparison(String path) {
+    var normalized = path.replaceAll('\\', '/').trim();
+    while (normalized.endsWith('/') && normalized.length > 1) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    return normalized;
+  }
+
+  void _atomicWriteJson(String targetPath, Map<String, dynamic> data) {
+    final targetFile = File(targetPath);
+    targetFile.parent.createSync(recursive: true);
+
+    final tmpFile = File('$targetPath.tmp.${DateTime.now().microsecondsSinceEpoch}');
+    tmpFile.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(data));
+
+    if (targetFile.existsSync()) {
+      targetFile.deleteSync();
+    }
+    tmpFile.renameSync(targetPath);
+  }
+
   String? _normalizeNullableString(Object? value) {
     if (value == null) return null;
     final text = value.toString().trim();
@@ -1070,7 +1194,7 @@ class ConsumersCommand extends Command<void> {
     return text;
   }
 
-  _ReleaseSyncSummary _syncRepoRelease({
+  Future<_ReleaseSyncSummary> _syncRepoRelease({
     required String repoRoot,
     required String outputDir,
     required _ConsumerRepo consumer,
@@ -1079,8 +1203,8 @@ class ConsumersCommand extends Command<void> {
     required bool includePrerelease,
     required bool verbose,
     required bool dryRun,
-  }) {
-    final release = _resolveRelease(
+  }) async {
+    final release = await _resolveRelease(
       repoRoot: repoRoot,
       consumer: consumer,
       exactTag: exactTag,
@@ -1130,7 +1254,7 @@ class ConsumersCommand extends Command<void> {
     final releaseMdPath = _joinPath(repoOutputPath, ['RELEASE.md']);
     final pubspecPath = _joinPath(repoOutputPath, ['pubspec.yaml']);
 
-    final pubspec = _fetchPubspec(repoRoot: repoRoot, fullName: consumer.fullName, verbose: verbose);
+    final pubspec = await _fetchPubspec(repoRoot: repoRoot, fullName: consumer.fullName, verbose: verbose);
     final metadata = <String, dynamic>{
       'repository': consumer.fullName,
       'discovery': consumer.toJson(),
@@ -1158,7 +1282,7 @@ class ConsumersCommand extends Command<void> {
       if (dryRun) {
         Logger.info('[DRY-RUN] Would download ${assets.length} assets to ${assetsDir.path}');
       } else {
-        final download = _runProcess(
+        final download = await _runProcess(
           executable: 'gh',
           args: ['release', 'download', tag, '--repo', consumer.fullName, '--dir', assetsDir.path, '--clobber'],
           cwd: repoRoot,
@@ -1182,19 +1306,19 @@ class ConsumersCommand extends Command<void> {
     return _ReleaseSyncSummary(fullName: consumer.fullName, status: 'ok', tag: tag, outputPath: repoOutputPath);
   }
 
-  Map<String, dynamic>? _resolveRelease({
+  Future<Map<String, dynamic>?> _resolveRelease({
     required String repoRoot,
     required _ConsumerRepo consumer,
     required String? exactTag,
     required RegExp? tagPattern,
     required bool includePrerelease,
     required bool verbose,
-  }) {
+  }) async {
     if (exactTag != null && exactTag.isNotEmpty) {
       return _viewRelease(repoRoot: repoRoot, fullName: consumer.fullName, tag: exactTag, verbose: verbose);
     }
 
-    final listResult = _runProcess(
+    final listResult = await _runProcess(
       executable: 'gh',
       args: [
         'release',
@@ -1232,13 +1356,13 @@ class ConsumersCommand extends Command<void> {
     }
   }
 
-  Map<String, dynamic>? _viewRelease({
+  Future<Map<String, dynamic>?> _viewRelease({
     required String repoRoot,
     required String fullName,
     required String tag,
     required bool verbose,
-  }) {
-    final result = _runProcess(
+  }) async {
+    final result = await _runProcess(
       executable: 'gh',
       args: [
         'release',
@@ -1286,16 +1410,16 @@ class ConsumersCommand extends Command<void> {
     return Directory(_joinPath(repoRoot, [outputDirOption]));
   }
 
-  ProcessResult _runProcess({
+  Future<ProcessResult> _runProcess({
     required String executable,
     required List<String> args,
     required String cwd,
     required bool verbose,
-  }) {
+  }) async {
     if (verbose) {
       Logger.info('  \$ $executable ${args.join(" ")}');
     }
-    return Process.runSync(executable, args, workingDirectory: cwd);
+    return Process.run(executable, args, workingDirectory: cwd);
   }
 }
 
