@@ -191,19 +191,13 @@ class InitCommand extends Command<void> {
       final srcDir = Directory('$repoRoot/lib/src');
       if (srcDir.existsSync()) {
         // Scan lib/src/ subdirectories for modules
-        final subdirs = srcDir
-            .listSync()
-            .whereType<Directory>()
-            .where((d) => !d.path.split('/').last.startsWith('.'))
-            .toList()
-          ..sort((a, b) => a.path.compareTo(b.path));
+        final subdirs =
+            srcDir.listSync().whereType<Directory>().where((d) => !d.path.split('/').last.startsWith('.')).toList()
+              ..sort((a, b) => a.path.compareTo(b.path));
 
         for (final dir in subdirs) {
           final dirName = dir.path.split('/').last;
-          final displayName = dirName
-              .split('_')
-              .map((w) => '${w[0].toUpperCase()}${w.substring(1)}')
-              .join(' ');
+          final displayName = dirName.split('_').map((w) => '${w[0].toUpperCase()}${w.substring(1)}').join(' ');
           modules.add({
             'id': dirName,
             'name': displayName,
@@ -231,10 +225,7 @@ class InitCommand extends Command<void> {
         // No lib/src/ -- use lib/ as single module
         modules.add({
           'id': 'core',
-          'name': packageName
-              .split('_')
-              .map((w) => '${w[0].toUpperCase()}${w.substring(1)}')
-              .join(' '),
+          'name': packageName.split('_').map((w) => '${w[0].toUpperCase()}${w.substring(1)}').join(' '),
           'source_paths': ['lib/'],
           'lib_paths': ['lib/'],
           'output_path': 'docs/',
@@ -256,9 +247,7 @@ class InitCommand extends Command<void> {
             'examples': 'scripts/prompts/autodoc_examples_prompt.dart',
           },
         };
-        autodocFile.writeAsStringSync(
-          '${const JsonEncoder.withIndent('  ').convert(autodocData)}\n',
-        );
+        autodocFile.writeAsStringSync('${const JsonEncoder.withIndent('  ').convert(autodocData)}\n');
         Logger.success('Created $kRuntimeCiDir/autodoc.json with ${modules.length} modules');
       } else {
         Logger.warn('No lib/ directory found -- skipping autodoc.json');
