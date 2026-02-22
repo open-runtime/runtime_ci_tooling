@@ -19,6 +19,7 @@ import 'commands/setup_command.dart';
 import 'commands/status_command.dart';
 import 'commands/test_command.dart';
 import 'commands/triage/triage_command.dart';
+import 'commands/update_all_command.dart';
 import 'commands/update_command.dart';
 import 'commands/validate_command.dart';
 import 'commands/verify_protos_command.dart';
@@ -66,6 +67,7 @@ class ManageCicdCli extends CommandRunner<void> {
     addCommand(StatusCommand());
     addCommand(TestCommand());
     addCommand(TriageCommand());
+    addCommand(UpdateAllCommand());
     addCommand(UpdateCommand());
     addCommand(ValidateCommand());
     addCommand(VerifyProtosCommand());
