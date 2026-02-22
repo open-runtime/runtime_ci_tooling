@@ -20,10 +20,7 @@ class WorkflowGenerator {
   final Map<String, dynamic> ciConfig;
   final String toolingVersion;
 
-  WorkflowGenerator({
-    required this.ciConfig,
-    required this.toolingVersion,
-  });
+  WorkflowGenerator({required this.ciConfig, required this.toolingVersion});
 
   /// Load the CI config section from a repo's config.json.
   ///
@@ -42,9 +39,7 @@ class WorkflowGenerator {
     final ci = config['ci'];
     if (ci == null) return null;
     if (ci is! Map<String, dynamic>) {
-      throw StateError(
-        'Expected "ci" in $configPath to be an object, got ${ci.runtimeType}',
-      );
+      throw StateError('Expected "ci" in $configPath to be an object, got ${ci.runtimeType}');
     }
     return ci;
   }
@@ -83,10 +78,7 @@ class WorkflowGenerator {
     final secretsList = <Map<String, String>>[];
     for (final entry in secrets.entries) {
       if (entry.value is String) {
-        secretsList.add({
-          'env_name': entry.key,
-          'secret_name': entry.value as String,
-        });
+        secretsList.add({'env_name': entry.key, 'secret_name': entry.value as String});
       }
     }
 
@@ -124,10 +116,7 @@ class WorkflowGenerator {
   ///   `# --- BEGIN USER: <name> ---`
   ///   `# --- END USER: <name> ---`
   String _preserveUserSections(String rendered, String existing) {
-    final sectionPattern = RegExp(
-      r'# --- BEGIN USER: (\S+) ---\n(.*?)# --- END USER: \1 ---',
-      dotAll: true,
-    );
+    final sectionPattern = RegExp(r'# --- BEGIN USER: (\S+) ---\n(.*?)# --- END USER: \1 ---', dotAll: true);
 
     // Extract user content from existing file
     final userSections = <String, String>{};

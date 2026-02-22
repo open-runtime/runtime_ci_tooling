@@ -454,8 +454,10 @@ class UpdateCommand extends Command<void> {
     // Load CI config from the consumer repo
     final ciConfig = WorkflowGenerator.loadCiConfig(repoRoot);
     if (ciConfig == null) {
-      Logger.warn('  ${entry.id}: no "ci" section in config.json. '
-          'Add a "ci" section to enable config-driven workflow generation.');
+      Logger.warn(
+        '  ${entry.id}: no "ci" section in config.json. '
+        'Add a "ci" section to enable config-driven workflow generation.',
+      );
       return _UpdateResult(entry.id, 'warning', reason: 'no ci config -- add "ci" section to config.json');
     }
 
@@ -475,10 +477,7 @@ class UpdateCommand extends Command<void> {
     final existingContent = destFile.existsSync() ? destFile.readAsStringSync() : null;
 
     // Generate the workflow
-    final generator = WorkflowGenerator(
-      ciConfig: ciConfig,
-      toolingVersion: toolingVersion,
-    );
+    final generator = WorkflowGenerator(ciConfig: ciConfig, toolingVersion: toolingVersion);
 
     if (verbose) {
       Logger.info('  ${entry.id}: rendering from config:');

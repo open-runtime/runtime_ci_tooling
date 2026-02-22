@@ -6,11 +6,8 @@ part of 'autodoc_options.dart';
 // CliGenerator
 // **************************************************************************
 
-AutodocOptions _$parseAutodocOptionsResult(ArgResults result) => AutodocOptions(
-  init: result['init'] as bool,
-  force: result['force'] as bool,
-  module: result['module'] as String?,
-);
+AutodocOptions _$parseAutodocOptionsResult(ArgResults result) =>
+    AutodocOptions(init: result['init'] as bool, force: result['force'] as bool, module: result['module'] as String?);
 
 ArgParser _$populateAutodocOptionsParser(ArgParser parser) => parser
   ..addFlag('init', help: 'Scan repo and create initial autodoc.json')
