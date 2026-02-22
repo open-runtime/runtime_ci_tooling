@@ -59,6 +59,16 @@ void main() {
       );
       expect(tag, equals('v2.0.0'));
     });
+
+    test('selects newest by publishedAt even when input is unsorted', () {
+      final unsorted = <Map<String, dynamic>>[
+        {'tagName': 'v1.0.0', 'isPrerelease': false, 'isDraft': false, 'publishedAt': '2024-01-01T00:00:00Z'},
+        {'tagName': 'v3.0.0', 'isPrerelease': false, 'isDraft': false, 'publishedAt': '2026-01-01T00:00:00Z'},
+        {'tagName': 'v2.0.0', 'isPrerelease': false, 'isDraft': false, 'publishedAt': '2025-01-01T00:00:00Z'},
+      ];
+      final tag = ConsumersCommand.selectTagFromReleaseList(releases: unsorted, includePrerelease: false);
+      expect(tag, equals('v3.0.0'));
+    });
   });
 
   group('buildReleaseOutputPath', () {
@@ -68,7 +78,23 @@ void main() {
         repoName: 'runtime_isomorphic_library',
         tagName: 'v1.2.3',
       );
-      expect(path, equals('.consumers/runtime_isomorphic_library/v1.2.3'));
+      expect(path.replaceAll('\\', '/'), equals('.consumers/runtime_isomorphic_library/v1.2.3'));
+    });
+  });
+
+  group('snapshotIdentityFromPath', () {
+    test('extracts stable filename identity from absolute path', () {
+      final identity = ConsumersCommand.snapshotIdentityFromPath(
+        '/tmp/workspaces/aot/.consumers/repos/discovery_run_3_local_time_22_02_26.json',
+      );
+      expect(identity, equals('discovery_run_3_local_time_22_02_26.json'));
+    });
+
+    test('normalizes windows separators for snapshot identity', () {
+      final identity = ConsumersCommand.snapshotIdentityFromPath(
+        r'C:\repos\aot\.consumers\repos\discovery_run_7_local_time_22_02_26.json',
+      );
+      expect(identity, equals('discovery_run_7_local_time_22_02_26.json'));
     });
   });
 }

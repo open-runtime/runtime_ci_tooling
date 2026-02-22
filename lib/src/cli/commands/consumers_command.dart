@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -17,11 +18,15 @@ const int _kDefaultRepoLimit = 1000;
 const int _kDefaultReleaseListLimit = 100;
 const String _kRuntimeCiConfigPath = '.runtime_ci/config.json';
 const String _kLatestReleaseSyncFileName = 'latest_release_sync.json';
+const Duration _kSearchRequestMinInterval = Duration(seconds: 7);
 final RegExp _kDiscoveryFilePattern = RegExp(r'^discovery_run_(\d+)_local_time_\d{2}_\d{2}_\d{2}\.json$');
 final RegExp _kLegacyDiscoveryFilePattern = RegExp(r'^discovery_#(\d+)_local_time_\d{2}_\d{2}_\d{2}\.json$');
 
 /// Discover repos that consume `runtime_ci_tooling`, then sync release artifacts.
 class ConsumersCommand extends Command<void> {
+  Future<void> _searchSerialQueue = Future<void>.value();
+  DateTime? _lastSearchRequestAt;
+
   @override
   final String name = 'consumers';
 
@@ -60,6 +65,13 @@ class ConsumersCommand extends Command<void> {
         help:
             'Resume release sync from existing .consumers/repos/latest_release_sync.json and skip already-complete repos.',
       )
+      ..addFlag(
+        'search-first',
+        defaultsTo: true,
+        help: 'Use org-level code search prefilter before per-repo verification.',
+      )
+      ..addOption('discovery-workers', defaultsTo: '4', help: 'Max concurrent workers for discovery verification.')
+      ..addOption('release-workers', defaultsTo: '4', help: 'Max concurrent workers for release syncing.')
       ..addOption(
         'repo-limit',
         defaultsTo: '$_kDefaultRepoLimit',
@@ -100,6 +112,14 @@ class ConsumersCommand extends Command<void> {
     return tagName.trim();
   }
 
+  /// Filename identity used for resume across moved workspaces.
+  static String snapshotIdentityFromPath(String path) {
+    final normalized = path.replaceAll('\\', '/');
+    final segments = normalized.split('/').where((segment) => segment.isNotEmpty).toList();
+    if (segments.isEmpty) return normalized;
+    return segments.last;
+  }
+
   /// Returns the expected release output path for a repo/tag combination.
   static String buildReleaseOutputPath({required String outputDir, required String repoName, required String tagName}) {
     return _joinPath(outputDir, [repoName, resolveVersionFolderName(tagName)]);
@@ -111,7 +131,17 @@ class ConsumersCommand extends Command<void> {
     required bool includePrerelease,
     RegExp? tagPattern,
   }) {
-    for (final release in releases) {
+    final orderedReleases = List<Map<String, dynamic>>.from(releases)
+      ..sort((a, b) {
+        final aPublished = DateTime.tryParse(a['publishedAt']?.toString() ?? '');
+        final bPublished = DateTime.tryParse(b['publishedAt']?.toString() ?? '');
+        if (aPublished == null && bPublished == null) return 0;
+        if (aPublished == null) return 1;
+        if (bPublished == null) return -1;
+        return bPublished.compareTo(aPublished);
+      });
+
+    for (final release in orderedReleases) {
       if (release['isDraft'] == true) continue;
       final isPrerelease = release['isPrerelease'] == true;
       if (!includePrerelease && isPrerelease) continue;
@@ -161,6 +191,7 @@ class ConsumersCommand extends Command<void> {
     if (runDiscovery) {
       Logger.header('Consumers Discovery');
       final snapshotTarget = _nextSnapshotTarget(reposDir: reposDir);
+      var lastDiscoveryCheckpointWrite = DateTime.fromMillisecondsSinceEpoch(0);
       if (global.dryRun) {
         Logger.info('[DRY-RUN] Would stream discovery updates to ${snapshotTarget.snapshotPath}');
       } else {
@@ -176,7 +207,9 @@ class ConsumersCommand extends Command<void> {
         );
       }
 
-      final discovery = _discoverConsumers(
+      final discovery = await _discoverConsumers(
+        searchFirst: options.searchFirst,
+        discoveryWorkers: options.discoveryWorkers,
         repoRoot: repoRoot,
         packageName: options.packageName,
         orgs: options.orgs,
@@ -184,6 +217,13 @@ class ConsumersCommand extends Command<void> {
         verbose: global.verbose,
         onProgress: (partial) {
           if (global.dryRun) return;
+          final now = DateTime.now();
+          final shouldFlush =
+              partial.scannedRepos % 10 == 0 ||
+              now.difference(lastDiscoveryCheckpointWrite) >= const Duration(seconds: 2);
+          if (!shouldFlush) {
+            return;
+          }
           _writeDiscoverySnapshotAtPath(
             snapshotPath: snapshotTarget.snapshotPath,
             index: snapshotTarget.index,
@@ -194,6 +234,7 @@ class ConsumersCommand extends Command<void> {
             runStatus: 'in_progress',
             dryRun: false,
           );
+          lastDiscoveryCheckpointWrite = now;
         },
       );
       snapshotResult = _writeDiscoverySnapshotAtPath(
@@ -267,16 +308,43 @@ class ConsumersCommand extends Command<void> {
       );
     }
 
+    final pendingConsumers = <_ConsumerRepo>[];
     for (final consumer in snapshotResult.consumers) {
-      final existing = summaryByRepo[consumer.fullName];
-      if (existing != null && _isCompletedSummaryReusable(existing, exactTag: options.tag)) {
+      final existingSummary = summaryByRepo[consumer.fullName];
+      if (existingSummary != null && _isCompletedSummaryReusable(existingSummary, exactTag: options.tag)) {
         Logger.info('Skipping ${consumer.fullName} (already completed in previous run).');
         continue;
       }
+      pendingConsumers.add(consumer);
+    }
 
+    var completionsSinceFlush = 0;
+    var lastReleaseCheckpointWrite = DateTime.now();
+    Future<void> flushReleaseSummaryIfNeeded({required bool force}) async {
+      if (global.dryRun) return;
+      final now = DateTime.now();
+      final shouldFlush =
+          force ||
+          completionsSinceFlush >= 3 ||
+          now.difference(lastReleaseCheckpointWrite) >= const Duration(seconds: 2);
+      if (!shouldFlush) return;
+      _writeReleaseSummary(
+        releaseSummaryPath: releaseSummaryPath,
+        sourceSnapshotPath: snapshotResult.snapshotPath,
+        criteria: criteria,
+        packageName: options.packageName,
+        repoCount: snapshotResult.consumers.length,
+        summaries: summaryByRepo.values.toList(),
+        runStatus: 'in_progress',
+      );
+      completionsSinceFlush = 0;
+      lastReleaseCheckpointWrite = now;
+    }
+
+    Future<void> processConsumer(_ConsumerRepo consumer) async {
       Logger.info('');
       Logger.header('Sync ${consumer.fullName}');
-      final summary = _syncRepoRelease(
+      final summary = await _syncRepoRelease(
         repoRoot: repoRoot,
         outputDir: outputDir.path,
         consumer: consumer,
@@ -287,18 +355,23 @@ class ConsumersCommand extends Command<void> {
         dryRun: global.dryRun,
       );
       summaryByRepo[consumer.fullName] = summary;
+      completionsSinceFlush++;
+      await flushReleaseSummaryIfNeeded(force: false);
+    }
 
-      if (!global.dryRun) {
-        _writeReleaseSummary(
-          releaseSummaryPath: releaseSummaryPath,
-          sourceSnapshotPath: snapshotResult.snapshotPath,
-          criteria: criteria,
-          packageName: options.packageName,
-          repoCount: snapshotResult.consumers.length,
-          summaries: summaryByRepo.values.toList(),
-          runStatus: 'in_progress',
+    if (pendingConsumers.isNotEmpty) {
+      if (options.releaseWorkers <= 1) {
+        for (final consumer in pendingConsumers) {
+          await processConsumer(consumer);
+        }
+      } else {
+        await _forEachConcurrent<_ConsumerRepo>(
+          items: pendingConsumers,
+          concurrency: options.releaseWorkers,
+          action: processConsumer,
         );
       }
+      await flushReleaseSummaryIfNeeded(force: true);
     }
 
     final counts = _countReleaseStatuses(summaryByRepo.values);
@@ -342,74 +415,96 @@ class ConsumersCommand extends Command<void> {
     }
   }
 
-  _DiscoveryResult _discoverConsumers({
+  Future<_DiscoveryResult> _discoverConsumers({
+    required bool searchFirst,
+    required int discoveryWorkers,
     required String repoRoot,
     required String packageName,
     required List<String> orgs,
     required int repoLimit,
     required bool verbose,
     void Function(_DiscoveryResult partial)? onProgress,
-  }) {
-    final consumers = <_ConsumerRepo>[];
+  }) async {
+    final consumersByRepo = <String, _ConsumerRepo>{};
     final failures = <Map<String, String>>[];
     var scannedRepos = 0;
 
-    for (final org in orgs) {
-      Logger.info('Scanning org: $org');
-      final repos = _listReposForOrg(repoRoot: repoRoot, org: org, repoLimit: repoLimit, verbose: verbose);
-
-      for (final repo in repos) {
-        scannedRepos++;
-        if (repo.repo == packageName) {
-          continue;
-        }
-        final consumer = _discoverConsumerInRepo(
-          repoRoot: repoRoot,
-          packageName: packageName,
-          descriptor: repo,
-          verbose: verbose,
-        );
-        if (consumer != null) {
-          consumers.add(consumer);
-          Logger.success('  Consumer: ${consumer.fullName}');
-          onProgress?.call(
-            _DiscoveryResult(
-              consumers: List<_ConsumerRepo>.from(consumers),
-              scannedRepos: scannedRepos,
-              failures: List<Map<String, String>>.from(failures),
-            ),
-          );
-        } else if (scannedRepos % 25 == 0) {
-          onProgress?.call(
-            _DiscoveryResult(
-              consumers: List<_ConsumerRepo>.from(consumers),
-              scannedRepos: scannedRepos,
-              failures: List<Map<String, String>>.from(failures),
-            ),
-          );
-        }
-      }
-
-      onProgress?.call(
+    void emitProgress() {
+      if (onProgress == null) return;
+      final snapshotConsumers = consumersByRepo.values.toList()..sort((a, b) => a.fullName.compareTo(b.fullName));
+      onProgress(
         _DiscoveryResult(
-          consumers: List<_ConsumerRepo>.from(consumers),
+          consumers: snapshotConsumers,
           scannedRepos: scannedRepos,
           failures: List<Map<String, String>>.from(failures),
         ),
       );
     }
 
-    consumers.sort((a, b) => a.fullName.compareTo(b.fullName));
+    for (final org in orgs) {
+      Logger.info('Scanning org: $org');
+      final repos = await _listReposForOrg(repoRoot: repoRoot, org: org, repoLimit: repoLimit, verbose: verbose);
+      if (repos.isEmpty) continue;
+      scannedRepos += repos.length;
+
+      final prefilter = searchFirst
+          ? await _searchFirstCandidatesForOrg(repoRoot: repoRoot, org: org, packageName: packageName, verbose: verbose)
+          : const _OrgSearchPrefilter.failed();
+      final usingFallback = !searchFirst || prefilter.failed || prefilter.incompleteResults;
+      if (usingFallback && searchFirst) {
+        Logger.warn('Search-first prefilter unavailable for $org; falling back to repo-by-repo verification.');
+      }
+
+      final candidatePathsByRepo = usingFallback ? const <String, List<String>>{} : prefilter.repoPathsByFullName;
+      final candidateRepos = repos
+          .where((repo) => repo.repo != packageName)
+          .where((repo) => usingFallback || candidatePathsByRepo.containsKey(repo.fullName))
+          .toList();
+      if (candidateRepos.isEmpty) {
+        emitProgress();
+        continue;
+      }
+
+      var processedCandidates = 0;
+      await _forEachConcurrent<_RepoDescriptor>(
+        items: candidateRepos,
+        concurrency: discoveryWorkers,
+        action: (_RepoDescriptor repo) async {
+          final prefilterPaths = candidatePathsByRepo[repo.fullName] ?? const <String>[];
+          final consumer = await _discoverConsumerInRepo(
+            allowRepoSearch: usingFallback,
+            orgSearchUsed: !usingFallback,
+            prefilterPaths: prefilterPaths,
+            repoRoot: repoRoot,
+            packageName: packageName,
+            descriptor: repo,
+            verbose: verbose,
+          );
+          processedCandidates++;
+          if (consumer != null) {
+            consumersByRepo[consumer.fullName] = consumer;
+            Logger.success('  Consumer: ${consumer.fullName}');
+            emitProgress();
+          } else if (processedCandidates % 25 == 0) {
+            emitProgress();
+          }
+        },
+      );
+
+      emitProgress();
+    }
+
+    final consumers = consumersByRepo.values.toList()..sort((a, b) => a.fullName.compareTo(b.fullName));
     return _DiscoveryResult(consumers: consumers, scannedRepos: scannedRepos, failures: failures);
   }
 
-  List<_RepoDescriptor> _listReposForOrg({
+  Future<List<_RepoDescriptor>> _listReposForOrg({
     required String repoRoot,
     required String org,
     required int repoLimit,
     required bool verbose,
-  }) {
-    final result = _runProcess(
+  }) async {
+    final result = await _runProcess(
       executable: 'gh',
       args: ['repo', 'list', org, '--limit', '$repoLimit', '--json', 'name,nameWithOwner,isArchived'],
       cwd: repoRoot,
@@ -449,14 +544,111 @@ class ConsumersCommand extends Command<void> {
     }
   }
 
-  _ConsumerRepo? _discoverConsumerInRepo({
+  Future<_OrgSearchPrefilter> _searchFirstCandidatesForOrg({
+    required String repoRoot,
+    required String org,
+    required String packageName,
+    required bool verbose,
+  }) async {
+    final queries = <_OrgSearchQuery>[
+      _OrgSearchQuery(query: '$packageName org:$org filename:pubspec.yaml'),
+      _OrgSearchQuery(query: '$packageName org:$org'),
+      _OrgSearchQuery(query: 'filename:config.json path:.runtime_ci org:$org'),
+    ];
+
+    final pathsByRepo = <String, Set<String>>{};
+    var anyIncomplete = false;
+
+    for (final query in queries) {
+      final result = await _searchCodeByOrg(repoRoot: repoRoot, query: query.query, verbose: verbose);
+      if (result.failed) {
+        return const _OrgSearchPrefilter.failed();
+      }
+      if (result.incompleteResults) {
+        anyIncomplete = true;
+      }
+      for (final hit in result.hits) {
+        pathsByRepo.putIfAbsent(hit.fullName, () => <String>{}).add(hit.path);
+      }
+    }
+
+    final normalized = <String, List<String>>{};
+    for (final entry in pathsByRepo.entries) {
+      final values = entry.value.toList()..sort();
+      normalized[entry.key] = values;
+    }
+    return _OrgSearchPrefilter(failed: false, incompleteResults: anyIncomplete, repoPathsByFullName: normalized);
+  }
+
+  Future<_OrgSearchResult> _searchCodeByOrg({
+    required String repoRoot,
+    required String query,
+    required bool verbose,
+  }) async {
+    final hits = <_OrgSearchHit>[];
+    var page = 1;
+    var incompleteResults = false;
+
+    while (true) {
+      final encodedQuery = Uri.encodeQueryComponent(query);
+      final result = await _searchCodeApiRequest(
+        repoRoot: repoRoot,
+        args: ['api', 'search/code?q=$encodedQuery&per_page=100&page=$page'],
+        verbose: verbose,
+      );
+      if (result.exitCode != 0) {
+        return const _OrgSearchResult.failed();
+      }
+
+      final stdout = (result.stdout as String).trim();
+      if (stdout.isEmpty) break;
+
+      try {
+        final parsed = json.decode(stdout);
+        if (parsed is! Map<String, dynamic>) {
+          return const _OrgSearchResult.failed();
+        }
+        incompleteResults = incompleteResults || parsed['incomplete_results'] == true;
+
+        final items = parsed['items'];
+        if (items is! List || items.isEmpty) {
+          break;
+        }
+
+        var itemCount = 0;
+        for (final item in items.whereType<Map<String, dynamic>>()) {
+          final repository = item['repository'];
+          if (repository is! Map<String, dynamic>) continue;
+          final fullName = repository['full_name']?.toString().trim() ?? '';
+          final path = item['path']?.toString().trim() ?? '';
+          if (fullName.isEmpty || path.isEmpty) continue;
+          hits.add(_OrgSearchHit(fullName: fullName, path: path));
+          itemCount++;
+        }
+
+        if (itemCount < 100) {
+          break;
+        }
+        page++;
+      } catch (_) {
+        return const _OrgSearchResult.failed();
+      }
+    }
+
+    return _OrgSearchResult(failed: false, incompleteResults: incompleteResults, hits: hits);
+  }
+
+  Future<_ConsumerRepo?> _discoverConsumerInRepo({
+    required bool allowRepoSearch,
+    required bool orgSearchUsed,
+    required List<String> prefilterPaths,
     required String repoRoot,
     required String packageName,
     required _RepoDescriptor descriptor,
     required bool verbose,
-  }) {
+  }) async {
     final fullName = descriptor.fullName;
-    var pubspec = _fetchPubspec(repoRoot: repoRoot, fullName: fullName, verbose: verbose);
+    var pubspec = await _fetchPubspec(repoRoot: repoRoot, fullName: fullName, verbose: verbose);
     var dependencyConstraint = _readDependencyConstraint(
       pubspec?.content,
       packageName: packageName,
@@ -475,48 +667,76 @@ class ConsumersCommand extends Command<void> {
       matchedPath = pubspec?.path ?? 'pubspec.yaml';
       usageSignals.add('pubspec_dependency');
     } else {
-      final targetedSearch = _searchCode(
-        repoRoot: repoRoot,
-        query: '$packageName repo:$fullName filename:pubspec.yaml',
-        verbose: verbose,
-      );
-      if (targetedSearch.totalCount > 0) {
-        matchedPath = targetedSearch.firstPath;
-        usageSignals.add('code_search_pubspec');
+      final prefilterPubspecPaths = prefilterPaths.where((path) => path.endsWith('pubspec.yaml')).toList();
+      if (prefilterPubspecPaths.isNotEmpty) {
+        matchedPath = prefilterPubspecPaths.first;
+        usageSignals.add('org_search_pubspec');
+      } else if (orgSearchUsed && prefilterPaths.isNotEmpty) {
+        matchedPath = prefilterPaths.first;
+        usageSignals.add('org_search_general');
+      }
 
-        final searchPath = matchedPath;
-        if (searchPath != null &&
-            searchPath.endsWith('pubspec.yaml') &&
-            (pubspec == null || searchPath != pubspec.path)) {
-          final nestedPubspec = _fetchPubspec(
-            repoRoot: repoRoot,
-            fullName: fullName,
-            verbose: verbose,
-            path: searchPath,
+      if (prefilterPaths.contains(_kRuntimeCiConfigPath)) {
+        runtimeCiConfigPath = _kRuntimeCiConfigPath;
+        if (matchedPath == null) {
+          matchedPath = _kRuntimeCiConfigPath;
+        }
+        usageSignals.add('runtime_ci_config');
+      }
+
+      if (matchedPath != null &&
+          matchedPath.endsWith('pubspec.yaml') &&
+          (pubspec == null || matchedPath != pubspec.path)) {
+        final nestedPubspec = await _fetchPubspec(
+          repoRoot: repoRoot,
+          fullName: fullName,
+          verbose: verbose,
+          path: matchedPath,
+        );
+        if (nestedPubspec != null) {
+          pubspec = nestedPubspec;
+          dependencyConstraint = _readDependencyConstraint(
+            nestedPubspec.content,
+            packageName: packageName,
+            section: 'dependencies',
           );
-          if (nestedPubspec != null) {
-            pubspec = nestedPubspec;
-            dependencyConstraint = _readDependencyConstraint(
-              nestedPubspec.content,
-              packageName: packageName,
-              section: 'dependencies',
-            );
-            devDependencyConstraint = _readDependencyConstraint(
-              nestedPubspec.content,
-              packageName: packageName,
-              section: 'dev_dependencies',
-            );
-            if (dependencyConstraint != null || devDependencyConstraint != null) {
-              usageSignals.add('pubspec_dependency_nested');
-            }
+          devDependencyConstraint = _readDependencyConstraint(
+            nestedPubspec.content,
+            packageName: packageName,
+            section: 'dev_dependencies',
+          );
+          if (dependencyConstraint != null || devDependencyConstraint != null) {
+            usageSignals.add('pubspec_dependency_nested');
           }
         }
-      } else {
-        final broadSearch = _searchCode(repoRoot: repoRoot, query: '$packageName repo:$fullName', verbose: verbose);
+      }
+
+      if (dependencyConstraint == null && devDependencyConstraint == null && matchedPath == null && allowRepoSearch) {
+        final targetedSearch = await _searchCode(
+          repoRoot: repoRoot,
+          query: '$packageName repo:$fullName filename:pubspec.yaml',
+          verbose: verbose,
+        );
+        if (targetedSearch.totalCount > 0) {
+          matchedPath = targetedSearch.firstPath;
+          usageSignals.add('code_search_pubspec');
+        }
+      }
+
+      if (dependencyConstraint == null &&
+          devDependencyConstraint == null &&
+          matchedPath == null &&
+          runtimeCiConfigPath == null &&
+          allowRepoSearch) {
+        final broadSearch = await _searchCode(
+          repoRoot: repoRoot,
+          query: '$packageName repo:$fullName',
+          verbose: verbose,
+        );
         if (broadSearch.totalCount > 0) {
           matchedPath = broadSearch.firstPath;
           usageSignals.add('code_search_general');
-        } else if (_repoFileExists(
+        } else if (await _repoFileExists(
           repoRoot: repoRoot,
           fullName: fullName,
           path: _kRuntimeCiConfigPath,
@@ -549,12 +769,15 @@ class ConsumersCommand extends Command<void> {
     );
   }
 
-  _CodeSearchResult _searchCode({required String repoRoot, required String query, required bool verbose}) {
+  Future<_CodeSearchResult> _searchCode({
+    required String repoRoot,
+    required String query,
+    required bool verbose,
+  }) async {
     final encodedQuery = Uri.encodeQueryComponent(query);
-    final result = _runProcess(
-      executable: 'gh',
+    final result = await _searchCodeApiRequest(
+      repoRoot: repoRoot,
       args: ['api', 'search/code?q=$encodedQuery&per_page=1'],
-      cwd: repoRoot,
       verbose: verbose,
     );
     if (result.exitCode != 0) {
@@ -581,13 +804,61 @@ class ConsumersCommand extends Command<void> {
     }
   }
 
-  bool _repoFileExists({
+  Future<ProcessResult> _searchCodeApiRequest({
+    required String repoRoot,
+    required List<String> args,
+    required bool verbose,
+  }) {
+    final completer = Completer<ProcessResult>();
+
+    _searchSerialQueue = _searchSerialQueue
+        .then((_) async {
+          if (_lastSearchRequestAt != null) {
+            final elapsed = DateTime.now().difference(_lastSearchRequestAt!);
+            final remaining = _kSearchRequestMinInterval - elapsed;
+            if (!remaining.isNegative) {
+              await Future<void>.delayed(remaining);
+            }
+          }
+
+          ProcessResult? finalResult;
+          for (var attempt = 0; attempt < 3; attempt++) {
+            final result = await _runProcess(executable: 'gh', args: args, cwd: repoRoot, verbose: verbose);
+            finalResult = result;
+            if (result.exitCode == 0) {
+              break;
+            }
+
+            final stderr = (result.stderr as String?)?.toLowerCase() ?? '';
+            final looksRateLimited = stderr.contains('rate limit') || stderr.contains('secondary rate');
+            if (!looksRateLimited || attempt == 2) {
+              break;
+            }
+
+            final backoffSeconds = 5 * (attempt + 1);
+            Logger.warn('Code search rate-limited; retrying in ${backoffSeconds}s...');
+            await Future<void>.delayed(Duration(seconds: backoffSeconds));
+          }
+
+          _lastSearchRequestAt = DateTime.now();
+          completer.complete(finalResult ?? ProcessResult(0, 1, '', 'Unable to execute search request.'));
+        })
+        .catchError((Object error, StackTrace stackTrace) {
+          if (!completer.isCompleted) {
+            completer.completeError(error, stackTrace);
+          }
+        });
+
+    return completer.future;
+  }
+
+  Future<bool> _repoFileExists({
     required String repoRoot,
     required String fullName,
     required String path,
     required bool verbose,
-  }) {
-    final result = _runProcess(
+  }) async {
+    final result = await _runProcess(
       executable: 'gh',
       args: ['api', 'repos/$fullName/contents/$path'],
       cwd: repoRoot,
@@ -596,13 +867,13 @@ class ConsumersCommand extends Command<void> {
     return result.exitCode == 0;
   }
 
-  _PubspecFile? _fetchPubspec({
+  Future<_PubspecFile?> _fetchPubspec({
     required String repoRoot,
     required String fullName,
     required bool verbose,
     String path = 'pubspec.yaml',
-  }) {
-    final result = _runProcess(
+  }) async {
+    final result = await _runProcess(
       executable: 'gh',
       args: ['api', 'repos/$fullName/contents/$path'],
       cwd: repoRoot,
@@ -706,8 +977,7 @@ class ConsumersCommand extends Command<void> {
     };
 
     if (!dryRun) {
-      File(snapshotPath).parent.createSync(recursive: true);
-      File(snapshotPath).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(snapshot));
+      _atomicWriteJson(snapshotPath, snapshot);
     }
 
     return _SnapshotResult(snapshotPath: snapshotPath, consumers: discovery.consumers, runStatus: runStatus);
@@ -823,6 +1093,7 @@ class ConsumersCommand extends Command<void> {
       'generated_at_local': nowLocal.toIso8601String(),
       'generated_at_utc': nowLocal.toUtc().toIso8601String(),
       'source_snapshot': sourceSnapshotPath,
+      'source_snapshot_identity': snapshotIdentityFromPath(sourceSnapshotPath),
       'package': packageName,
       'criteria': criteria.toJson(),
       'repo_count': repoCount,
@@ -834,9 +1105,7 @@ class ConsumersCommand extends Command<void> {
       'repos': sortedSummaries.map((summary) => summary.toJson()).toList(),
     };
 
-    final file = File(releaseSummaryPath);
-    file.parent.createSync(recursive: true);
-    file.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(releaseSummary));
+    _atomicWriteJson(releaseSummaryPath, releaseSummary);
   }
 
   Map<String, _ReleaseSyncSummary> _loadExistingReleaseSummaries({
@@ -853,7 +1122,15 @@ class ConsumersCommand extends Command<void> {
       if (parsed is! Map<String, dynamic>) return {};
 
       final sourceSnapshot = parsed['source_snapshot']?.toString();
-      if (sourceSnapshot != expectedSnapshotPath) return {};
+      final sourceSnapshotIdentity =
+          _normalizeNullableString(parsed['source_snapshot_identity']) ??
+          (sourceSnapshot == null ? null : snapshotIdentityFromPath(sourceSnapshot));
+      final expectedSnapshotIdentity = snapshotIdentityFromPath(expectedSnapshotPath);
+      final normalizedSourceSnapshot = sourceSnapshot == null ? null : _normalizePathForComparison(sourceSnapshot);
+      final normalizedExpectedSnapshot = _normalizePathForComparison(expectedSnapshotPath);
+      final identityMatches = sourceSnapshotIdentity == expectedSnapshotIdentity;
+      final pathMatches = normalizedSourceSnapshot == normalizedExpectedSnapshot;
+      if (!identityMatches && !pathMatches) return {};
 
       final criteriaMap = parsed['criteria'];
       if (criteriaMap is! Map<String, dynamic>) return {};
@@ -896,7 +1173,28 @@ class ConsumersCommand extends Command<void> {
     return text;
   }
 
-  _ReleaseSyncSummary _syncRepoRelease({
+  String _normalizePathForComparison(String path) {
+    var normalized = path.replaceAll('\\', '/').trim();
+    while (normalized.endsWith('/') && normalized.length > 1) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    return normalized;
+  }
+
+  void _atomicWriteJson(String targetPath, Map<String, dynamic> data) {
+    final targetFile = File(targetPath);
+    targetFile.parent.createSync(recursive: true);
+
+    final tempFile = File('$targetPath.tmp.${DateTime.now().microsecondsSinceEpoch}');
+    tempFile.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(data));
+
+    if (targetFile.existsSync()) {
+      targetFile.deleteSync();
+    }
+    tempFile.renameSync(targetPath);
+  }
+
+  Future<_ReleaseSyncSummary> _syncRepoRelease({
     required String repoRoot,
     required String outputDir,
     required _ConsumerRepo consumer,
@@ -905,8 +1203,8 @@ class ConsumersCommand extends Command<void> {
     required bool includePrerelease,
     required bool verbose,
     required bool dryRun,
-  }) {
-    final release = _resolveRelease(
+  }) async {
+    final release = await _resolveRelease(
       repoRoot: repoRoot,
       consumer: consumer,
       exactTag: exactTag,
@@ -956,7 +1254,7 @@ class ConsumersCommand extends Command<void> {
     final releaseMdPath = _joinPath(repoOutputPath, ['RELEASE.md']);
     final pubspecPath = _joinPath(repoOutputPath, ['pubspec.yaml']);
 
-    final pubspec = _fetchPubspec(repoRoot: repoRoot, fullName: consumer.fullName, verbose: verbose);
+    final pubspec = await _fetchPubspec(repoRoot: repoRoot, fullName: consumer.fullName, verbose: verbose);
     final metadata = <String, dynamic>{
       'repository': consumer.fullName,
       'discovery': consumer.toJson(),
@@ -984,7 +1282,7 @@ class ConsumersCommand extends Command<void> {
       if (dryRun) {
         Logger.info('[DRY-RUN] Would download ${assets.length} assets to ${assetsDir.path}');
       } else {
-        final download = _runProcess(
+        final download = await _runProcess(
           executable: 'gh',
           args: ['release', 'download', tag, '--repo', consumer.fullName, '--dir', assetsDir.path, '--clobber'],
           cwd: repoRoot,
@@ -1008,19 +1306,19 @@ class ConsumersCommand extends Command<void> {
     return _ReleaseSyncSummary(fullName: consumer.fullName, status: 'ok', tag: tag, outputPath: repoOutputPath);
   }
 
-  Map<String, dynamic>? _resolveRelease({
+  Future<Map<String, dynamic>?> _resolveRelease({
     required String repoRoot,
     required _ConsumerRepo consumer,
     required String? exactTag,
     required RegExp? tagPattern,
     required bool includePrerelease,
     required bool verbose,
-  }) {
+  }) async {
     if (exactTag != null && exactTag.isNotEmpty) {
       return _viewRelease(repoRoot: repoRoot, fullName: consumer.fullName, tag: exactTag, verbose: verbose);
     }
 
-    final listResult = _runProcess(
+    final listResult = await _runProcess(
       executable: 'gh',
       args: [
         'release',
@@ -1058,13 +1356,13 @@ class ConsumersCommand extends Command<void> {
     }
   }
 
-  Map<String, dynamic>? _viewRelease({
+  Future<Map<String, dynamic>?> _viewRelease({
     required String repoRoot,
     required String fullName,
     required String tag,
     required bool verbose,
-  }) {
-    final result = _runProcess(
+  }) async {
+    final result = await _runProcess(
       executable: 'gh',
       args: [
         'release',
@@ -1112,16 +1410,41 @@ class ConsumersCommand extends Command<void> {
     return Directory(_joinPath(repoRoot, [outputDirOption]));
   }
 
-  ProcessResult _runProcess({
+  Future<ProcessResult> _runProcess({
     required String executable,
     required List<String> args,
     required String cwd,
     required bool verbose,
-  }) {
+  }) async {
     if (verbose) {
       Logger.info('  \$ $executable ${args.join(" ")}');
     }
-    return Process.runSync(executable, args, workingDirectory: cwd);
+    return Process.run(executable, args, workingDirectory: cwd);
+  }
+
+  Future<void> _forEachConcurrent<T>({
+    required List<T> items,
+    required int concurrency,
+    required Future<void> Function(T item) action,
+  }) async {
+    if (items.isEmpty) return;
+    final workerCount = concurrency <= 1 ? 1 : (concurrency > items.length ? items.length : concurrency);
+    var index = 0;
+
+    Future<void> worker() async {
+      while (true) {
+        if (index >= items.length) break;
+        final currentIndex = index;
+        index++;
+        await action(items[currentIndex]);
+      }
+    }
+
+    final workers = <Future<void>>[];
+    for (var i = 0; i < workerCount; i++) {
+      workers.add(worker());
+    }
+    await Future.wait(workers);
   }
 }
 
@@ -1135,6 +1458,9 @@ class _ConsumersOptions {
   final String? tagRegex;
   final bool includePrerelease;
   final bool resume;
+  final bool searchFirst;
+  final int discoveryWorkers;
+  final int releaseWorkers;
   final int repoLimit;
 
   const _ConsumersOptions({
@@ -1147,6 +1473,9 @@ class _ConsumersOptions {
     required this.tagRegex,
     required this.includePrerelease,
     required this.resume,
+    required this.searchFirst,
+    required this.discoveryWorkers,
+    required this.releaseWorkers,
     required this.repoLimit,
   });
 
@@ -1160,6 +1489,11 @@ class _ConsumersOptions {
     final tagRegex = (results['tag-regex'] as String?)?.trim();
     final includePrerelease = results['include-prerelease'] == true;
     final resume = results['resume'] != false;
+    final searchFirst = results['search-first'] != false;
+    final discoveryWorkersRaw = (results['discovery-workers'] as String?)?.trim() ?? '4';
+    final discoveryWorkers = int.tryParse(discoveryWorkersRaw) ?? 4;
+    final releaseWorkersRaw = (results['release-workers'] as String?)?.trim() ?? '4';
+    final releaseWorkers = int.tryParse(releaseWorkersRaw) ?? 4;
     final repoLimitRaw = (results['repo-limit'] as String?)?.trim() ?? '$_kDefaultRepoLimit';
     final repoLimit = int.tryParse(repoLimitRaw) ?? _kDefaultRepoLimit;
 
@@ -1173,6 +1507,9 @@ class _ConsumersOptions {
       tagRegex: tagRegex == null || tagRegex.isEmpty ? null : tagRegex,
       includePrerelease: includePrerelease,
       resume: resume,
+      searchFirst: searchFirst,
+      discoveryWorkers: discoveryWorkers <= 0 ? 1 : discoveryWorkers,
+      releaseWorkers: releaseWorkers <= 0 ? 1 : releaseWorkers,
       repoLimit: repoLimit <= 0 ? _kDefaultRepoLimit : repoLimit,
     );
   }
@@ -1200,6 +1537,39 @@ class _CodeSearchResult {
   final String? firstPath;
 
   const _CodeSearchResult({required this.totalCount, required this.firstPath});
+}
+
+class _OrgSearchQuery {
+  final String query;
+
+  const _OrgSearchQuery({required this.query});
+}
+
+class _OrgSearchHit {
+  final String fullName;
+  final String path;
+
+  const _OrgSearchHit({required this.fullName, required this.path});
+}
+
+class _OrgSearchResult {
+  final bool failed;
+  final bool incompleteResults;
+  final List<_OrgSearchHit> hits;
+
+  const _OrgSearchResult({required this.failed, required this.incompleteResults, required this.hits});
+
+  const _OrgSearchResult.failed() : this(failed: true, incompleteResults: false, hits: const <_OrgSearchHit>[]);
+}
+
+class _OrgSearchPrefilter {
+  final bool failed;
+  final bool incompleteResults;
+  final Map<String, List<String>> repoPathsByFullName;
+
+  const _OrgSearchPrefilter({required this.failed, required this.incompleteResults, required this.repoPathsByFullName});
+
+  const _OrgSearchPrefilter.failed() : this(failed: true, incompleteResults: false, repoPathsByFullName: const {});
 }
 
 class _ConsumerRepo {
