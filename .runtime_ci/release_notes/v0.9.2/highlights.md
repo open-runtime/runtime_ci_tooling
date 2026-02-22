@@ -1,0 +1,3 @@
+- Fixed an issue where running `autodoc --init` failed to generate `autodoc.json`, by extracting a new shared scaffolding utility.
+- Resolved a bug in the changelog generation prompt that caused terminal processes to hang due to `JSONEOF` indentation errors.
+- Completed the system-wide migration of hardcoded output paths from `.cicd_runs` to `.runtime_ci/runs` across all scripts and CLI commands.

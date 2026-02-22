@@ -1,0 +1,17 @@
+{
+  "version": "0.9.2",
+  "github_issues": [
+    {
+      "number": 2,
+      "title": "Bug: autodoc --init fails with ArgParserException",
+      "status": "fixed",
+      "confidence": 1.0,
+      "referenced_in": [
+        "release_notes",
+        "changelog"
+      ]
+    }
+  ],
+  "sentry_issues": [],
+  "prs_referenced": []
+}

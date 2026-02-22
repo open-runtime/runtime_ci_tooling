@@ -19,7 +19,7 @@ Add `runtime_ci_tooling` to your `dev_dependencies`:
 
 ```yaml
 dev_dependencies:
-  runtime_ci_tooling: ^0.9.1
+  runtime_ci_tooling: ^0.9.2
 ```
 
 Or run:
@@ -44,7 +44,7 @@ This will create:
 
 ## Usage
 
-As of version **v0.9.1**, tools are available as executables in `bin/`, and CLI options are strictly typed.
+As of version **v0.9.2**, tools are available as executables in `bin/`, and CLI options are strictly typed.
 
 ### Manage CI/CD
 
@@ -66,7 +66,7 @@ dart run bin/manage_cicd.dart <command> [options]
 - `explore`: Run Stage 1 Explorer Agent.
 - `compose`: Run Stage 2 Changelog Composer.
 - `release-notes`: Run Stage 3 Release Notes Author.
-- `autodoc`: Generate/update module documentation.
+- `autodoc`: Generate/update module documentation. Use `--init` to automatically scaffold `autodoc.json` based on the `lib/src/` structure.
 - `status`: Show current CI/CD configuration status.
 
 Run `dart run bin/manage_cicd.dart --help` for full usage details.
@@ -82,8 +82,8 @@ dart run bin/triage_cli.dart <command> [options]
 **Usage Examples:**
 - **Single Issue**: `dart run bin/triage_cli.dart <issue_number>`
 - **Auto Triage**: `dart run bin/triage_cli.dart --auto`
-- **Pre-Release Scan**: `dart run bin/triage_cli.dart --pre-release --prev-tag v0.9.0 --version 0.9.1`
-- **Post-Release Loop**: `dart run bin/triage_cli.dart --post-release --version 0.9.1 --release-tag v0.9.1`
+- **Pre-Release Scan**: `dart run bin/triage_cli.dart --pre-release --prev-tag v0.9.1 --version 0.9.2`
+- **Post-Release Loop**: `dart run bin/triage_cli.dart --post-release --version 0.9.2 --release-tag v0.9.2`
 
 Run `dart run bin/triage_cli.dart --help` for full usage details.
 

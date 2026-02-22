@@ -1,0 +1,46 @@
+{
+  "version": "0.9.2",
+  "previous_version": "v0.9.1",
+  "total_commits": 3,
+  "categories": {
+    "added": [
+      {
+        "description": "Scaffold `autodoc.json` automatically during `autodoc --init` based on `lib/src/` structure using shared scaffolding logic",
+        "pr": "#2",
+        "commits": ["ce3db9606961170b80473a519220c3e6f3d48a38"]
+      },
+      {
+        "description": "Add runtime_ci_tooling generated files",
+        "pr": "",
+        "commits": ["eecd3fee859afc2514e55b705fbe8a60f6c535c5"]
+      }
+    ],
+    "changed": [
+      {
+        "description": "Complete `.cicd_runs` → `.runtime_ci/runs` path migration in CLI tools, agent scripts, and prompt files",
+        "pr": "",
+        "commits": ["4e9f180e768114e774bd8633fcea7a746fd8be1f"]
+      }
+    ],
+    "deprecated": [],
+    "removed": [],
+    "fixed": [
+      {
+        "description": "Fix `autodoc --init` failing or acting as a no-op, now correctly scaffolds `autodoc.json` and closes issue #2",
+        "pr": "#2",
+        "commits": ["ce3db9606961170b80473a519220c3e6f3d48a38"]
+      },
+      {
+        "description": "Fix heredoc JSONEOF terminator indentation in `gemini_changelog_prompt.dart` to prevent `tee` from hanging",
+        "pr": "",
+        "commits": ["4e9f180e768114e774bd8633fcea7a746fd8be1f"]
+      },
+      {
+        "description": "Fix retry log message in `autodoc_command.dart` (now properly generic instead of claiming `Rate limited` for all errors) and fix environment spread consistency",
+        "pr": "",
+        "commits": ["4e9f180e768114e774bd8633fcea7a746fd8be1f"]
+      }
+    ],
+    "security": []
+  }
+}
