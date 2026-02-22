@@ -84,6 +84,8 @@ jobs:
 
 <%/proto%>
       - run: dart pub get
+        env:
+          GIT_LFS_SKIP_SMUDGE: "1"
 
 <%#analysis_cache%>
       - name: Cache Dart analysis
@@ -117,7 +119,7 @@ jobs:
       - name: Analyze (<%name%>)
         working-directory: <%path%>
         run: |
-          dart pub get
+          GIT_LFS_SKIP_SMUDGE=1 dart pub get
           dart analyze 2>&1 | tee /tmp/sub_analysis.txt
           if grep -q "^  error -" /tmp/sub_analysis.txt; then
             echo "::error::Errors found in <%name%>"

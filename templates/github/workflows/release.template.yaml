@@ -88,6 +88,8 @@ jobs:
           restore-keys: ${{ runner.os }}-dart-pub-
 
       - run: dart pub get
+        env:
+          GIT_LFS_SKIP_SMUDGE: "1"
 
       - uses: actions/setup-node@v6.2.0
         with:
@@ -159,6 +161,8 @@ jobs:
           restore-keys: ${{ runner.os }}-dart-pub-
 
       - run: dart pub get
+        env:
+          GIT_LFS_SKIP_SMUDGE: "1"
 
       - uses: actions/setup-node@v6.2.0
         with:
@@ -238,6 +242,8 @@ jobs:
           restore-keys: ${{ runner.os }}-dart-pub-
 
       - run: dart pub get
+        env:
+          GIT_LFS_SKIP_SMUDGE: "1"
 
       - uses: actions/setup-node@v6.2.0
         with:
@@ -324,6 +330,8 @@ jobs:
           restore-keys: ${{ runner.os }}-dart-pub-
 
       - run: dart pub get
+        env:
+          GIT_LFS_SKIP_SMUDGE: "1"
 
       - uses: actions/setup-node@v6.2.0
         with:
@@ -423,6 +431,8 @@ jobs:
 
       - name: Install dependencies
         run: dart pub get
+        env:
+          GIT_LFS_SKIP_SMUDGE: "1"
 
       - uses: actions/setup-node@v6.2.0
         with:
@@ -519,6 +529,8 @@ jobs:
           restore-keys: ${{ runner.os }}-dart-pub-
 
       - run: dart pub get
+        env:
+          GIT_LFS_SKIP_SMUDGE: "1"
 
       - uses: actions/setup-node@v6.2.0
         with:
@@ -653,6 +665,8 @@ jobs:
           restore-keys: ${{ runner.os }}-dart-pub-
 
       - run: dart pub get
+        env:
+          GIT_LFS_SKIP_SMUDGE: "1"
 
       - uses: actions/download-artifact@v7.0.0
         with:
@@ -770,6 +784,8 @@ jobs:
           restore-keys: ${{ runner.os }}-dart-pub-
 
       - run: dart pub get
+        env:
+          GIT_LFS_SKIP_SMUDGE: "1"
 
       - uses: actions/setup-node@v6.2.0
         with:
