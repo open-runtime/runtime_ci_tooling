@@ -26,8 +26,8 @@ class AnalyzeCommand extends Command<void> {
 
     final result = Process.runSync(Platform.resolvedExecutable, [
       'analyze',
-      '--fatal-infos=false',
-      '--fatal-warnings=false',
+      '--no-fatal-infos',
+      '--no-fatal-warnings',
     ], workingDirectory: repoRoot);
 
     final stdout = (result.stdout as String).trim();

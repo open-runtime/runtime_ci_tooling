@@ -24,6 +24,13 @@ class TestCommand extends Command<void> {
 
     Logger.header('Running dart test');
 
+    // Skip gracefully if no test/ directory exists
+    final testDir = Directory('$repoRoot/test');
+    if (!testDir.existsSync()) {
+      Logger.success('No test/ directory found — skipping tests');
+      return;
+    }
+
     final result = Process.runSync(Platform.resolvedExecutable, ['test'], workingDirectory: repoRoot);
 
     final stdout = (result.stdout as String).trim();
