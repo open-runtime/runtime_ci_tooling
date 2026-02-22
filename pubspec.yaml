@@ -13,11 +13,9 @@ executables:
 environment:
   sdk: ^3.9.0
 
-resolution: workspace
-
-# NOTE: When used inside the aot_monorepo workspace, add
-# `resolution: workspace` here. It is intentionally omitted so this
-# package can also resolve standalone (e.g., in its own CI pipeline).
+# NOTE: `resolution: workspace` is intentionally absent here so this package
+# resolves correctly in its own standalone CI pipeline. Add it only in your
+# local monorepo workspace (never commit it to this repo).
 
 dependencies:
   args: ^2.7.0
