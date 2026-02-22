@@ -1,0 +1,139 @@
+# QUICKSTART
+
+## 1. Overview
+The CI/CD CLI module (`manage_cicd`) provides cross-platform setup, validation, and execution of AI-powered release pipelines, documentation generation, and issue triage. It automates repository maintenance tasks locally and within CI workflows (like GitHub Actions) using Gemini models.
+
+## 2. Import
+Most functionality is exposed as a command-line executable. However, if you need to invoke the CLI programmatically, use the following real import paths based on the `lib` structure:
+
+```dart
+import 'package:runtime_ci_tooling/src/cli/manage_cicd_cli.dart';
+import 'package:runtime_ci_tooling/src/cli/options/global_options.dart';
+```
+
+## 3. Setup
+To bootstrap the CI tooling in a new repository, run the initialization and setup commands.
+
+```bash
+# 1. Initialize configuration (.runtime_ci/config.json, .runtime_ci/autodoc.json)
+dart run runtime_ci_tooling:manage_cicd init
+
+# 2. Install required CLI dependencies (Node.js, Gemini CLI, gh, jq)
+dart run runtime_ci_tooling:manage_cicd setup
+
+# 3. Configure Model Context Protocol (MCP) servers (GitHub, Sentry)
+dart run runtime_ci_tooling:manage_cicd configure-mcp
+```
+
+### Programmatic Instantiation
+If running from Dart code, instantiate the `ManageCicdCli` command runner:
+```dart
+import 'package:runtime_ci_tooling/src/cli/manage_cicd_cli.dart';
+
+void main() async {
+  final cli = ManageCicdCli();
+  // Executes the StatusCommand
+  await cli.run(['status', '--verbose']);
+}
+```
+
+## 4. Common Operations
+
+The CLI provides commands for managing the full CI/CD lifecycle. All commands accept the `--verbose` and `--dry-run` global options.
+
+### Checking Environment Status
+Validate that all files, tools, and API keys are correctly configured:
+```bash
+dart run runtime_ci_tooling:manage_cicd status
+dart run runtime_ci_tooling:manage_cicd validate
+```
+
+### Running the Release Pipeline
+Execute the full local release pipeline. This runs version detection (`version`), explores commits (`explore`), and composes the changelog (`compose`):
+```bash
+dart run runtime_ci_tooling:manage_cicd release --verbose
+```
+Alternatively, you can run the stages individually:
+```bash
+dart run runtime_ci_tooling:manage_cicd version
+dart run runtime_ci_tooling:manage_cicd explore --prev-tag v0.0.1 --version 0.0.2
+dart run runtime_ci_tooling:manage_cicd compose --prev-tag v0.0.1 --version 0.0.2
+dart run runtime_ci_tooling:manage_cicd release-notes --prev-tag v0.0.1 --version 0.0.2
+dart run runtime_ci_tooling:manage_cicd determine-version
+dart run runtime_ci_tooling:manage_cicd create-release --version 0.0.2
+```
+
+### Auto-Triaging GitHub Issues
+Use the Gemini-powered triage pipeline (`triage`) to automatically analyze, verify, and route issues:
+```bash
+# Auto-triage all open, untriaged issues
+dart run runtime_ci_tooling:manage_cicd triage auto
+
+# Triage a specific issue by number
+dart run runtime_ci_tooling:manage_cicd triage 42
+
+# Check triage status
+dart run runtime_ci_tooling:manage_cicd triage status
+
+# Triage specific to releases
+dart run runtime_ci_tooling:manage_cicd triage pre-release --prev-tag v0.0.1 --version 0.0.2
+dart run runtime_ci_tooling:manage_cicd triage post-release --version 0.0.2 --release-tag v0.0.2
+```
+
+### Code Quality and Verification
+```bash
+# Run dart analyze
+dart run runtime_ci_tooling:manage_cicd analyze
+
+# Run dart test
+dart run runtime_ci_tooling:manage_cicd test
+
+# Verify protobufs exist and are generated
+dart run runtime_ci_tooling:manage_cicd verify-protos
+```
+
+### Generating Documentation
+Generate missing or updated markdown documentation using the `autodoc` pipeline:
+```bash
+dart run runtime_ci_tooling:manage_cicd autodoc
+
+# Force regenerate all docs regardless of hash
+dart run runtime_ci_tooling:manage_cicd autodoc --force
+
+# Update Gemini-powered documentation based on commits
+dart run runtime_ci_tooling:manage_cicd documentation
+```
+
+### Repository Consumers and Updates
+Discover consumer repositories of the package and sync release artifacts:
+```bash
+dart run runtime_ci_tooling:manage_cicd consumers --package runtime_ci_tooling --org open-runtime
+```
+Update templates, configs, and workflows from runtime_ci_tooling to the consuming repository:
+```bash
+dart run runtime_ci_tooling:manage_cicd update
+```
+
+### Managing Audit Trails
+In a CI environment, you can merge audit trail artifacts from multiple jobs and archive them:
+```bash
+dart run runtime_ci_tooling:manage_cicd merge-audit-trails
+dart run runtime_ci_tooling:manage_cicd archive-run
+```
+
+## 5. Configuration
+The CLI relies heavily on the following configuration files and environment variables:
+
+**Environment Variables**
+*   `GEMINI_API_KEY`: Required for AI-powered generation (Release Notes, Triage, Autodoc).
+*   `GITHUB_TOKEN` or `GH_TOKEN`: Required for interacting with GitHub APIs.
+
+**Configuration Files**
+*   `.runtime_ci/config.json`: Core settings generated by `init` (labels, thresholds, workflow rules).
+*   `.runtime_ci/autodoc.json`: Target modules and rules for `autodoc`.
+*   `.gemini/settings.json`: MCP definitions set by `configure-mcp`.
+*   `CHANGELOG.md`: Read and updated by `compose`.
+
+## 6. Related Modules
+*   **Triage Module** (`lib/src/triage/`): The `triage` subcommands heavily delegate to this core module.
+*   **Release Management**: Utilizes utilities like `VersionDetection`, `ReleaseUtils`, and `TemplateVersionTracker` for determining SemVer bumps, assembling release notes, and managing templates.
