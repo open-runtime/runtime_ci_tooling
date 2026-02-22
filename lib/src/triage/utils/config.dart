@@ -216,7 +216,7 @@ class TriageConfig {
   // ═══════════════════════════════════════════════════════════════════════════
 
   String get flashModel => _str(['gemini', 'flash_model'], 'gemini-3-flash-preview');
-  String get proModel => _str(['gemini', 'pro_model'], 'gemini-3-1-pro-preview');
+  String get proModel => _str(['gemini', 'pro_model'], 'gemini-3.1-pro-preview');
   int get maxTurns => _int(['gemini', 'max_turns'], 100);
   int get maxConcurrent => _int(['gemini', 'max_concurrent'], 4);
   int get maxRetries => _int(['gemini', 'max_retries'], 3);

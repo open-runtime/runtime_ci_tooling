@@ -251,7 +251,7 @@ dart run runtime_ci_tooling:manage_cicd explore
 dart run runtime_ci_tooling:manage_cicd explore --prev-tag v0.1.0 --version 0.2.0
 ```
 
-**Gemini model:** `gemini-3-1-pro-preview`
+**Gemini model:** `gemini-3.1-pro-preview`
 
 **What it produces (3 JSON artifacts):**
 
@@ -280,7 +280,7 @@ dart run runtime_ci_tooling:manage_cicd compose
 dart run runtime_ci_tooling:manage_cicd compose --prev-tag v0.1.0 --version 0.2.0
 ```
 
-**Gemini model:** `gemini-3-1-pro-preview`
+**Gemini model:** `gemini-3.1-pro-preview`
 
 **What it does:**
 1. Loads Stage 1 artifacts (`commit_analysis.json`, `pr_data.json`, `breaking_changes.json`)
@@ -306,7 +306,7 @@ dart run runtime_ci_tooling:manage_cicd release-notes
 dart run runtime_ci_tooling:manage_cicd release-notes --prev-tag v0.1.0 --version 0.2.0
 ```
 
-**Gemini model:** `gemini-3-1-pro-preview`
+**Gemini model:** `gemini-3.1-pro-preview`
 
 **What it produces (4 files per version):**
 
@@ -341,7 +341,7 @@ Run Gemini-powered documentation updates to `README.md`.
 dart run runtime_ci_tooling:manage_cicd documentation --prev-tag v0.1.0 --version 0.2.0
 ```
 
-**Gemini model:** `gemini-3-1-pro-preview`
+**Gemini model:** `gemini-3.1-pro-preview`
 
 **What it does:**
 - Updates version references in README
@@ -793,7 +793,7 @@ Only runs if `cross_repo.enabled` is true in config.
 
 #### Code Analysis Agent
 
-- **Gemini model:** `gemini-3-1-pro-preview`
+- **Gemini model:** `gemini-3.1-pro-preview`
 - **Tools:** `git`, `gh`
 - **Investigates:** Related commits, code fixes, test additions, behavior changes
 
@@ -808,7 +808,7 @@ Only runs if `cross_repo.enabled` is true in config.
 
 #### PR Correlation Agent
 
-- **Gemini model:** `gemini-3-1-pro-preview`
+- **Gemini model:** `gemini-3.1-pro-preview`
 - **Tools:** `git`, `gh`
 - **Investigates:** PRs referencing the issue, merged PRs with matching content
 
@@ -823,7 +823,7 @@ Only runs if `cross_repo.enabled` is true in config.
 
 #### Duplicate Detection Agent
 
-- **Gemini model:** `gemini-3-1-pro-preview`
+- **Gemini model:** `gemini-3.1-pro-preview`
 - **Tools:** `gh` only
 - **Investigates:** Similar titles, same root cause, same error messages, same component
 
@@ -838,7 +838,7 @@ Only runs if `cross_repo.enabled` is true in config.
 
 #### Sentiment Analysis Agent
 
-- **Gemini model:** `gemini-3-1-pro-preview`
+- **Gemini model:** `gemini-3.1-pro-preview`
 - **Tools:** `gh` only
 - **Investigates:** Discussion consensus, blockers, activity, maintainer input, reporter satisfaction
 
@@ -856,7 +856,7 @@ Only runs if `cross_repo.enabled` is true in config.
 
 #### Changelog Agent
 
-- **Gemini model:** `gemini-3-1-pro-preview`
+- **Gemini model:** `gemini-3.1-pro-preview`
 - **Tools:** `git`, `gh`
 - **File includes:** `CHANGELOG.md` (via `@include`)
 - **Investigates:** Issue references in changelogs, release notes, git tags
@@ -1075,7 +1075,7 @@ print(cfg.repoName);           // Package name
 print(cfg.repoOwner);          // GitHub org
 print(cfg.autoCloseThreshold); // 0.9
 print(cfg.enabledAgents);      // ['code_analysis', ...]
-print(cfg.proModel);           // 'gemini-3-1-pro-preview'
+print(cfg.proModel);           // 'gemini-3.1-pro-preview'
 
 // Reload after modifications
 reloadConfig();
