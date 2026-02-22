@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:test/test.dart';
 
 import 'package:runtime_ci_tooling/src/cli/commands/consumers_command.dart';
@@ -95,6 +97,78 @@ void main() {
         r'C:\repos\aot\.consumers\repos\discovery_run_7_local_time_22_02_26.json',
       );
       expect(identity, equals('discovery_run_7_local_time_22_02_26.json'));
+    });
+  });
+
+  group('isSnapshotSourceCompatible', () {
+    test('matches when snapshot identities are equal across different absolute paths', () {
+      final compatible = ConsumersCommand.isSnapshotSourceCompatible(
+        sourceSnapshotPath: '/tmp/a/discovery_run_3_local_time_22_02_26.json',
+        sourceSnapshotIdentity: null,
+        expectedSnapshotPath: '/workspace/b/discovery_run_3_local_time_22_02_26.json',
+      );
+      expect(compatible, isTrue);
+    });
+
+    test('matches when normalized source path equals expected path', () {
+      final compatible = ConsumersCommand.isSnapshotSourceCompatible(
+        sourceSnapshotPath: r'C:\repo\run\discovery_run_3_local_time_22_02_26.json',
+        sourceSnapshotIdentity: null,
+        expectedSnapshotPath: r'C:/repo/run/discovery_run_3_local_time_22_02_26.json',
+      );
+      expect(compatible, isTrue);
+    });
+  });
+
+  group('isReleaseSummaryReusable', () {
+    test('reuses ok status when output directory exists and tag matches', () {
+      final tempDir = Directory.systemTemp.createTempSync('consumers-ok-');
+      addTearDown(() => tempDir.deleteSync(recursive: true));
+
+      final reusable = ConsumersCommand.isReleaseSummaryReusable(
+        status: 'ok',
+        outputPath: tempDir.path,
+        tag: 'v1.2.3',
+        exactTag: 'v1.2.3',
+      );
+      expect(reusable, isTrue);
+    });
+
+    test('does not reuse ok status when exact tag mismatches', () {
+      final tempDir = Directory.systemTemp.createTempSync('consumers-tag-');
+      addTearDown(() => tempDir.deleteSync(recursive: true));
+
+      final reusable = ConsumersCommand.isReleaseSummaryReusable(
+        status: 'ok',
+        outputPath: tempDir.path,
+        tag: 'v1.2.3',
+        exactTag: 'v9.9.9',
+      );
+      expect(reusable, isFalse);
+    });
+
+    test('reuses no_release status only when marker file exists', () {
+      final tempDir = Directory.systemTemp.createTempSync('consumers-no-release-');
+      addTearDown(() => tempDir.deleteSync(recursive: true));
+      final marker = File('${tempDir.path}${Platform.pathSeparator}NO_RELEASE.md')..writeAsStringSync('none');
+
+      final reusable = ConsumersCommand.isReleaseSummaryReusable(
+        status: 'no_release',
+        outputPath: marker.path,
+        tag: null,
+        exactTag: null,
+      );
+      expect(reusable, isTrue);
+    });
+
+    test('never reuses failed status', () {
+      final reusable = ConsumersCommand.isReleaseSummaryReusable(
+        status: 'failed',
+        outputPath: '/tmp/does-not-matter',
+        tag: null,
+        exactTag: null,
+      );
+      expect(reusable, isFalse);
     });
   });
 }

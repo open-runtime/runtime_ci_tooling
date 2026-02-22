@@ -26,17 +26,21 @@ dev_dependencies:
     git:
       url: git@github.com:open-runtime/runtime_ci_tooling.git
       tag_pattern: v{{version}}
-    version: ^0.6.0
+    version: ^0.8.0
   build_runner: ^2.11.0
   test: ^1.24.0
   leak_tracker: ^11.0.1
   crypto: ^3.0.3
   encrypt:
     git:
-      url: git@github.com:pieces-app/encrypt.git
+      url: git@github.com:open-runtime/encrypt.git
       tag_pattern: v{{version}}
     version: ^5.1.6
-  cli_script: ^1.0.0
+  cli_script:
+    git:
+      url: git@github.com:open-runtime/dart_cli_script.git
+      tag_pattern: v{{version}}
+    version: ^1.0.0
   meta: ^1.9.1
   safe_int_id: ^1.0.0
   http2: ^2.3.0

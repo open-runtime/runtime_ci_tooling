@@ -1,0 +1,60 @@
+{
+  "index": 5,
+  "generated_at_local": "2026-02-22T13:45:59.256415",
+  "generated_at_utc": "2026-02-22T18:45:59.256415Z",
+  "updated_at_local": "2026-02-22T13:46:44.015558",
+  "updated_at_utc": "2026-02-22T18:46:44.015558Z",
+  "run_status": "completed",
+  "package": "runtime_ci_tooling",
+  "orgs": [
+    "open-runtime",
+    "pieces-app"
+  ],
+  "scanned_repo_count": 10,
+  "consumer_count": 3,
+  "failures": [],
+  "consumers": [
+    {
+      "owner": "open-runtime",
+      "repo": "named_locks",
+      "full_name": "open-runtime/named_locks",
+      "dependency_constraint": null,
+      "dev_dependency_constraint": "{\n  \"git\": {\n    \"url\": \"git@github.com:open-runtime/runtime_ci_tooling.git\",\n    \"tag_pattern\": \"v{{version}}\"\n  },\n  \"version\": \"^0.8.0\"\n}",
+      "matched_path": "pubspec.yaml",
+      "pubspec_path": "pubspec.yaml",
+      "pubspec_sha": "4b8e316f8971d47828ed4113cd47484147f3a9d0",
+      "runtime_ci_config_path": null,
+      "usage_signals": [
+        "pubspec_dependency"
+      ]
+    },
+    {
+      "owner": "open-runtime",
+      "repo": "native_semaphores",
+      "full_name": "open-runtime/native_semaphores",
+      "dependency_constraint": null,
+      "dev_dependency_constraint": "{\n  \"git\": {\n    \"url\": \"git@github.com:open-runtime/runtime_ci_tooling.git\",\n    \"tag_pattern\": \"v{{version}}\"\n  },\n  \"version\": \"^0.8.0\"\n}",
+      "matched_path": "pubspec.yaml",
+      "pubspec_path": "pubspec.yaml",
+      "pubspec_sha": "7998920b10d4cf0b3bf3eb2ff22d88c5119b4e0c",
+      "runtime_ci_config_path": null,
+      "usage_signals": [
+        "pubspec_dependency"
+      ]
+    },
+    {
+      "owner": "open-runtime",
+      "repo": "runtime_aot_tooling",
+      "full_name": "open-runtime/runtime_aot_tooling",
+      "dependency_constraint": null,
+      "dev_dependency_constraint": "{\n  \"git\": {\n    \"url\": \"git@github.com:open-runtime/runtime_ci_tooling.git\",\n    \"tag_pattern\": \"v{{version}}\"\n  },\n  \"version\": \"^0.8.0\"\n}",
+      "matched_path": "pubspec.yaml",
+      "pubspec_path": "pubspec.yaml",
+      "pubspec_sha": "1897c05191022bb80bcdc29154cd0b8f31158095",
+      "runtime_ci_config_path": null,
+      "usage_signals": [
+        "pubspec_dependency"
+      ]
+    }
+  ]
+}

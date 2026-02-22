@@ -10,7 +10,9 @@
     "pubspec_path": "pubspec.yaml",
     "pubspec_sha": "6cdf15a36a42270d1b1214e6eefbd6785dba66e0",
     "runtime_ci_config_path": null,
-    "usage_signals": []
+    "usage_signals": [
+      "pubspec_dependency"
+    ]
   },
   "release": {
     "assets": [],

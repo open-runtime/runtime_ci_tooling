@@ -41,7 +41,7 @@ dependencies:
   # ==========================================================================
   encrypt:
     git:
-      url: git@github.com:pieces-app/encrypt.git
+      url: git@github.com:open-runtime/encrypt.git
       tag_pattern: v{{version}}
     version: ^5.1.6
   grpc:
@@ -58,7 +58,7 @@ dependencies:
     git:
       url: git@github.com:open-runtime/mindfck.git
       tag_pattern: v{{version}}
-    version: ^0.0.9
+    version: ^0.0.13
 
 dev_dependencies:
   # ==========================================================================
@@ -75,7 +75,7 @@ dev_dependencies:
     git:
       url: git@github.com:open-runtime/runtime_ci_tooling.git
       tag_pattern: v{{version}}
-    version: ^0.6.0
+    version: ^0.8.0
 
   # ==========================================================================
   #
