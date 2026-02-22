@@ -7,6 +7,7 @@ import '../../triage/utils/config.dart';
 import '../../triage/utils/run_context.dart';
 import '../manage_cicd_cli.dart';
 import '../options/version_options.dart';
+import '../utils/ci_constants.dart';
 import '../utils/gemini_utils.dart';
 import '../utils/logger.dart';
 import '../utils/process_runner.dart';
@@ -89,15 +90,15 @@ class ComposeCommand extends Command<void> {
     final includes = <String>[];
     final artifactNames = ['commit_analysis.json', 'pr_data.json', 'breaking_changes.json'];
     for (final name in artifactNames) {
-      if (File('/tmp/$name').existsSync()) {
-        includes.add('@/tmp/$name');
+      if (File('$kStagingDir/$name').existsSync()) {
+        includes.add('@$kStagingDir/$name');
       } else if (File('$repoRoot/$kCicdRunsDir/explore/$name').existsSync()) {
         includes.add('@$repoRoot/$kCicdRunsDir/explore/$name');
       }
     }
     // Issue manifest from pre-release-triage
-    if (File('/tmp/issue_manifest.json').existsSync()) {
-      includes.add('@/tmp/issue_manifest.json');
+    if (File('$kStagingDir/issue_manifest.json').existsSync()) {
+      includes.add('@$kStagingDir/issue_manifest.json');
     }
     final changelogFile = File('$repoRoot/CHANGELOG.md');
     if (!changelogFile.existsSync()) {

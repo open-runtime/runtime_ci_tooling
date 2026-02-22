@@ -266,7 +266,9 @@ class GeminiRunner {
     // Clean up prompt file
     try {
       await promptFile.delete();
-    } catch (_) {}
+    } catch (_) {
+      /* intentionally ignored: prompt temp file cleanup is best-effort */
+    }
 
     if (result.exitCode != 0) {
       return GeminiResult(

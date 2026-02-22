@@ -1,14 +1,15 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../../utils/ci_constants.dart';
 import '../../utils/logger.dart';
 import '../../../triage/models/game_plan.dart';
 import '../../../triage/models/investigation_result.dart';
 import '../../../triage/models/triage_decision.dart';
 import '../../../triage/utils/run_context.dart';
 
-/// Lock file remains in /tmp (not repo-scoped -- prevents concurrent triage globally).
-const String kLockFilePath = '/tmp/triage.lock';
+/// Lock file prevents concurrent triage globally.
+final String kLockFilePath = '${kStagingDir}/triage.lock';
 
 /// Acquire a file-based lock. Returns true if acquired, false if another run is active.
 bool acquireTriageLock(bool force) {
@@ -32,8 +33,9 @@ bool acquireTriageLock(bool force) {
         // Process doesn't exist -- stale lock, safe to clean up
         Logger.info('Cleaned up stale lock from PID $lockPid');
       }
-    } catch (_) {
+    } catch (e) {
       // Can't parse lock file -- just remove it
+      Logger.warn('Could not parse lock file, removing: $e');
     }
     lockFile.deleteSync();
   }
@@ -50,7 +52,9 @@ void releaseTriageLock() {
     if (lockFile.existsSync()) {
       lockFile.deleteSync();
     }
-  } catch (_) {}
+  } catch (e) {
+    Logger.warn('Could not release triage lock: $e');
+  }
 }
 
 /// Create a unique run directory for this triage session.

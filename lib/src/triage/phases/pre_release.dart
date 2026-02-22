@@ -189,10 +189,14 @@ Future<List<Map<String, dynamic>>> _searchGithubIssues({
                 });
               }
             }
-          } catch (_) {}
+          } catch (e) {
+            print('  Warning: Could not parse issue search results for "$keyword": $e');
+          }
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      print('  Warning: Could not search issues for keyword "$keyword": $e');
+    }
   }
 
   // Also search for issues directly referenced in commit messages (#N)
@@ -221,7 +225,9 @@ Future<List<Map<String, dynamic>>> _searchGithubIssues({
             'evidence': 'Directly referenced in commit message',
             'category': 'referenced',
           });
-        } catch (_) {}
+        } catch (e) {
+          print('  Warning: Could not parse issue #$number details: $e');
+        }
       }
     }
   }
@@ -334,7 +340,9 @@ Write valid JSON only.
         if (data is List) {
           return data.cast<Map<String, dynamic>>();
         }
-      } catch (_) {}
+      } catch (e) {
+        print('  Warning: Could not parse Sentry scan results: $e');
+      }
     }
   }
 

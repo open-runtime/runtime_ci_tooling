@@ -6,6 +6,7 @@ import 'dart:io';
 import '../models/game_plan.dart';
 import '../models/investigation_result.dart';
 import '../models/triage_decision.dart';
+import '../utils/config.dart';
 import '../utils/json_schemas.dart';
 
 /// Phase 5: LINK
@@ -96,8 +97,8 @@ Future<void> link(GamePlan plan, List<TriageDecision> decisions, String repoRoot
       }
     }
 
-    // Link issue -> release notes (check release_notes/ folder)
-    final releaseNotesDir = Directory('$repoRoot/release_notes');
+    // Link issue -> release notes (check configured release_notes folder)
+    final releaseNotesDir = Directory('$repoRoot/${config.releaseNotesPath}');
     if (releaseNotesDir.existsSync()) {
       for (final versionDir in releaseNotesDir.listSync().whereType<Directory>()) {
         final releaseNotesFile = File('${versionDir.path}/release_notes.md');
@@ -156,7 +157,9 @@ Future<bool> _isAlreadyLinked(int issueNumber, String searchText, String repoRoo
     if (result.exitCode == 0) {
       return (result.stdout as String).contains(searchText);
     }
-  } catch (_) {}
+  } catch (_) {
+    /* intentionally ignored: gh CLI may not be available or issue may not exist */
+  }
   return false;
 }
 

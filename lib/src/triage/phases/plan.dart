@@ -63,7 +63,7 @@ Future<GamePlan> planAutoTriage(String repoRoot, {required String runDir}) async
 
 /// Loads an existing game plan from a run directory.
 GamePlan? loadPlan({String? runDir}) {
-  final path = runDir != null ? '$runDir/triage_game_plan.json' : '/tmp/triage_game_plan.json';
+  final path = runDir != null ? '$runDir/triage_game_plan.json' : '${Directory.systemTemp.path}/triage_game_plan.json';
   final file = File(path);
   if (!file.existsSync()) return null;
 

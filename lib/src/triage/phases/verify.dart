@@ -5,6 +5,7 @@ import 'dart:io';
 
 import '../models/game_plan.dart';
 import '../models/triage_decision.dart';
+import '../utils/config.dart';
 import '../utils/json_schemas.dart';
 
 /// Phase 4: VERIFY
@@ -96,12 +97,15 @@ Future<VerificationReport> verify(
       }
     }
 
-    // Verify triaged label exists
+    // Verify triaged label exists (using configured label name)
+    final triagedLabel = config.triagedLabel;
     checks.add(
       VerificationCheck(
         name: 'triaged_label',
-        passed: currentLabels.contains('triaged'),
-        message: currentLabels.contains('triaged') ? '"triaged" label applied' : '"triaged" label NOT found',
+        passed: currentLabels.contains(triagedLabel),
+        message: currentLabels.contains(triagedLabel)
+            ? '"$triagedLabel" label applied'
+            : '"$triagedLabel" label NOT found',
       ),
     );
 

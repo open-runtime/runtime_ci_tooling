@@ -95,9 +95,17 @@ Future<Map<int, List<InvestigationResult>>> investigate(
     final investigationResult = _readAgentResult(resultFile, task.id, issueNumber, geminiResult);
     results[issueNumber]!.add(investigationResult);
 
-    // Update task in game plan
-    final issuePlan = plan.issues.firstWhere((i) => i.number == issueNumber, orElse: () => plan.issues.first);
-    final taskPlan = issuePlan.tasks.firstWhere((t) => t.id == task.id, orElse: () => issuePlan.tasks.first);
+    // Update task in game plan (skip if issue/task not found — never fall back to wrong issue)
+    final issuePlan = plan.issues.where((i) => i.number == issueNumber).firstOrNull;
+    if (issuePlan == null) {
+      print('  Warning: Issue #$issueNumber not found in game plan — skipping status update');
+      continue;
+    }
+    final taskPlan = issuePlan.tasks.where((t) => t.id == task.id).firstOrNull;
+    if (taskPlan == null) {
+      print('  Warning: Task ${task.id} not found in issue #$issueNumber — skipping status update');
+      continue;
+    }
     taskPlan.status = geminiResult.success ? TaskStatus.completed : TaskStatus.failed;
     taskPlan.error = geminiResult.success ? null : geminiResult.errorMessage;
     taskPlan.result = investigationResult.toJson();
@@ -144,19 +152,19 @@ List<GeminiTask> _buildTasksForIssue(IssuePlan issue, String repoRoot, String re
   final tasks = <GeminiTask>[];
 
   if (config.shouldRunAgent('code_analysis', repoRoot)) {
-    tasks.add(code_agent.buildTask(issue, repoRoot));
+    tasks.add(code_agent.buildTask(issue, repoRoot, resultsDir: resultsDir));
   }
   if (config.shouldRunAgent('pr_correlation', repoRoot)) {
-    tasks.add(pr_agent.buildTask(issue, repoRoot));
+    tasks.add(pr_agent.buildTask(issue, repoRoot, resultsDir: resultsDir));
   }
   if (config.shouldRunAgent('duplicate', repoRoot)) {
-    tasks.add(dupe_agent.buildTask(issue, repoRoot));
+    tasks.add(dupe_agent.buildTask(issue, repoRoot, resultsDir: resultsDir));
   }
   if (config.shouldRunAgent('sentiment', repoRoot)) {
-    tasks.add(sentiment_agent.buildTask(issue, repoRoot));
+    tasks.add(sentiment_agent.buildTask(issue, repoRoot, resultsDir: resultsDir));
   }
   if (config.shouldRunAgent('changelog', repoRoot)) {
-    tasks.add(changelog_agent.buildTask(issue, repoRoot));
+    tasks.add(changelog_agent.buildTask(issue, repoRoot, resultsDir: resultsDir));
   }
 
   return tasks;
@@ -207,12 +215,14 @@ InvestigationResult _readAgentResult(String filePath, String taskId, int issueNu
   if (geminiResult.response != null) {
     try {
       final responseText = geminiResult.response!;
-      final jsonMatch = RegExp(r'\{[\s\S]*"agent_id"[\s\S]*\}').firstMatch(responseText);
-      if (jsonMatch != null) {
-        final data = json.decode(jsonMatch.group(0)!) as Map<String, dynamic>;
+      final jsonStr = _extractJsonObject(responseText);
+      if (jsonStr != null) {
+        final data = json.decode(jsonStr) as Map<String, dynamic>;
         return InvestigationResult.fromJson(data);
       }
-    } catch (_) {}
+    } catch (e) {
+      print('  Warning: Could not parse Gemini response for $taskId: $e');
+    }
   }
 
   return InvestigationResult.failed(
@@ -220,4 +230,40 @@ InvestigationResult _readAgentResult(String filePath, String taskId, int issueNu
     issueNumber: issueNumber,
     error: geminiResult.success ? 'No result file written' : geminiResult.errorMessage,
   );
+}
+
+/// Extract the first balanced JSON object from a string.
+///
+/// Uses bracket-counting instead of greedy regex to correctly handle
+/// nested objects and avoid over-matching.
+String? _extractJsonObject(String text) {
+  final start = text.indexOf('{');
+  if (start < 0) return null;
+
+  var depth = 0;
+  var inString = false;
+  var escaped = false;
+
+  for (var i = start; i < text.length; i++) {
+    final ch = text[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch == r'\' && inString) {
+      escaped = true;
+      continue;
+    }
+    if (ch == '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch == '{') depth++;
+    if (ch == '}') {
+      depth--;
+      if (depth == 0) return text.substring(start, i + 1);
+    }
+  }
+  return null;
 }

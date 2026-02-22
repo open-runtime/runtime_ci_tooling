@@ -68,7 +68,9 @@ class InitCommand extends Command<void> {
           Logger.success('Detected GitHub owner: $repoOwner');
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      Logger.warn('Could not detect GitHub owner via gh CLI: $e');
+    }
     if (repoOwner == 'unknown') {
       // Fallback: try parsing git remote
       try {
@@ -81,7 +83,9 @@ class InitCommand extends Command<void> {
             Logger.success('Detected GitHub owner from remote: $repoOwner');
           }
         }
-      } catch (_) {}
+      } catch (e) {
+        Logger.warn('Could not detect GitHub owner from git remote: $e');
+      }
     }
 
     // -- 3. Scan for existing files --

@@ -2,34 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
+import 'package:yaml/yaml.dart';
 
 import '../../triage/utils/config.dart';
-import '../../triage/utils/run_context.dart';
+import '../utils/ci_constants.dart';
 import '../utils/logger.dart';
 import '../utils/repo_utils.dart';
-
-const List<String> _kConfigFiles = [
-  '.github/workflows/release.yaml',
-  '.github/workflows/issue-triage.yaml',
-  '.github/workflows/ci.yaml',
-  '.gemini/settings.json',
-  '.gemini/commands/changelog.toml',
-  '.gemini/commands/release-notes.toml',
-  '.gemini/commands/triage.toml',
-  'GEMINI.md',
-  'CHANGELOG.md',
-  'lib/src/prompts/gemini_changelog_prompt.dart',
-  'lib/src/prompts/gemini_changelog_composer_prompt.dart',
-  'lib/src/prompts/gemini_release_notes_author_prompt.dart',
-  'lib/src/prompts/gemini_documentation_prompt.dart',
-  'lib/src/prompts/gemini_triage_prompt.dart',
-];
-
-const List<String> _kStage1Artifacts = [
-  '$kCicdRunsDir/explore/commit_analysis.json',
-  '$kCicdRunsDir/explore/pr_data.json',
-  '$kCicdRunsDir/explore/breaking_changes.json',
-];
 
 /// Validate all configuration files.
 class ValidateCommand extends Command<void> {
@@ -51,7 +29,7 @@ class ValidateCommand extends Command<void> {
 
     var allValid = true;
 
-    for (final file in _kConfigFiles) {
+    for (final file in kCiConfigFiles) {
       final path = '$repoRoot/$file';
       if (!File(path).existsSync()) {
         Logger.error('Missing: $file');
@@ -69,21 +47,18 @@ class ValidateCommand extends Command<void> {
           allValid = false;
         }
       } else if (file.endsWith('.yaml') || file.endsWith('.yml')) {
-        final result = Process.runSync('ruby', [
-          '-ryaml',
-          '-e',
-          'YAML.safe_load(File.read("$path"))',
-        ], workingDirectory: repoRoot);
-        if (result.exitCode == 0) {
-          Logger.success('Valid YAML: $file');
-        } else {
+        try {
           final content = File(path).readAsStringSync();
-          if (content.trim().isNotEmpty) {
-            Logger.success('Exists (YAML validation skipped): $file');
-          } else {
+          if (content.trim().isEmpty) {
             Logger.error('Empty file: $file');
             allValid = false;
+          } else {
+            loadYaml(content);
+            Logger.success('Valid YAML: $file');
           }
+        } catch (e) {
+          Logger.error('Invalid YAML: $file -- $e');
+          allValid = false;
         }
       } else if (file.endsWith('.dart')) {
         final result = Process.runSync('dart', ['analyze', path], workingDirectory: repoRoot);
@@ -116,7 +91,7 @@ class ValidateCommand extends Command<void> {
     // Validate Stage 1 artifacts
     Logger.info('');
     Logger.info('Checking Stage 1 artifacts from previous runs...');
-    for (final artifact in _kStage1Artifacts) {
+    for (final artifact in kStage1Artifacts) {
       if (File(artifact).existsSync()) {
         try {
           final content = File(artifact).readAsStringSync();

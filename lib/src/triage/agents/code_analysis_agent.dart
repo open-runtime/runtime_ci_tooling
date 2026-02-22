@@ -12,9 +12,13 @@ import '../utils/gemini_runner.dart';
 const String kAgentId = 'code_analysis';
 
 /// Builds a Gemini task for code analysis investigation.
-GeminiTask buildTask(IssuePlan issue, String repoRoot) {
+GeminiTask buildTask(IssuePlan issue, String repoRoot, {String? resultsDir}) {
+  final taskId = 'issue-${issue.number}-code';
+  final outputPath = resultsDir != null
+      ? '$resultsDir/$taskId.json'
+      : '.runtime_ci/runs/triage_results/issue_${issue.number}_$kAgentId.json';
   return GeminiTask(
-    id: 'issue-${issue.number}-code',
+    id: taskId,
     model: kDefaultProModel,
     workingDirectory: repoRoot,
     allowedTools: ['run_shell_command(git)', 'run_shell_command(gh)'],
@@ -41,7 +45,7 @@ You are a Code Analysis Agent investigating GitHub issue #${issue.number}.
 
 ## Required Output
 
-Write a JSON file to .runtime_ci/runs/triage_results/issue_${issue.number}_$kAgentId.json with this EXACT structure:
+Write a JSON file to $outputPath with this EXACT structure:
 ```json
 {
   "agent_id": "$kAgentId",

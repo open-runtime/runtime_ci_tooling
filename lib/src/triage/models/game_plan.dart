@@ -37,7 +37,9 @@ class TriageTask {
 
   factory TriageTask.fromJson(Map<String, dynamic> json) => TriageTask(
     id: json['id'] as String,
-    agent: AgentType.values.firstWhere((e) => e.name == json['agent'], orElse: () => AgentType.codeAnalysis),
+    agent:
+        AgentType.values.where((e) => e.name == json['agent']).firstOrNull ??
+        (throw FormatException('Unknown agent type: ${json['agent']}')),
     status: TaskStatus.values.firstWhere((e) => e.name == json['status'], orElse: () => TaskStatus.pending),
     error: json['error'] as String?,
     result: json['result'] as Map<String, dynamic>?,

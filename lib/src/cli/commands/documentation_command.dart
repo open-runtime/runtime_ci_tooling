@@ -7,6 +7,7 @@ import '../../triage/utils/config.dart';
 import '../../triage/utils/run_context.dart';
 import '../manage_cicd_cli.dart';
 import '../options/version_options.dart';
+import '../utils/ci_constants.dart';
 import '../utils/gemini_utils.dart';
 import '../utils/logger.dart';
 import '../utils/process_runner.dart';
@@ -77,8 +78,8 @@ class DocumentationCommand extends Command<void> {
 
     // Build @ includes
     final includes = <String>[];
-    if (File('/tmp/commit_analysis.json').existsSync()) {
-      includes.add('@/tmp/commit_analysis.json');
+    if (File('$kStagingDir/commit_analysis.json').existsSync()) {
+      includes.add('@$kStagingDir/commit_analysis.json');
     } else if (File('$repoRoot/$kCicdRunsDir/explore/commit_analysis.json').existsSync()) {
       includes.add('@$repoRoot/$kCicdRunsDir/explore/commit_analysis.json');
     }

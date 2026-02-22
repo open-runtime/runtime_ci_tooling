@@ -45,7 +45,9 @@ abstract final class PromptResolver {
               return resolvedPath.endsWith('/') ? resolvedPath.substring(0, resolvedPath.length - 1) : resolvedPath;
             }
           }
-        } catch (_) {}
+        } catch (e) {
+          Logger.warn('Could not parse package_config.json at ${dir.path}: $e');
+        }
       }
       final parent = dir.parent;
       if (parent.path == dir.path) break;

@@ -2,6 +2,7 @@
 
 import 'dart:io';
 
+import '../cli/utils/ci_constants.dart';
 import '_ci_config.dart';
 
 /// Stage 2 Changelog Composer Agent prompt generator.
@@ -28,15 +29,16 @@ void main(List<String> args) {
 
   // Check which Stage 1 artifacts are available
   final hasCommitAnalysis =
-      File('/tmp/commit_analysis.json').existsSync() ||
+      File('$kStagingDir/commit_analysis.json').existsSync() ||
       File('.runtime_ci/runs/explore/commit_analysis.json').existsSync();
   final hasPrData =
-      File('/tmp/pr_data.json').existsSync() || File('.runtime_ci/runs/explore/pr_data.json').existsSync();
+      File('$kStagingDir/pr_data.json').existsSync() || File('.runtime_ci/runs/explore/pr_data.json').existsSync();
   final hasBreakingChanges =
-      File('/tmp/breaking_changes.json').existsSync() ||
+      File('$kStagingDir/breaking_changes.json').existsSync() ||
       File('.runtime_ci/runs/explore/breaking_changes.json').existsSync();
   final hasIssueManifest =
-      File('/tmp/issue_manifest.json').existsSync() || File('.runtime_ci/runs/issue_manifest.json').existsSync();
+      File('$kStagingDir/issue_manifest.json').existsSync() ||
+      File('.runtime_ci/runs/issue_manifest.json').existsSync();
 
   print('''
 You are a Changelog Composer Agent for the $pkg Dart package.

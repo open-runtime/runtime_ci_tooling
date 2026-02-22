@@ -7,6 +7,7 @@ import '../../triage/utils/config.dart';
 import '../../triage/utils/run_context.dart';
 import '../manage_cicd_cli.dart';
 import '../options/version_options.dart';
+import '../utils/ci_constants.dart';
 import '../utils/gemini_utils.dart';
 import '../utils/logger.dart';
 import '../utils/process_runner.dart';
@@ -56,7 +57,7 @@ class ReleaseNotesCommand extends Command<void> {
       // Create minimal fallback
       final newVersion = versionOpts.version ?? 'unknown';
       final fallback = '# ${config.repoName} v$newVersion\n\nSee CHANGELOG.md for details.';
-      File('/tmp/release_notes_body.md').writeAsStringSync(fallback);
+      File('$kStagingDir/release_notes_body.md').writeAsStringSync(fallback);
       return;
     }
 
@@ -100,12 +101,14 @@ class ReleaseNotesCommand extends Command<void> {
 
     // -- Load issue manifest for verified issue data --
     List<dynamic> verifiedIssues = [];
-    for (final path in ['/tmp/issue_manifest.json', '$repoRoot/$kCicdRunsDir/triage/issue_manifest.json']) {
+    for (final path in ['$kStagingDir/issue_manifest.json', '$repoRoot/$kCicdRunsDir/triage/issue_manifest.json']) {
       if (File(path).existsSync()) {
         try {
           final manifest = json.decode(File(path).readAsStringSync()) as Map<String, dynamic>;
           verifiedIssues = (manifest['github_issues'] as List?) ?? [];
-        } catch (_) {}
+        } catch (e) {
+          Logger.warn('Could not parse issue manifest JSON: $e');
+        }
         break;
       }
     }
@@ -140,14 +143,14 @@ class ReleaseNotesCommand extends Command<void> {
     final includes = <String>[];
     final artifactNames = ['commit_analysis.json', 'pr_data.json', 'breaking_changes.json'];
     for (final name in artifactNames) {
-      if (File('/tmp/$name').existsSync()) {
-        includes.add('@/tmp/$name');
+      if (File('$kStagingDir/$name').existsSync()) {
+        includes.add('@$kStagingDir/$name');
       } else if (File('$repoRoot/$kCicdRunsDir/explore/$name').existsSync()) {
         includes.add('@$repoRoot/$kCicdRunsDir/explore/$name');
       }
     }
-    if (File('/tmp/issue_manifest.json').existsSync()) {
-      includes.add('@/tmp/issue_manifest.json');
+    if (File('$kStagingDir/issue_manifest.json').existsSync()) {
+      includes.add('@$kStagingDir/issue_manifest.json');
     }
     // Include verified contributors for Gemini to reference
     includes.add('@${releaseNotesDir.path}/contributors.json');
@@ -182,7 +185,7 @@ class ReleaseNotesCommand extends Command<void> {
       Logger.warn('Gemini CLI failed for release notes: ${result.stderr}');
       // Create fallback
       final fallback = '# ${config.repoName} v$newVersion\n\nSee CHANGELOG.md for details.';
-      File('/tmp/release_notes_body.md').writeAsStringSync(fallback);
+      File('$kStagingDir/release_notes_body.md').writeAsStringSync(fallback);
       ctx.finalize(exitCode: result.exitCode);
       return;
     }
@@ -225,20 +228,20 @@ class ReleaseNotesCommand extends Command<void> {
 
       // Write back the cleaned version
       releaseNotesFile.writeAsStringSync(content);
-      File('/tmp/release_notes_body.md').writeAsStringSync(content);
+      File('$kStagingDir/release_notes_body.md').writeAsStringSync(content);
       ctx.saveArtifact('release-notes', 'release_notes.md', content);
     } else {
       Logger.warn('Gemini did not produce release_notes.md -- creating from CHANGELOG');
       final fallback = ReleaseUtils.buildFallbackReleaseNotes(repoRoot, newVersion, prevTag);
       releaseNotesDir.createSync(recursive: true);
       releaseNotesFile.writeAsStringSync(fallback);
-      File('/tmp/release_notes_body.md').writeAsStringSync(fallback);
+      File('$kStagingDir/release_notes_body.md').writeAsStringSync(fallback);
       ctx.saveArtifact('release-notes', 'release_notes.md', fallback);
     }
 
     if (migrationFile.existsSync()) {
       Logger.success('Migration guide: ${migrationFile.lengthSync()} bytes');
-      File('/tmp/migration_guide.md').writeAsStringSync(migrationFile.readAsStringSync());
+      File('$kStagingDir/migration_guide.md').writeAsStringSync(migrationFile.readAsStringSync());
     } else if (bumpType == 'major') {
       Logger.warn('Major release but no migration guide generated');
     }

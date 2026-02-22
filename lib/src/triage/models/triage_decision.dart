@@ -86,6 +86,11 @@ class TriageDecision {
     actions:
         (json['actions'] as List<dynamic>?)?.map((a) => TriageAction.fromJson(a as Map<String, dynamic>)).toList() ??
         [],
+    investigationResults:
+        (json['investigation_results'] as List<dynamic>?)
+            ?.map((r) => InvestigationResult.fromJson(r as Map<String, dynamic>))
+            .toList() ??
+        [],
   );
 
   Map<String, dynamic> toJson() => {
@@ -94,6 +99,7 @@ class TriageDecision {
     'risk_level': riskLevel.name,
     'rationale': rationale,
     'actions': actions.map((a) => a.toJson()).toList(),
+    'investigation_results': investigationResults.map((r) => r.toJson()).toList(),
   };
 
   /// Creates a decision from aggregated investigation results.

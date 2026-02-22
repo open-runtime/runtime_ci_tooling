@@ -7,6 +7,7 @@ import '../../triage/utils/config.dart';
 import '../../triage/utils/run_context.dart';
 import '../manage_cicd_cli.dart';
 import '../options/version_options.dart';
+import '../utils/ci_constants.dart';
 import '../utils/file_utils.dart';
 import '../utils/gemini_utils.dart';
 import '../utils/logger.dart';
@@ -140,7 +141,7 @@ class ExploreCommand extends Command<void> {
     final artifactNames = ['commit_analysis.json', 'pr_data.json', 'breaking_changes.json'];
     for (final name in artifactNames) {
       final ctxPath = '${ctx.runDir}/explore/$name';
-      final tmpPath = '/tmp/$name';
+      final tmpPath = '$kStagingDir/$name';
 
       File? source;
       if (File(ctxPath).existsSync()) {
@@ -165,12 +166,12 @@ class ExploreCommand extends Command<void> {
       }
     }
 
-    Logger.success('Stage 1 complete. Artifacts available in /tmp/ for upload.');
+    Logger.success('Stage 1 complete. Artifacts available in staging dir for upload.');
 
     // Write step summary
-    final commitJson = FileUtils.readFileOr('/tmp/commit_analysis.json');
-    final prJson = FileUtils.readFileOr('/tmp/pr_data.json');
-    final breakingJson = FileUtils.readFileOr('/tmp/breaking_changes.json');
+    final commitJson = FileUtils.readFileOr('$kStagingDir/commit_analysis.json');
+    final prJson = FileUtils.readFileOr('$kStagingDir/pr_data.json');
+    final breakingJson = FileUtils.readFileOr('$kStagingDir/breaking_changes.json');
 
     StepSummary.write('''
 ## Stage 1: Explorer Agent Complete

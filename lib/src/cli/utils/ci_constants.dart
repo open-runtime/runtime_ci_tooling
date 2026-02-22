@@ -1,4 +1,15 @@
+import 'dart:io';
+
 import '../../triage/utils/run_context.dart';
+
+/// Staging directory for CI artifacts.
+///
+/// In CI, GitHub Actions downloads artifacts to `/tmp/`. Locally,
+/// `Directory.systemTemp` is used (which maps to `/tmp` on Linux
+/// and `/var/folders/…` on macOS).
+///
+/// Override via `CI_STAGING_DIR` environment variable.
+String get kStagingDir => Platform.environment['CI_STAGING_DIR'] ?? Directory.systemTemp.path;
 
 /// Configuration files expected in a repo using runtime_ci_tooling.
 const List<String> kCiConfigFiles = [

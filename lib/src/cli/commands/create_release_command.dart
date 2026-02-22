@@ -8,6 +8,7 @@ import '../../triage/utils/run_context.dart';
 import '../manage_cicd_cli.dart';
 import '../options/create_release_options.dart';
 import '../options/version_options.dart';
+import '../utils/ci_constants.dart';
 import '../utils/file_utils.dart';
 import '../utils/logger.dart';
 import '../utils/process_runner.dart';
@@ -103,7 +104,7 @@ class CreateReleaseCommand extends Command<void> {
     final releaseNotesSearchPaths = [
       '${releaseDir.path}/release_notes.md',
       '$repoRoot/release-notes-artifacts/release_notes/v$newVersion/release_notes.md',
-      '/tmp/release_notes_body.md',
+      '$kStagingDir/release_notes_body.md',
       '$repoRoot/${artifactsDir ?? "."}/release_notes_body.md',
     ];
 
@@ -131,7 +132,7 @@ class CreateReleaseCommand extends Command<void> {
     final migrationSearchPaths = [
       '${releaseDir.path}/migration_guide.md',
       '$repoRoot/release-notes-artifacts/release_notes/v$newVersion/migration_guide.md',
-      '/tmp/migration_guide.md',
+      '$kStagingDir/migration_guide.md',
     ];
     for (final path in migrationSearchPaths) {
       final f = File(path);

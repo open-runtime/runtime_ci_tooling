@@ -11,9 +11,13 @@ import '../utils/gemini_runner.dart';
 const String kAgentId = 'duplicate';
 
 /// Builds a Gemini task for duplicate detection.
-GeminiTask buildTask(IssuePlan issue, String repoRoot) {
+GeminiTask buildTask(IssuePlan issue, String repoRoot, {String? resultsDir}) {
+  final taskId = 'issue-${issue.number}-dupes';
+  final outputPath = resultsDir != null
+      ? '$resultsDir/$taskId.json'
+      : '.runtime_ci/runs/triage_results/issue_${issue.number}_$kAgentId.json';
   return GeminiTask(
-    id: 'issue-${issue.number}-dupes',
+    id: taskId,
     model: kDefaultProModel,
     workingDirectory: repoRoot,
     allowedTools: ['run_shell_command(gh)'],
@@ -39,7 +43,7 @@ You are a Duplicate Detection Agent for GitHub issue #${issue.number}.
 
 ## Required Output
 
-Write a JSON file to .runtime_ci/runs/triage_results/issue_${issue.number}_$kAgentId.json:
+Write a JSON file to $outputPath:
 ```json
 {
   "agent_id": "$kAgentId",

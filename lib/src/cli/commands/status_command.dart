@@ -4,38 +4,15 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 
 import '../../triage/utils/config.dart';
-import '../../triage/utils/run_context.dart';
 import '../manage_cicd_cli.dart';
+import '../utils/ci_constants.dart';
 import '../utils/logger.dart';
 import '../utils/process_runner.dart';
 import '../utils/repo_utils.dart';
 import '../utils/version_detection.dart';
 
-const List<String> _kConfigFiles = [
-  '.github/workflows/release.yaml',
-  '.github/workflows/issue-triage.yaml',
-  '.github/workflows/ci.yaml',
-  '.gemini/settings.json',
-  '.gemini/commands/changelog.toml',
-  '.gemini/commands/release-notes.toml',
-  '.gemini/commands/triage.toml',
-  'GEMINI.md',
-  'CHANGELOG.md',
-  'lib/src/prompts/gemini_changelog_prompt.dart',
-  'lib/src/prompts/gemini_changelog_composer_prompt.dart',
-  'lib/src/prompts/gemini_release_notes_author_prompt.dart',
-  'lib/src/prompts/gemini_documentation_prompt.dart',
-  'lib/src/prompts/gemini_triage_prompt.dart',
-];
-
 const List<String> _kRequiredTools = ['git', 'gh', 'node', 'npm', 'jq'];
 const List<String> _kOptionalTools = ['tree', 'gemini'];
-
-const List<String> _kStage1Artifacts = [
-  '$kCicdRunsDir/explore/commit_analysis.json',
-  '$kCicdRunsDir/explore/pr_data.json',
-  '$kCicdRunsDir/explore/breaking_changes.json',
-];
 
 /// Show current CI/CD configuration status.
 class StatusCommand extends Command<void> {
@@ -58,7 +35,7 @@ class StatusCommand extends Command<void> {
 
     // Check files
     Logger.info('Configuration files:');
-    for (final file in _kConfigFiles) {
+    for (final file in kCiConfigFiles) {
       final exists = File('$repoRoot/$file').existsSync();
       if (exists) {
         Logger.success('  $file');
@@ -111,7 +88,7 @@ class StatusCommand extends Command<void> {
     // Check Stage 1 artifacts
     Logger.info('');
     Logger.info('Stage 1 artifacts:');
-    for (final artifact in _kStage1Artifacts) {
+    for (final artifact in kStage1Artifacts) {
       if (File(artifact).existsSync()) {
         final size = File(artifact).lengthSync();
         Logger.success('  $artifact ($size bytes)');

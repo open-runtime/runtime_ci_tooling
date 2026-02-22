@@ -48,7 +48,11 @@ Future<void> crossRepoLink(
 
   for (final decision in decisions) {
     final issueNumber = decision.issueNumber;
-    final issuePlan = plan.issues.firstWhere((i) => i.number == issueNumber, orElse: () => plan.issues.first);
+    final issuePlan = plan.issues.where((i) => i.number == issueNumber).firstOrNull;
+    if (issuePlan == null) {
+      print('  Warning: Issue #$issueNumber not found in game plan — skipping cross-repo link');
+      continue;
+    }
 
     // Extract search terms from issue title
     final searchTerms = _extractSearchTerms(issuePlan.title);
@@ -239,7 +243,9 @@ Future<bool> _hasExistingComment(String owner, String repo, int issueNumber, Str
     if (result.exitCode == 0) {
       return (result.stdout as String).contains(searchText);
     }
-  } catch (_) {}
+  } catch (_) {
+    /* intentionally ignored: gh CLI may not be available or cross-repo issue may not exist */
+  }
   return false;
 }
 

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../cli/options/triage_cli_options.dart';
+import '../cli/utils/ci_constants.dart';
 import 'models/game_plan.dart';
 import 'models/investigation_result.dart';
 import 'models/triage_decision.dart';
@@ -40,8 +41,8 @@ import 'utils/run_context.dart';
 // Constants
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Lock file remains in /tmp (not repo-scoped -- prevents concurrent triage globally).
-const String kLockFilePath = '/tmp/triage.lock';
+/// Lock file prevents concurrent triage globally.
+final String kLockFilePath = '${kStagingDir}/triage.lock';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Main
@@ -189,7 +190,9 @@ void _releaseLock() {
     if (lockFile.existsSync()) {
       lockFile.deleteSync();
     }
-  } catch (_) {}
+  } catch (e) {
+    print('  Warning: Could not release triage lock: $e');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

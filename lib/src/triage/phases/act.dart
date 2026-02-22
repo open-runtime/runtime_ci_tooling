@@ -212,7 +212,9 @@ Future<Set<String>> _getIssueLabels(int issueNumber, String repoRoot) async {
     if (result.exitCode == 0) {
       return (result.stdout as String).trim().split('\n').where((l) => l.isNotEmpty).toSet();
     }
-  } catch (_) {}
+  } catch (_) {
+    /* intentionally ignored: gh CLI may not be available or issue may not exist */
+  }
   return {};
 }
 
@@ -231,7 +233,9 @@ Future<bool> _hasExistingComment(int issueNumber, String searchText, String repo
     if (result.exitCode == 0) {
       return (result.stdout as String).contains(searchText);
     }
-  } catch (_) {}
+  } catch (_) {
+    /* intentionally ignored: gh CLI may not be available or issue may not exist */
+  }
   return false;
 }
 

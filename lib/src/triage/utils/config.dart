@@ -314,7 +314,9 @@ class TriageConfig {
       if (result.exitCode == 0) {
         return (result.stdout as String).trim();
       }
-    } catch (_) {}
+    } catch (e) {
+      print('  Warning: Could not fetch secret from GCP Secret Manager: $e');
+    }
     return null;
   }
 }

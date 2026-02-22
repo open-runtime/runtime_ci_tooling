@@ -232,7 +232,9 @@ class RunContext {
           try {
             final meta = json.decode(metaFile.readAsStringSync()) as Map<String, dynamic>;
             if (meta['command'] == command) return run.path;
-          } catch (_) {}
+          } catch (e) {
+            print('  Warning: Could not parse meta.json in ${run.path}: $e');
+          }
         }
       } else {
         return run.path;

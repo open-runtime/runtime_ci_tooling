@@ -12,9 +12,13 @@ import '../utils/gemini_runner.dart';
 const String kAgentId = 'sentiment';
 
 /// Builds a Gemini task for comment sentiment analysis.
-GeminiTask buildTask(IssuePlan issue, String repoRoot) {
+GeminiTask buildTask(IssuePlan issue, String repoRoot, {String? resultsDir}) {
+  final taskId = 'issue-${issue.number}-sentiment';
+  final outputPath = resultsDir != null
+      ? '$resultsDir/$taskId.json'
+      : '.runtime_ci/runs/triage_results/issue_${issue.number}_$kAgentId.json';
   return GeminiTask(
-    id: 'issue-${issue.number}-sentiment',
+    id: taskId,
     model: kDefaultProModel,
     workingDirectory: repoRoot,
     allowedTools: ['run_shell_command(gh)'],
@@ -40,7 +44,7 @@ You are a Comment Sentiment Agent analyzing the discussion on GitHub issue #${is
 
 ## Required Output
 
-Write a JSON file to .runtime_ci/runs/triage_results/issue_${issue.number}_$kAgentId.json:
+Write a JSON file to $outputPath:
 ```json
 {
   "agent_id": "$kAgentId",
