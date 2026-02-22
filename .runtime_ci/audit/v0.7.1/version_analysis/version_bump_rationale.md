@@ -1,0 +1,7 @@
+- **Decision**: patch. The `fix:` commit modifies code in the `lib/` directory, so a patch bump is required.
+- **Key Changes**:
+  - The `create-release` command was updated to correctly copy `autodoc.json` and the generated `docs/` directory from the artifacts directory to the repository root.
+- **Breaking Changes**: None
+- **New Features**: None
+- **References**:
+  - Commit: `fix: copy autodoc docs/ and autodoc.json from artifacts in create-release`

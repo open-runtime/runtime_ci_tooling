@@ -1,0 +1,1 @@
+- Fixed a pipeline bug in `create-release` to properly preserve the generated `docs/` folder and `autodoc.json` hash updates during the release process.
