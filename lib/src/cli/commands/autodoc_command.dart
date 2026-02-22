@@ -7,6 +7,7 @@ import '../../triage/utils/config.dart';
 import '../../triage/utils/run_context.dart';
 import '../manage_cicd_cli.dart';
 import '../options/autodoc_options.dart';
+import '../utils/autodoc_scaffold.dart';
 import '../utils/gemini_utils.dart';
 import '../utils/logger.dart';
 import '../utils/process_runner.dart';
@@ -59,11 +60,17 @@ class AutodocCommand extends Command<void> {
     }
 
     if (init) {
-      Logger.info('--init: autodoc.json should be created manually or already exists.');
       if (File(configPath).existsSync()) {
-        Logger.success('autodoc.json exists at $configPath');
+        Logger.info('$kRuntimeCiDir/autodoc.json already exists.');
+        Logger.info('Use `manage_cicd autodoc --force` to regenerate all docs.');
       } else {
-        Logger.error('autodoc.json not found. Create it at $kRuntimeCiDir/autodoc.json');
+        final created = scaffoldAutodocJson(repoRoot);
+        if (created) {
+          Logger.success('Created $kRuntimeCiDir/autodoc.json');
+          Logger.info('Next: run `manage_cicd autodoc` to generate docs.');
+        } else {
+          Logger.warn('No lib/ directory found — cannot scaffold autodoc.json.');
+        }
       }
       return;
     }
