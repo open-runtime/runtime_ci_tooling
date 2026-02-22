@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-02-22
+
+### Breaking Changes
+- **BREAKING**: Removed package executables (bin/manage_cicd.dart). The CLI must now be invoked via scripts/.
+  - Migration: Use `dart run scripts/manage_cicd.dart` instead of `dart run runtime_ci_tooling:manage_cicd`.
+- **BREAKING**: Updated CI template secret names and removed SendGrid/LFS support.
+  - Migration: Update GitHub Actions workflows to use new secret names (e.g., GEMINI_API_KEY instead of CICD_GEMINI_API_KEY_OPEN_RUNTIME) and remove LFS configuration if not needed.
+
+### Added
+- Added script wrappers in scripts/ for local execution
+- Added build_cli and build_runner dependencies
+
+### Changed
+- Refactored CLI argument parsing to use typed options (build_cli)
+- Updated CI workflow templates with new secret mappings and script paths
+
+### Removed
+- Removed bin/ executables (manage_cicd, triage_cli) in favor of scripts/
+- Removed USAGE.md and SETUP.md documentation
+- Removed SendGrid API keys and LFS configuration from CI template
+
 ## [0.5.0] - 2026-02-16
 
 ### Added
@@ -28,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed `git add` failure in release process by adding files individually (commit 1d45361)
 
+[0.6.0]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/open-runtime/runtime_ci_tooling/releases/tag/v0.4.0

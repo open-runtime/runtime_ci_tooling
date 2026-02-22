@@ -10,7 +10,7 @@ Shared CI/CD automation tooling for open-runtime or pieces-app packages. Provide
 - **Audit Trails**: Comprehensive logging of CI/CD actions and decisions.
 - **MCP Integration**: Configuration for Model Context Protocol servers (GitHub, Sentry).
 - **Cross-Platform**: Utilities for tool installation and environment setup.
-- **Documentation**: Comprehensive [setup](SETUP.md) and [usage](USAGE.md) guides.
+- **Typed CLI Options**: Uses `build_cli` to generate typed and structured command-line options.
 
 ## Installation
 
@@ -18,7 +18,7 @@ Add `runtime_ci_tooling` to your `dev_dependencies`:
 
 ```yaml
 dev_dependencies:
-  runtime_ci_tooling: ^0.5.0
+  runtime_ci_tooling: ^0.6.0
 ```
 
 Or run:
@@ -29,13 +29,11 @@ dart pub add dev:runtime_ci_tooling
 
 ## Configuration
 
-For a detailed setup guide, see [SETUP.md](SETUP.md).
-
 The tooling expects configuration to be present in the `.runtime_ci/` directory.
 You can generate a default configuration and scaffold workflows using:
 
 ```bash
-dart run runtime_ci_tooling:manage_cicd init
+dart run scripts/manage_cicd.dart init
 ```
 
 This will create:
@@ -44,16 +42,14 @@ This will create:
 
 ## Usage
 
-For a comprehensive usage guide, see [USAGE.md](USAGE.md).
-
-As of version **v0.5.0**, tools are available as direct executables.
+As of version **v0.6.0**, tools are available as script wrappers in `scripts/` instead of `bin/` executables, and CLI options are strictly typed.
 
 ### Manage CI/CD
 
 The main entry point for CI/CD operations.
 
 ```bash
-dart run runtime_ci_tooling:manage_cicd <command> [options]
+dart run scripts/manage_cicd.dart <command> [options]
 ```
 
 **Common Commands:**
@@ -68,23 +64,23 @@ dart run runtime_ci_tooling:manage_cicd <command> [options]
 - `autodoc`: Generate/update module documentation.
 - `status`: Show current CI/CD configuration status.
 
-Run `dart run runtime_ci_tooling:manage_cicd --help` for full usage details.
+Run `dart run scripts/manage_cicd.dart --help` for full usage details.
 
 ### Triage CLI
 
 Specialized tool for issue triage and release management interactions.
 
 ```bash
-dart run runtime_ci_tooling:triage_cli <command> [options]
+dart run scripts/triage_cli.dart <command> [options]
 ```
 
 **Usage Examples:**
-- **Single Issue**: `dart run runtime_ci_tooling:triage_cli <issue_number>`
-- **Auto Triage**: `dart run runtime_ci_tooling:triage_cli --auto`
-- **Pre-Release Scan**: `dart run runtime_ci_tooling:triage_cli --pre-release --prev-tag v0.4.1 --version 0.5.0`
-- **Post-Release Loop**: `dart run runtime_ci_tooling:triage_cli --post-release --version 0.5.0 --release-tag v0.5.0`
+- **Single Issue**: `dart run scripts/triage_cli.dart <issue_number>`
+- **Auto Triage**: `dart run scripts/triage_cli.dart --auto`
+- **Pre-Release Scan**: `dart run scripts/triage_cli.dart --pre-release --prev-tag v0.5.0 --version 0.6.0`
+- **Post-Release Loop**: `dart run scripts/triage_cli.dart --post-release --version 0.6.0 --release-tag v0.6.0`
 
-Run `dart run runtime_ci_tooling:triage_cli --help` for full usage details.
+Run `dart run scripts/triage_cli.dart --help` for full usage details.
 
 ## Versioning
 
