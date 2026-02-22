@@ -8,7 +8,7 @@ import 'process_runner.dart';
 
 /// Constants used by version detection.
 const String kGeminiModel = 'gemini-3-flash-preview';
-const String kGeminiProModel = 'gemini-3.1-pro-preview';
+const String kGeminiProModel = 'gemini-3-pro-preview';
 
 /// Version detection and semantic versioning utilities.
 abstract final class VersionDetection {

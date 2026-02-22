@@ -162,7 +162,7 @@ class InitCommand extends Command<void> {
         },
         'gemini': {
           'flash_model': 'gemini-3-flash-preview',
-          'pro_model': 'gemini-3.1-pro-preview',
+          'pro_model': 'gemini-3-pro-preview',
           'max_turns': 100,
           'max_concurrent': 4,
           'max_retries': 3,
@@ -238,7 +238,7 @@ class InitCommand extends Command<void> {
       if (modules.isNotEmpty) {
         final autodocData = {
           'version': '1.0.0',
-          'gemini_model': 'gemini-3.1-pro-preview',
+          'gemini_model': 'gemini-3-pro-preview',
           'max_concurrent': 4,
           'modules': modules,
           'templates': {

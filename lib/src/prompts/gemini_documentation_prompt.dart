@@ -15,7 +15,7 @@ import '_ci_config.dart';
 ///
 /// Example:
 ///   dart run scripts/prompts/gemini_documentation_prompt.dart v0.0.1 0.0.2 | \
-///     gemini -o json --yolo -s -m gemini-3.1-pro-preview \
+///     gemini -o json --yolo -s -m gemini-3-pro-preview \
 ///     @.cicd_runs/explore/commit_analysis.json @README.md ...
 
 void main(List<String> args) {

@@ -13,7 +13,7 @@ import '../utils/process_runner.dart';
 import '../utils/repo_utils.dart';
 import '../utils/step_summary.dart';
 
-const String _kGeminiProModel = 'gemini-3.1-pro-preview';
+const String _kGeminiProModel = 'gemini-3-pro-preview';
 
 /// Generate/update documentation for proto modules using Gemini Pro.
 ///
