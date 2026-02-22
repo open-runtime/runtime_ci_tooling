@@ -18,7 +18,7 @@ import 'dart:io';
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const String kDefaultFlashModel = 'gemini-3-flash-preview';
-const String kDefaultProModel = 'gemini-3-pro-preview';
+const String kDefaultProModel = 'gemini-3-1-pro-preview';
 const int kDefaultMaxTurns = 100;
 const int kDefaultMaxConcurrent = 4;
 const int kDefaultMaxRetries = 3;
