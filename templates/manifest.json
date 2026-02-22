@@ -1,0 +1,68 @@
+{
+  "schema_version": "1.0.0",
+  "templates": [
+    {
+      "id": "gemini_settings",
+      "source": "gemini/settings.template.json",
+      "destination": ".gemini/settings.json",
+      "category": "overwritable",
+      "description": "Gemini CLI settings with MCP servers and tool allowlists"
+    },
+    {
+      "id": "gemini_cmd_changelog",
+      "source": "gemini/commands/changelog.toml",
+      "destination": ".gemini/commands/changelog.toml",
+      "category": "overwritable",
+      "description": "Gemini /changelog command"
+    },
+    {
+      "id": "gemini_cmd_release_notes",
+      "source": "gemini/commands/release-notes.toml",
+      "destination": ".gemini/commands/release-notes.toml",
+      "category": "overwritable",
+      "description": "Gemini /release-notes command"
+    },
+    {
+      "id": "gemini_cmd_triage",
+      "source": "gemini/commands/triage.toml",
+      "destination": ".gemini/commands/triage.toml",
+      "category": "overwritable",
+      "description": "Gemini /triage command"
+    },
+    {
+      "id": "workflow_ci",
+      "source": "github/workflows/ci.template.yaml",
+      "destination": ".github/workflows/ci.yaml",
+      "category": "cautious",
+      "description": "CI pipeline workflow"
+    },
+    {
+      "id": "workflow_release",
+      "source": "github/workflows/release.template.yaml",
+      "destination": ".github/workflows/release.yaml",
+      "category": "cautious",
+      "description": "Release pipeline workflow"
+    },
+    {
+      "id": "workflow_issue_triage",
+      "source": "github/workflows/issue-triage.template.yaml",
+      "destination": ".github/workflows/issue-triage.yaml",
+      "category": "cautious",
+      "description": "Issue triage workflow"
+    },
+    {
+      "id": "config_json",
+      "source": null,
+      "destination": ".runtime_ci/config.json",
+      "category": "mergeable",
+      "description": "Runtime CI config (user-owned, merge new keys only)"
+    },
+    {
+      "id": "autodoc_json",
+      "source": null,
+      "destination": ".runtime_ci/autodoc.json",
+      "category": "regeneratable",
+      "description": "Autodoc module config (re-scan lib/src/)"
+    }
+  ]
+}
