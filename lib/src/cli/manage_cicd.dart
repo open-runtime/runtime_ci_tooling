@@ -2141,6 +2141,19 @@ ${_artifactLink()}
 /// Run dart test.
 Future<void> _runTest(String repoRoot) async {
   _header('Running Tests');
+
+  // Skip gracefully if no test/ directory exists
+  final testDir = Directory('$repoRoot/test');
+  if (!testDir.existsSync()) {
+    _success('No test/ directory found — skipping tests');
+    _writeStepSummary('''
+## Test Results
+
+**No test/ directory found — skipped.**
+''');
+    return;
+  }
+
   final result = await Process.run('dart', ['test', '--exclude-tags', 'gcp'], workingDirectory: repoRoot);
   final output = result.stdout as String;
   stdout.write(output);
