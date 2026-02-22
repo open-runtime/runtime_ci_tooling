@@ -12,6 +12,7 @@ executables:
 
 environment:
   sdk: ^3.9.0
+resolution: workspace
 
 dependencies:
   args: ^2.7.0

@@ -72,7 +72,7 @@ abstract final class VersionDetection {
         commitSubjects
             .split('\n')
             .every(
-              (line) => line.trim().isEmpty || RegExp(r'^(chore|style|ci|docs|build)(\(.+\))?:').hasMatch(line.trim()),
+              (line) => line.trim().isEmpty || RegExp(r'^(style|ci|docs|build)(\(.+\))?:').hasMatch(line.trim()),
             )) {
       bump = 'none';
     }
@@ -134,10 +134,12 @@ abstract final class VersionDetection {
           'Rules:\n'
           '- MAJOR: Breaking changes to public APIs, removed functions, changed signatures\n'
           '- MINOR: New features, new proto messages, new exports, additive API changes\n'
-          '- PATCH: Bug fixes, test improvements, dependency updates, refactors, '
-          'performance improvements — anything that changes code in lib/ or test/\n'
-          '- NONE: No release needed — pure chore, style, CI workflow, '
-          'docs-only, or build config changes that touch ZERO code in lib/ or test/\n\n'
+          '- PATCH: Bug fixes, chore/maintenance, test improvements, dependency updates, '
+          'refactors, performance improvements — anything that changes code in lib/ or test/. '
+          'IMPORTANT: fix: and chore: commits ALWAYS require at least a patch release.\n'
+          '- NONE: No release needed — ONLY pure style, CI workflow, '
+          'docs-only, or build config changes that touch ZERO code in lib/ or test/. '
+          'Never return NONE for fix: or chore: commits.\n\n'
           'IMPORTANT: The next version will be computed by bumping from the '
           'previous tag ($prevTag), NOT from the pubspec.yaml version. '
           'Your job is ONLY to decide the bump type.\n';
