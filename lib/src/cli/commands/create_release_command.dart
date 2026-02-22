@@ -69,6 +69,21 @@ class CreateReleaseCommand extends Command<void> {
             Logger.info('Copied $name from artifacts');
           }
         }
+
+        // Copy autodoc.json from artifacts (updated hashes from compose stage)
+        final autodocSrc = File('${artDir.path}/$kRuntimeCiDir/autodoc.json');
+        if (autodocSrc.existsSync()) {
+          Directory('$repoRoot/$kRuntimeCiDir').createSync(recursive: true);
+          autodocSrc.copySync('$repoRoot/$kRuntimeCiDir/autodoc.json');
+          Logger.info('Copied autodoc.json from artifacts');
+        }
+
+        // Copy generated docs/ directory from artifacts (autodoc output)
+        final docsSrc = Directory('${artDir.path}/docs');
+        if (docsSrc.existsSync()) {
+          _copyDirectory(docsSrc, Directory('$repoRoot/docs'));
+          Logger.info('Copied docs/ from artifacts');
+        }
       }
     }
 
@@ -303,5 +318,18 @@ ${StepSummary.collapsible('Contributors (JSON)', '```json\n$contribContent\n```'
 
 ${StepSummary.artifactLink()}
 ''');
+  }
+
+  /// Recursively copy a directory tree.
+  void _copyDirectory(Directory source, Directory destination) {
+    destination.createSync(recursive: true);
+    for (final entity in source.listSync(recursive: false)) {
+      final newPath = '${destination.path}/${entity.uri.pathSegments.last}';
+      if (entity is File) {
+        entity.copySync(newPath);
+      } else if (entity is Directory) {
+        _copyDirectory(entity, Directory(newPath));
+      }
+    }
   }
 }
