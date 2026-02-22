@@ -57,24 +57,11 @@ abstract final class VersionDetection {
       repoRoot,
       verbose: verbose,
     );
-    final commitSubjects = CiProcessRunner.runSync(
-      'git log "$prevTag"..HEAD --pretty=format:"%s" --no-merges 2>/dev/null',
-      repoRoot,
-      verbose: verbose,
-    );
-
     var bump = 'patch';
     if (RegExp(r'(BREAKING CHANGE|^[a-z]+(\(.+\))?!:)', multiLine: true).hasMatch(commits)) {
       bump = 'major';
     } else if (RegExp(r'^feat(\(.+\))?:', multiLine: true).hasMatch(commits)) {
       bump = 'minor';
-    } else if (commitSubjects.isNotEmpty &&
-        commitSubjects
-            .split('\n')
-            .every(
-              (line) => line.trim().isEmpty || RegExp(r'^(style|ci|docs|build)(\(.+\))?:').hasMatch(line.trim()),
-            )) {
-      bump = 'none';
     }
 
     Logger.info('  Regex heuristic: $bump');
@@ -134,12 +121,11 @@ abstract final class VersionDetection {
           'Rules:\n'
           '- MAJOR: Breaking changes to public APIs, removed functions, changed signatures\n'
           '- MINOR: New features, new proto messages, new exports, additive API changes\n'
-          '- PATCH: Bug fixes, chore/maintenance, test improvements, dependency updates, '
-          'refactors, performance improvements — anything that changes code in lib/ or test/. '
-          'IMPORTANT: fix: and chore: commits ALWAYS require at least a patch release.\n'
-          '- NONE: No release needed — ONLY pure style, CI workflow, '
-          'docs-only, or build config changes that touch ZERO code in lib/ or test/. '
-          'Never return NONE for fix: or chore: commits.\n\n'
+          '- PATCH: Bug fixes, chore/maintenance, CI changes, style, docs, build config, '
+          'test improvements, dependency updates, refactors, performance improvements — '
+          'anything that reaches this pipeline has already passed pre-check filtering '
+          'of bot commits, so every commit warrants at least a patch release.\n'
+          '- NONE: Do not use. Every commit that reaches this analysis requires a release.\n\n'
           'IMPORTANT: The next version will be computed by bumping from the '
           'previous tag ($prevTag), NOT from the pubspec.yaml version. '
           'Your job is ONLY to decide the bump type.\n';
@@ -156,9 +142,11 @@ abstract final class VersionDetection {
         verbose: verbose,
       );
 
-      // Save raw Gemini response for audit trail
+      // Save Gemini response for audit trail (strip MCP/warning prefix)
       if (geminiResult.isNotEmpty) {
-        File('${versionAnalysisDir.path}/gemini_response.json').writeAsStringSync(geminiResult);
+        final jsonStart = geminiResult.indexOf('{');
+        final cleaned = jsonStart > 0 ? geminiResult.substring(jsonStart) : geminiResult;
+        File('${versionAnalysisDir.path}/gemini_response.json').writeAsStringSync(cleaned);
       }
 
       if (geminiResult.isNotEmpty && File(bumpJsonPath).existsSync()) {
