@@ -120,6 +120,50 @@ class ConsumersCommand extends Command<void> {
     return segments.last;
   }
 
+  static String _normalizePathForComparisonText(String path) {
+    var normalized = path.replaceAll('\\', '/').trim();
+    while (normalized.endsWith('/') && normalized.length > 1) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    return normalized;
+  }
+
+  /// Compatible if either normalized path or filename identity matches.
+  static bool isSnapshotSourceCompatible({
+    required String? sourceSnapshotPath,
+    required String? sourceSnapshotIdentity,
+    required String expectedSnapshotPath,
+  }) {
+    final sourceIdentity = sourceSnapshotIdentity?.trim().isNotEmpty == true
+        ? sourceSnapshotIdentity!.trim()
+        : (sourceSnapshotPath == null ? null : snapshotIdentityFromPath(sourceSnapshotPath));
+    final expectedIdentity = snapshotIdentityFromPath(expectedSnapshotPath);
+    final normalizedSource = sourceSnapshotPath == null ? null : _normalizePathForComparisonText(sourceSnapshotPath);
+    final normalizedExpected = _normalizePathForComparisonText(expectedSnapshotPath);
+    final identityMatches = sourceIdentity == expectedIdentity;
+    final pathMatches = normalizedSource == normalizedExpected;
+    return identityMatches || pathMatches;
+  }
+
+  static bool isReleaseSummaryReusable({
+    required String status,
+    required String outputPath,
+    required String? tag,
+    required String? exactTag,
+  }) {
+    if (status == 'failed') return false;
+    if (status == 'ok') {
+      if (exactTag != null && exactTag.isNotEmpty && tag != exactTag) {
+        return false;
+      }
+      return Directory(outputPath).existsSync();
+    }
+    if (status == 'no_release') {
+      return File(outputPath).existsSync();
+    }
+    return false;
+  }
+
   /// Returns the expected release output path for a repo/tag combination.
   static String buildReleaseOutputPath({required String outputDir, required String repoName, required String tagName}) {
     return _joinPath(outputDir, [repoName, resolveVersionFolderName(tagName)]);
@@ -1047,17 +1091,12 @@ class ConsumersCommand extends Command<void> {
   }
 
   bool _isCompletedSummaryReusable(_ReleaseSyncSummary summary, {required String? exactTag}) {
-    if (summary.status == 'failed') return false;
-    if (summary.status == 'ok') {
-      if (exactTag != null && exactTag.isNotEmpty && summary.tag != exactTag) {
-        return false;
-      }
-      return Directory(summary.outputPath).existsSync();
-    }
-    if (summary.status == 'no_release') {
-      return File(summary.outputPath).existsSync();
-    }
-    return false;
+    return isReleaseSummaryReusable(
+      status: summary.status,
+      outputPath: summary.outputPath,
+      tag: summary.tag,
+      exactTag: exactTag,
+    );
   }
 
   _ReleaseCounts _countReleaseStatuses(Iterable<_ReleaseSyncSummary> summaries) {
@@ -1122,15 +1161,14 @@ class ConsumersCommand extends Command<void> {
       if (parsed is! Map<String, dynamic>) return {};
 
       final sourceSnapshot = parsed['source_snapshot']?.toString();
-      final sourceSnapshotIdentity =
-          _normalizeNullableString(parsed['source_snapshot_identity']) ??
-          (sourceSnapshot == null ? null : snapshotIdentityFromPath(sourceSnapshot));
-      final expectedSnapshotIdentity = snapshotIdentityFromPath(expectedSnapshotPath);
-      final normalizedSourceSnapshot = sourceSnapshot == null ? null : _normalizePathForComparison(sourceSnapshot);
-      final normalizedExpectedSnapshot = _normalizePathForComparison(expectedSnapshotPath);
-      final identityMatches = sourceSnapshotIdentity == expectedSnapshotIdentity;
-      final pathMatches = normalizedSourceSnapshot == normalizedExpectedSnapshot;
-      if (!identityMatches && !pathMatches) return {};
+      final sourceSnapshotIdentity = _normalizeNullableString(parsed['source_snapshot_identity']);
+      if (!isSnapshotSourceCompatible(
+        sourceSnapshotPath: sourceSnapshot,
+        sourceSnapshotIdentity: sourceSnapshotIdentity,
+        expectedSnapshotPath: expectedSnapshotPath,
+      )) {
+        return {};
+      }
 
       final criteriaMap = parsed['criteria'];
       if (criteriaMap is! Map<String, dynamic>) return {};
@@ -1171,14 +1209,6 @@ class ConsumersCommand extends Command<void> {
     final text = value.toString().trim();
     if (text.isEmpty || text == 'null') return null;
     return text;
-  }
-
-  String _normalizePathForComparison(String path) {
-    var normalized = path.replaceAll('\\', '/').trim();
-    while (normalized.endsWith('/') && normalized.length > 1) {
-      normalized = normalized.substring(0, normalized.length - 1);
-    }
-    return normalized;
   }
 
   void _atomicWriteJson(String targetPath, Map<String, dynamic> data) {

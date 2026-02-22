@@ -71,14 +71,62 @@ void main() {
       expect(content, contains("grep '^lib/.*\\.dart\$'"));
     });
 
-    test('hook exits early with no error when no staged lib/ Dart files', () {
+    test('hook only formats Dart files when staged lib/ Dart files exist (no early exit)', () {
       final tmp = _makeTempRepo();
       addTearDown(() => tmp.deleteSync(recursive: true));
       HookInstaller.install(tmp.path);
       final content = File('${tmp.path}/.git/hooks/pre-commit').readAsStringSync();
-      // Must check if STAGED_DART is empty and exit 0 (not 1)
-      expect(content, contains('if [ -z "\$STAGED_DART" ]; then'));
-      expect(content, contains('  exit 0'));
+      // Format section must be conditional (not exit-early) so pubspec section always runs.
+      // A pubspec-only commit must not be short-circuited by the Dart section.
+      expect(content, contains('if [ -n "\$STAGED_DART" ]; then'));
+      // Must NOT have the old early-exit pattern that would skip the pubspec check
+      expect(content, isNot(contains('if [ -z "\$STAGED_DART" ]; then')));
+      expect(content, isNot(contains('  exit 0')));
+    });
+
+    test('hook content includes pubspec.yaml resolution: workspace check', () {
+      final tmp = _makeTempRepo();
+      addTearDown(() => tmp.deleteSync(recursive: true));
+      HookInstaller.install(tmp.path);
+      final content = File('${tmp.path}/.git/hooks/pre-commit').readAsStringSync();
+      // Must detect staged pubspec.yaml files
+      expect(content, contains("grep 'pubspec\\.yaml\$'"));
+      // Must check for the offending line
+      expect(content, contains("grep -q '^resolution: workspace'"));
+    });
+
+    test('hook strips resolution: workspace using portable sed', () {
+      final tmp = _makeTempRepo();
+      addTearDown(() => tmp.deleteSync(recursive: true));
+      HookInstaller.install(tmp.path);
+      final content = File('${tmp.path}/.git/hooks/pre-commit').readAsStringSync();
+      // sed -i.bak works on both macOS (requires extension) and Linux (accepts it)
+      expect(content, contains("sed -i.bak '/^resolution: workspace/d'"));
+      // Must clean up the temp .bak file
+      expect(content, contains('rm -f "\${f}.bak"'));
+      // Must re-stage the modified pubspec
+      expect(content, contains('git add "\$f"'));
+    });
+
+    test('hook runs dart pub get only when resolution: workspace was actually stripped', () {
+      final tmp = _makeTempRepo();
+      addTearDown(() => tmp.deleteSync(recursive: true));
+      HookInstaller.install(tmp.path);
+      final content = File('${tmp.path}/.git/hooks/pre-commit').readAsStringSync();
+      // dart pub get must be conditional on STRIPPED=1, not run for every pubspec change
+      expect(content, contains('STRIPPED=1'));
+      expect(content, contains('if [ "\$STRIPPED" = "1" ]'));
+      expect(content, contains('dart pub get'));
+    });
+
+    test('hook aborts commit if dart pub get fails after stripping', () {
+      final tmp = _makeTempRepo();
+      addTearDown(() => tmp.deleteSync(recursive: true));
+      HookInstaller.install(tmp.path);
+      final content = File('${tmp.path}/.git/hooks/pre-commit').readAsStringSync();
+      // Must exit 1 on dart pub get failure — silent continuation would allow a broken pubspec
+      expect(content, contains('if ! dart pub get'));
+      expect(content, contains('exit 1'));
     });
 
     test('backs up pre-existing custom hook before replacing', () {
