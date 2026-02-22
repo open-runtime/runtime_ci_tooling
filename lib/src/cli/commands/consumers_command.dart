@@ -112,6 +112,14 @@ class ConsumersCommand extends Command<void> {
     return tagName.trim();
   }
 
+  /// Filename identity used for resume across moved workspaces.
+  static String snapshotIdentityFromPath(String path) {
+    final normalized = path.replaceAll('\\', '/');
+    final segments = normalized.split('/').where((segment) => segment.isNotEmpty).toList();
+    if (segments.isEmpty) return normalized;
+    return segments.last;
+  }
+
   /// Returns the expected release output path for a repo/tag combination.
   static String buildReleaseOutputPath({required String outputDir, required String repoName, required String tagName}) {
     return _joinPath(outputDir, [repoName, resolveVersionFolderName(tagName)]);
@@ -123,7 +131,17 @@ class ConsumersCommand extends Command<void> {
     required bool includePrerelease,
     RegExp? tagPattern,
   }) {
-    for (final release in releases) {
+    final orderedReleases = List<Map<String, dynamic>>.from(releases)
+      ..sort((a, b) {
+        final aPublished = DateTime.tryParse(a['publishedAt']?.toString() ?? '');
+        final bPublished = DateTime.tryParse(b['publishedAt']?.toString() ?? '');
+        if (aPublished == null && bPublished == null) return 0;
+        if (aPublished == null) return 1;
+        if (bPublished == null) return -1;
+        return bPublished.compareTo(aPublished);
+      });
+
+    for (final release in orderedReleases) {
       if (release['isDraft'] == true) continue;
       final isPrerelease = release['isPrerelease'] == true;
       if (!includePrerelease && isPrerelease) continue;
@@ -1074,7 +1092,7 @@ class ConsumersCommand extends Command<void> {
     return text;
   }
 
-  _ReleaseSyncSummary _syncRepoRelease({
+  Future<_ReleaseSyncSummary> _syncRepoRelease({
     required String repoRoot,
     required String outputDir,
     required _ConsumerRepo consumer,
@@ -1083,8 +1101,8 @@ class ConsumersCommand extends Command<void> {
     required bool includePrerelease,
     required bool verbose,
     required bool dryRun,
-  }) {
-    final release = _resolveRelease(
+  }) async {
+    final release = await _resolveRelease(
       repoRoot: repoRoot,
       consumer: consumer,
       exactTag: exactTag,
@@ -1134,7 +1152,7 @@ class ConsumersCommand extends Command<void> {
     final releaseMdPath = _joinPath(repoOutputPath, ['RELEASE.md']);
     final pubspecPath = _joinPath(repoOutputPath, ['pubspec.yaml']);
 
-    final pubspec = _fetchPubspec(repoRoot: repoRoot, fullName: consumer.fullName, verbose: verbose);
+    final pubspec = await _fetchPubspec(repoRoot: repoRoot, fullName: consumer.fullName, verbose: verbose);
     final metadata = <String, dynamic>{
       'repository': consumer.fullName,
       'discovery': consumer.toJson(),
@@ -1162,7 +1180,7 @@ class ConsumersCommand extends Command<void> {
       if (dryRun) {
         Logger.info('[DRY-RUN] Would download ${assets.length} assets to ${assetsDir.path}');
       } else {
-        final download = _runProcess(
+        final download = await _runProcess(
           executable: 'gh',
           args: ['release', 'download', tag, '--repo', consumer.fullName, '--dir', assetsDir.path, '--clobber'],
           cwd: repoRoot,
@@ -1186,19 +1204,19 @@ class ConsumersCommand extends Command<void> {
     return _ReleaseSyncSummary(fullName: consumer.fullName, status: 'ok', tag: tag, outputPath: repoOutputPath);
   }
 
-  Map<String, dynamic>? _resolveRelease({
+  Future<Map<String, dynamic>?> _resolveRelease({
     required String repoRoot,
     required _ConsumerRepo consumer,
     required String? exactTag,
     required RegExp? tagPattern,
     required bool includePrerelease,
     required bool verbose,
-  }) {
+  }) async {
     if (exactTag != null && exactTag.isNotEmpty) {
       return _viewRelease(repoRoot: repoRoot, fullName: consumer.fullName, tag: exactTag, verbose: verbose);
     }
 
-    final listResult = _runProcess(
+    final listResult = await _runProcess(
       executable: 'gh',
       args: [
         'release',
@@ -1236,13 +1254,13 @@ class ConsumersCommand extends Command<void> {
     }
   }
 
-  Map<String, dynamic>? _viewRelease({
+  Future<Map<String, dynamic>?> _viewRelease({
     required String repoRoot,
     required String fullName,
     required String tag,
     required bool verbose,
-  }) {
-    final result = _runProcess(
+  }) async {
+    final result = await _runProcess(
       executable: 'gh',
       args: [
         'release',
@@ -1290,16 +1308,41 @@ class ConsumersCommand extends Command<void> {
     return Directory(_joinPath(repoRoot, [outputDirOption]));
   }
 
-  ProcessResult _runProcess({
+  Future<ProcessResult> _runProcess({
     required String executable,
     required List<String> args,
     required String cwd,
     required bool verbose,
-  }) {
+  }) async {
     if (verbose) {
       Logger.info('  \$ $executable ${args.join(" ")}');
     }
-    return Process.runSync(executable, args, workingDirectory: cwd);
+    return Process.run(executable, args, workingDirectory: cwd);
+  }
+
+  Future<void> _forEachConcurrent<T>({
+    required List<T> items,
+    required int concurrency,
+    required Future<void> Function(T item) action,
+  }) async {
+    if (items.isEmpty) return;
+    final workerCount = concurrency <= 1 ? 1 : (concurrency > items.length ? items.length : concurrency);
+    var index = 0;
+
+    Future<void> worker() async {
+      while (true) {
+        if (index >= items.length) break;
+        final currentIndex = index;
+        index++;
+        await action(items[currentIndex]);
+      }
+    }
+
+    final workers = <Future<void>>[];
+    for (var i = 0; i < workerCount; i++) {
+      workers.add(worker());
+    }
+    await Future.wait(workers);
   }
 }
 
@@ -1313,6 +1356,9 @@ class _ConsumersOptions {
   final String? tagRegex;
   final bool includePrerelease;
   final bool resume;
+  final bool searchFirst;
+  final int discoveryWorkers;
+  final int releaseWorkers;
   final int repoLimit;
 
   const _ConsumersOptions({
@@ -1325,6 +1371,9 @@ class _ConsumersOptions {
     required this.tagRegex,
     required this.includePrerelease,
     required this.resume,
+    required this.searchFirst,
+    required this.discoveryWorkers,
+    required this.releaseWorkers,
     required this.repoLimit,
   });
 
@@ -1338,6 +1387,11 @@ class _ConsumersOptions {
     final tagRegex = (results['tag-regex'] as String?)?.trim();
     final includePrerelease = results['include-prerelease'] == true;
     final resume = results['resume'] != false;
+    final searchFirst = results['search-first'] != false;
+    final discoveryWorkersRaw = (results['discovery-workers'] as String?)?.trim() ?? '4';
+    final discoveryWorkers = int.tryParse(discoveryWorkersRaw) ?? 4;
+    final releaseWorkersRaw = (results['release-workers'] as String?)?.trim() ?? '4';
+    final releaseWorkers = int.tryParse(releaseWorkersRaw) ?? 4;
     final repoLimitRaw = (results['repo-limit'] as String?)?.trim() ?? '$_kDefaultRepoLimit';
     final repoLimit = int.tryParse(repoLimitRaw) ?? _kDefaultRepoLimit;
 
@@ -1351,6 +1405,9 @@ class _ConsumersOptions {
       tagRegex: tagRegex == null || tagRegex.isEmpty ? null : tagRegex,
       includePrerelease: includePrerelease,
       resume: resume,
+      searchFirst: searchFirst,
+      discoveryWorkers: discoveryWorkers <= 0 ? 1 : discoveryWorkers,
+      releaseWorkers: releaseWorkers <= 0 ? 1 : releaseWorkers,
       repoLimit: repoLimit <= 0 ? _kDefaultRepoLimit : repoLimit,
     );
   }
