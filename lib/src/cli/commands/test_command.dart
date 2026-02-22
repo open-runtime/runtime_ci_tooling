@@ -31,7 +31,11 @@ class TestCommand extends Command<void> {
       return;
     }
 
-    final result = Process.runSync(Platform.resolvedExecutable, ['test'], workingDirectory: repoRoot);
+    final result = Process.runSync(Platform.resolvedExecutable, [
+      'test',
+      '--exclude-tags',
+      'gcp,integration',
+    ], workingDirectory: repoRoot);
 
     final stdout = (result.stdout as String).trim();
     if (stdout.isNotEmpty) print(stdout);
