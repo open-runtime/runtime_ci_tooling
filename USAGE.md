@@ -13,6 +13,7 @@ API, the Gemini-powered triage pipeline, release automation, and documentation g
 - [manage\_cicd Commands](#manage_cicd-commands)
   - [setup](#setup)
   - [init](#init)
+  - [update](#update)
   - [validate](#validate)
   - [status](#status)
   - [version](#version)
@@ -137,9 +138,64 @@ dart run runtime_ci_tooling:manage_cicd init
 1. Auto-detects package name and version from `pubspec.yaml`
 2. Auto-detects GitHub owner via `gh repo view` or git remote URL
 3. Scans `lib/` and `lib/src/` to auto-generate area labels
-4. Creates `.runtime_ci/config.json` with detected values
-5. Creates a starter `CHANGELOG.md` if none exists
-6. Adds `.runtime_ci/runs/` to `.gitignore`
+4. Creates `.runtime_ci/config.json` with detected values (skipped if already present)
+5. Creates `.runtime_ci/autodoc.json` from `lib/src/` directory structure (skipped if already present)
+6. Creates a starter `CHANGELOG.md` if none exists
+7. Installs `.git/hooks/pre-commit` to auto-format staged `lib/` Dart files before every commit
+8. Adds `.runtime_ci/runs/` to `.gitignore`
+9. Prints a summary of all actions taken and suggested next steps
+
+Re-running `init` is safe — existing config and autodoc files are preserved as-is; only
+missing items (changelog, gitignore entry, pre-commit hook) are repaired.
+
+---
+
+### update
+
+Sync runtime_ci_tooling templates, workflows, settings, and config defaults to a consumer
+repository. Installs the latest version of each managed file and refreshes the pre-commit hook.
+
+```bash
+# Update everything (recommended)
+dart run runtime_ci_tooling:manage_cicd update --all
+
+# Update only workflows (CI, release, issue-triage)
+dart run runtime_ci_tooling:manage_cicd update --workflows
+
+# Update only Gemini CLI settings and command templates
+dart run runtime_ci_tooling:manage_cicd update --templates
+
+# Preview without writing any files
+dart run runtime_ci_tooling:manage_cicd update --all --dry-run
+
+# Force overwrite even cautious templates
+dart run runtime_ci_tooling:manage_cicd update --all --force
+```
+
+**What it does:**
+1. Loads `.runtime_ci/config.json` and validates the `ci` section
+2. Regenerates `.github/workflows/ci.yaml` from `ci.skeleton.yaml` + your config (user-editable sections are preserved)
+3. Updates cautious templates (`release.yaml`, `issue-triage.yaml`) — warns instead of overwriting unless `--force`
+4. Updates Gemini settings and command TOML files
+5. Installs/refreshes `.git/hooks/pre-commit` using the configured `ci.line_length` (unconditional — hooks are not version-tracked and must always reflect current config)
+6. Prints a summary of every file updated, skipped, or backed up
+
+**Flags:**
+- `--all` — Update all managed categories (equivalent to all flags below combined)
+- `--workflows` — Update `.github/workflows/` files
+- `--templates` — Update `.gemini/settings.json` and `.gemini/commands/*.toml`
+- `--config` — Merge new config keys into `.runtime_ci/config.json`
+- `--autodoc` — Update `.runtime_ci/autodoc.json` module list
+- `--dry-run` — Show all planned changes without writing any files
+- `--force` — Overwrite cautious templates without confirmation
+- `--verbose` — Print detailed per-file processing logs
+
+**Template categories:**
+- `overwritable` — Always replaced with the latest version
+- `cautious` — Warns before overwriting; use `--force` to override
+- `templated` — Rendered from `config.json`; user sections preserved
+- `mergeable` — New keys added; existing user keys retained
+- `regeneratable` — Fully regenerated from current source config
 
 ---
 
@@ -1316,7 +1372,10 @@ These flags apply to all `manage_cicd` commands:
 | Path | Purpose | Gitignored |
 |---|---|---|
 | `.runtime_ci/config.json` | Repository CI/CD configuration | No |
+| `.runtime_ci/autodoc.json` | Module documentation configuration + content hashes | No |
 | `CHANGELOG.md` | Keep a Changelog file | No |
+| `.git/hooks/pre-commit` | Auto-formats staged `lib/` Dart files before every commit | N/A (not tracked) |
+| `.gitignore` entry | Adds `.runtime_ci/runs/` to prevent audit trails from being committed | No |
 
 ### Created by `configure-mcp`
 
@@ -1332,7 +1391,6 @@ These flags apply to all `manage_cicd` commands:
 | `.runtime_ci/audit/v<version>/` | Curated release audit snapshots | No |
 | `.runtime_ci/release_notes/v<version>/` | Release notes artifacts | No |
 | `.runtime_ci/version_bumps/v<version>.md` | Version bump rationale | No |
-| `.runtime_ci/autodoc.json` | Autodoc module configuration + hashes | No |
 | `/tmp/commit_analysis.json` | Stage 1 artifact (CI) | N/A |
 | `/tmp/pr_data.json` | Stage 1 artifact (CI) | N/A |
 | `/tmp/breaking_changes.json` | Stage 1 artifact (CI) | N/A |

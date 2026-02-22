@@ -109,14 +109,36 @@ This auto-detects your environment and creates:
 | File | Purpose |
 |---|---|
 | `.runtime_ci/config.json` | Repository-specific CI/CD configuration |
+| `.runtime_ci/autodoc.json` | Module documentation configuration (from `lib/src/` layout) |
 | `CHANGELOG.md` | Starter changelog (if not present) |
 | `.gitignore` entry | Adds `.runtime_ci/runs/` to gitignore |
+| `.git/hooks/pre-commit` | Auto-formats staged `lib/` Dart files before every commit |
 
 The `init` command will:
 1. Auto-detect your package name and version from `pubspec.yaml`
 2. Auto-detect the GitHub owner via `gh repo view` or git remote URL
 3. Scan `lib/` and `lib/src/` to auto-generate area labels
-4. Print a summary and next steps
+4. Create `.runtime_ci/config.json` with detected values (skipped if already present)
+5. Create `.runtime_ci/autodoc.json` from `lib/src/` directory structure (skipped if already present)
+6. Create a starter `CHANGELOG.md` if none exists
+7. Install a git pre-commit hook that runs `dart format` on staged `lib/` Dart files
+8. Add `.runtime_ci/runs/` to `.gitignore`
+9. Print a summary and next steps
+
+### Pre-Commit Hooks
+
+The `init` (and `update`) command installs `.git/hooks/pre-commit` automatically. The
+hook formats only the Dart files staged for the current commit — it never touches
+unstaged changes or files outside `lib/`. If a pre-existing custom hook is found it is
+backed up to `.git/hooks/pre-commit.bak` before replacement.
+
+To reinstall or refresh the hook at any time:
+
+```bash
+dart run runtime_ci_tooling:manage_cicd update --all
+```
+
+The hook respects the `ci.line_length` value in `.runtime_ci/config.json`.
 
 ### Manual configuration
 
@@ -283,7 +305,7 @@ The CI workflow (`.github/workflows/ci.yaml`) is generated from your `ci` sectio
 |-----|------|---------|-------------|
 | `dart_sdk` | string | **required** | Dart SDK version (e.g. `"3.9.2"`) |
 | `personal_access_token_secret` | string | `"GITHUB_TOKEN"` | GitHub secret name for PAT |
-| `line_length` | int/string | `120` | Line length for `dart format` checks |
+| `line_length` | int/string | `120` | Line length for `dart format` checks (also controls the git pre-commit hook) |
 | `features.proto` | bool | `false` | Enable protobuf generation step |
 | `features.lfs` | bool | `false` | Enable Git LFS checkout |
 | `features.format_check` | bool | `true` | Enable `dart format` check |

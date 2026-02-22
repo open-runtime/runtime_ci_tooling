@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - User-preservable sections (`# --- BEGIN USER / END USER ---`) survive workflow regeneration
 - `ci` section defaults in `init` command for new consumers
 - Strict type validation for all `ci` config fields (dart_sdk, features, secrets, pat_secret, line_length)
+- `HookInstaller` utility and automatic git pre-commit hook installation in `init` and `update` commands — only staged `lib/` Dart files are formatted; existing custom hooks are backed up before replacement; hook respects consumer's `line_length` config
 
 ### Changed
 - Replaced monolithic `ci.template.yaml` with config-driven `ci.skeleton.yaml`
