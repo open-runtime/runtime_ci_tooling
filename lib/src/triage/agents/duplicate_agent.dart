@@ -39,7 +39,7 @@ You are a Duplicate Detection Agent for GitHub issue #${issue.number}.
 
 ## Required Output
 
-Write a JSON file to .cicd_runs/triage_results/issue_${issue.number}_$kAgentId.json:
+Write a JSON file to .runtime_ci/runs/triage_results/issue_${issue.number}_$kAgentId.json:
 ```json
 {
   "agent_id": "$kAgentId",

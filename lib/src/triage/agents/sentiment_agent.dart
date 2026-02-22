@@ -40,7 +40,7 @@ You are a Comment Sentiment Agent analyzing the discussion on GitHub issue #${is
 
 ## Required Output
 
-Write a JSON file to .cicd_runs/triage_results/issue_${issue.number}_$kAgentId.json:
+Write a JSON file to .runtime_ci/runs/triage_results/issue_${issue.number}_$kAgentId.json:
 ```json
 {
   "agent_id": "$kAgentId",

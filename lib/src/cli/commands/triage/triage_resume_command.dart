@@ -14,6 +14,7 @@ import '../../../triage/phases/cross_repo_link.dart' as cross_repo_phase;
 import '../../../triage/utils/config.dart';
 import '../../manage_cicd_cli.dart';
 import '../../utils/logger.dart';
+import '../../../triage/utils/run_context.dart';
 import '../../utils/repo_utils.dart';
 import 'triage_utils.dart';
 
@@ -52,7 +53,7 @@ class TriageResumeCommand extends Command<void> {
     }
 
     try {
-      final runDir = '$repoRoot/.cicd_runs/$runId';
+      final runDir = '$repoRoot/$kCicdRunsDir/$runId';
       final checkpointFile = File('$runDir/checkpoint.json');
 
       if (!checkpointFile.existsSync()) {

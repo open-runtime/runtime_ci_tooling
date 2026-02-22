@@ -47,7 +47,7 @@ IMPORTANT: Do NOT use write_file. It is unreliable. Instead, write files using s
   run_shell_command: mkdir -p .runtime_ci/runs/explore
   run_shell_command: tee .runtime_ci/runs/explore/FILENAME.json <<'JSONEOF'
   { ... your JSON ... }
-  JSONEOF
+JSONEOF
 
 ## Project Structure (lib/)
 ```

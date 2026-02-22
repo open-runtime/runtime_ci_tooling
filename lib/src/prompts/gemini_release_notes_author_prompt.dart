@@ -42,12 +42,12 @@ void main(List<String> args) {
 
   // Check which data sources are available
   final hasCommitAnalysis =
-      _fileExists('/tmp/commit_analysis.json') || _fileExists('.cicd_runs/explore/commit_analysis.json');
-  final hasPrData = _fileExists('/tmp/pr_data.json') || _fileExists('.cicd_runs/explore/pr_data.json');
+      _fileExists('/tmp/commit_analysis.json') || _fileExists('.runtime_ci/runs/explore/commit_analysis.json');
+  final hasPrData = _fileExists('/tmp/pr_data.json') || _fileExists('.runtime_ci/runs/explore/pr_data.json');
   final hasBreakingChanges =
-      _fileExists('/tmp/breaking_changes.json') || _fileExists('.cicd_runs/explore/breaking_changes.json');
+      _fileExists('/tmp/breaking_changes.json') || _fileExists('.runtime_ci/runs/explore/breaking_changes.json');
   final hasIssueManifest =
-      _fileExists('/tmp/issue_manifest.json') || _fileExists('.cicd_runs/triage/issue_manifest.json');
+      _fileExists('/tmp/issue_manifest.json') || _fileExists('.runtime_ci/runs/issue_manifest.json');
   final hasChangelog = _fileExists('CHANGELOG.md');
   final hasVersionBump = _fileExists('version_bumps/v$newVersion.md');
 

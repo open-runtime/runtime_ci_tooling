@@ -16,7 +16,7 @@ import '_ci_config.dart';
 /// Example:
 ///   dart run scripts/prompts/gemini_documentation_prompt.dart v0.0.1 0.0.2 | \
 ///     gemini -o json --yolo -s -m gemini-3.1-pro-preview \
-///     @.cicd_runs/explore/commit_analysis.json @README.md ...
+///     @.runtime_ci/runs/explore/commit_analysis.json @README.md ...
 
 void main(List<String> args) {
   if (args.length < 2) {
@@ -93,7 +93,7 @@ $scriptNames
 ## Documentation Update Instructions
 
 1. Read the current README.md (provided via @include)
-2. Read .cicd_runs/explore/commit_analysis.json (provided via @include) to understand categorized changes
+2. Read .runtime_ci/runs/explore/commit_analysis.json (provided via @include) to understand categorized changes
 
 3. Make TARGETED updates to README.md:
    - Update any version references from the old version to v$newVersion

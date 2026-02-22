@@ -39,7 +39,7 @@ You are a PR Correlation Agent investigating GitHub issue #${issue.number}.
 
 ## Required Output
 
-Write a JSON file to .cicd_runs/triage_results/issue_${issue.number}_$kAgentId.json with this EXACT structure:
+Write a JSON file to .runtime_ci/runs/triage_results/issue_${issue.number}_$kAgentId.json with this EXACT structure:
 ```json
 {
   "agent_id": "$kAgentId",

@@ -137,7 +137,7 @@ Use the gh CLI to apply your triage decisions:
 5. Post the helpful comment:
    `gh issue comment $issueNumber --body "<your comment>"`
 
-Also write a summary of your triage decisions to .cicd_runs/triage/triage_result.json:
+Also write a summary of your triage decisions to .runtime_ci/runs/triage/triage_result.json:
 ```json
 {
   "issue_number": $issueNumber,

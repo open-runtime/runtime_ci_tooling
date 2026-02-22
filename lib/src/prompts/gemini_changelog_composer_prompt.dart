@@ -28,12 +28,15 @@ void main(List<String> args) {
 
   // Check which Stage 1 artifacts are available
   final hasCommitAnalysis =
-      File('/tmp/commit_analysis.json').existsSync() || File('.cicd_runs/explore/commit_analysis.json').existsSync();
-  final hasPrData = File('/tmp/pr_data.json').existsSync() || File('.cicd_runs/explore/pr_data.json').existsSync();
+      File('/tmp/commit_analysis.json').existsSync() ||
+      File('.runtime_ci/runs/explore/commit_analysis.json').existsSync();
+  final hasPrData =
+      File('/tmp/pr_data.json').existsSync() || File('.runtime_ci/runs/explore/pr_data.json').existsSync();
   final hasBreakingChanges =
-      File('/tmp/breaking_changes.json').existsSync() || File('.cicd_runs/explore/breaking_changes.json').existsSync();
+      File('/tmp/breaking_changes.json').existsSync() ||
+      File('.runtime_ci/runs/explore/breaking_changes.json').existsSync();
   final hasIssueManifest =
-      File('/tmp/issue_manifest.json').existsSync() || File('.cicd_runs/triage/issue_manifest.json').existsSync();
+      File('/tmp/issue_manifest.json').existsSync() || File('.runtime_ci/runs/issue_manifest.json').existsSync();
 
   print('''
 You are a Changelog Composer Agent for the $pkg Dart package.

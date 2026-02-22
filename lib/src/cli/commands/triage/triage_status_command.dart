@@ -6,6 +6,7 @@ import 'package:args/command_runner.dart';
 import '../../../triage/utils/config.dart';
 import '../../../triage/utils/mcp_config.dart' as mcp;
 import '../../utils/logger.dart';
+import '../../../triage/utils/run_context.dart';
 import '../../utils/repo_utils.dart';
 import 'triage_utils.dart';
 
@@ -53,7 +54,7 @@ class TriageStatusCommand extends Command<void> {
     }
 
     // List recent runs
-    final runsDir = Directory('$repoRoot/.cicd_runs');
+    final runsDir = Directory('$repoRoot/$kCicdRunsDir');
     if (runsDir.existsSync()) {
       final runs = runsDir.listSync().whereType<Directory>().toList()..sort((a, b) => b.path.compareTo(a.path));
       Logger.info('');

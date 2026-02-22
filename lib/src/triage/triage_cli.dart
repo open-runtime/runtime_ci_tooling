@@ -17,6 +17,7 @@ import 'phases/pre_release.dart' as pre_release_phase;
 import 'phases/post_release.dart' as post_release_phase;
 import 'utils/config.dart';
 import 'utils/mcp_config.dart' as mcp;
+import 'utils/run_context.dart';
 
 /// Triage CLI entry point.
 ///
@@ -199,7 +200,7 @@ void _releaseLock() {
 String _createRunDir(String repoRoot) {
   final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').replaceAll('.', '-').substring(0, 19);
   final runId = 'triage_${timestamp}_$pid';
-  final runDir = Directory('$repoRoot/.cicd_runs/$runId');
+  final runDir = Directory('$repoRoot/$kCicdRunsDir/$runId');
   runDir.createSync(recursive: true);
   Directory('${runDir.path}/results').createSync();
   Directory('${runDir.path}/triage').createSync();
@@ -367,7 +368,7 @@ Future<void> _runAutoTriage(String repoRoot, {bool verbose = false, bool dryRun 
 
 /// Resume a previously interrupted triage run.
 Future<void> _resumeRun(String runId, String repoRoot, {bool verbose = false, bool dryRun = false}) async {
-  final runDir = '$repoRoot/.cicd_runs/$runId';
+  final runDir = '$repoRoot/$kCicdRunsDir/$runId';
   final checkpointFile = File('$runDir/checkpoint.json');
 
   if (!checkpointFile.existsSync()) {
@@ -560,7 +561,7 @@ Future<void> _runPostRelease({
 
 /// Search recent triage runs for the latest issue_manifest.json.
 String? _findLatestManifest(String repoRoot) {
-  final runsDir = Directory('$repoRoot/.cicd_runs');
+  final runsDir = Directory('$repoRoot/$kCicdRunsDir');
   if (!runsDir.existsSync()) return null;
 
   final runs = runsDir.listSync().whereType<Directory>().toList()..sort((a, b) => b.path.compareTo(a.path));
@@ -601,7 +602,7 @@ Future<void> _showStatus(String repoRoot) async {
   }
 
   // List recent runs
-  final runsDir = Directory('$repoRoot/.cicd_runs');
+  final runsDir = Directory('$repoRoot/$kCicdRunsDir');
   if (runsDir.existsSync()) {
     final runs = runsDir.listSync().whereType<Directory>().toList()..sort((a, b) => b.path.compareTo(a.path));
     print('');

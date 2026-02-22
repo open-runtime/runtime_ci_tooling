@@ -432,7 +432,7 @@ Write the corrected file to the same path: $absOutputFile
         'sh',
         ['-c', command],
         workingDirectory: workingDirectory,
-        environment: Platform.environment,
+        environment: {...Platform.environment},
       );
 
       if (result.exitCode == 0) return result;
@@ -442,7 +442,7 @@ Write the corrected file to the same path: $absOutputFile
 
       if (_retryablePattern.hasMatch(stderr) && attemptsLeft > 0) {
         final delay = _retryDelays[attempt.clamp(0, _retryDelays.length - 1)];
-        Logger.warn('  [$taskLabel] Rate limited — retrying in ${delay.inSeconds}s ($attemptsLeft left)');
+        Logger.warn('  [$taskLabel] Retrying in ${delay.inSeconds}s ($attemptsLeft left)');
         await Future.delayed(delay);
         continue;
       }
