@@ -7,8 +7,9 @@ import '../../triage/utils/config.dart';
 import '../../triage/utils/run_context.dart';
 import '../utils/logger.dart';
 
-/// Scan the current repo and generate `.runtime_ci/config.json` plus
-/// optional scaffolding (CHANGELOG.md, .gitignore entries).
+/// Scan the current repo and generate `.runtime_ci/config.json`,
+/// `.runtime_ci/autodoc.json`, plus optional scaffolding (CHANGELOG.md,
+/// .gitignore entries).
 ///
 /// This command runs BEFORE repo root detection -- it uses CWD directly,
 /// since it bootstraps the config that repo root detection depends on.
@@ -17,7 +18,7 @@ class InitCommand extends Command<void> {
   final String name = 'init';
 
   @override
-  final String description = 'Scan repo and generate .runtime_ci/config.json + scaffold workflows.';
+  final String description = 'Scan repo and generate .runtime_ci/config.json + autodoc.json + scaffold workflows.';
 
   @override
   Future<void> run() async {
@@ -180,7 +181,93 @@ class InitCommand extends Command<void> {
       Logger.info('$kConfigFileName already exists (kept as-is)');
     }
 
-    // -- 6. Ensure CHANGELOG.md exists --
+    // -- 6. Generate .runtime_ci/autodoc.json (skip if already exists) --
+    final autodocFile = File('$repoRoot/$kRuntimeCiDir/autodoc.json');
+    final autodocExists = autodocFile.existsSync();
+    if (!autodocExists) {
+      configDir.createSync(recursive: true);
+      final modules = <Map<String, dynamic>>[];
+
+      final srcDir = Directory('$repoRoot/lib/src');
+      if (srcDir.existsSync()) {
+        // Scan lib/src/ subdirectories for modules
+        final subdirs = srcDir
+            .listSync()
+            .whereType<Directory>()
+            .where((d) => !d.path.split('/').last.startsWith('.'))
+            .toList()
+          ..sort((a, b) => a.path.compareTo(b.path));
+
+        for (final dir in subdirs) {
+          final dirName = dir.path.split('/').last;
+          final displayName = dirName
+              .split('_')
+              .map((w) => '${w[0].toUpperCase()}${w.substring(1)}')
+              .join(' ');
+          modules.add({
+            'id': dirName,
+            'name': displayName,
+            'source_paths': ['lib/src/$dirName/'],
+            'lib_paths': ['lib/src/$dirName/'],
+            'output_path': 'docs/$dirName/',
+            'generate': ['quickstart', 'api_reference'],
+            'hash': '',
+            'last_updated': null,
+          });
+        }
+
+        // Add top-level module for package entry points
+        modules.add({
+          'id': 'top_level',
+          'name': 'Package Entry Points',
+          'source_paths': ['lib/'],
+          'lib_paths': <String>[],
+          'output_path': 'docs/',
+          'generate': ['quickstart'],
+          'hash': '',
+          'last_updated': null,
+        });
+      } else if (libDir.existsSync()) {
+        // No lib/src/ -- use lib/ as single module
+        modules.add({
+          'id': 'core',
+          'name': packageName
+              .split('_')
+              .map((w) => '${w[0].toUpperCase()}${w.substring(1)}')
+              .join(' '),
+          'source_paths': ['lib/'],
+          'lib_paths': ['lib/'],
+          'output_path': 'docs/',
+          'generate': ['quickstart', 'api_reference'],
+          'hash': '',
+          'last_updated': null,
+        });
+      }
+
+      if (modules.isNotEmpty) {
+        final autodocData = {
+          'version': '1.0.0',
+          'gemini_model': 'gemini-3.1-pro-preview',
+          'max_concurrent': 4,
+          'modules': modules,
+          'templates': {
+            'quickstart': 'scripts/prompts/autodoc_quickstart_prompt.dart',
+            'api_reference': 'scripts/prompts/autodoc_api_reference_prompt.dart',
+            'examples': 'scripts/prompts/autodoc_examples_prompt.dart',
+          },
+        };
+        autodocFile.writeAsStringSync(
+          '${const JsonEncoder.withIndent('  ').convert(autodocData)}\n',
+        );
+        Logger.success('Created $kRuntimeCiDir/autodoc.json with ${modules.length} modules');
+      } else {
+        Logger.warn('No lib/ directory found -- skipping autodoc.json');
+      }
+    } else {
+      Logger.info('$kRuntimeCiDir/autodoc.json already exists (kept as-is)');
+    }
+
+    // -- 7. Ensure CHANGELOG.md exists --
     final changelogFile = File('$repoRoot/CHANGELOG.md');
     final hadChangelog = changelogFile.existsSync();
     if (!hadChangelog) {
@@ -194,7 +281,7 @@ class InitCommand extends Command<void> {
       repaired++;
     }
 
-    // -- 7. Ensure .runtime_ci/runs/ is in .gitignore --
+    // -- 8. Ensure .runtime_ci/runs/ is in .gitignore --
     final gitignoreFile = File('$repoRoot/.gitignore');
     if (gitignoreFile.existsSync()) {
       final content = gitignoreFile.readAsStringSync();
@@ -209,15 +296,16 @@ class InitCommand extends Command<void> {
       repaired++;
     }
 
-    // -- 8. Summary --
+    // -- 9. Summary --
     print('');
-    Logger.header(configExists ? 'Init Repair Complete' : 'Init Complete');
-    if (configExists && repaired == 0) {
+    Logger.header(configExists && autodocExists ? 'Init Repair Complete' : 'Init Complete');
+    if (configExists && autodocExists && repaired == 0) {
       Logger.info('All items present — nothing to repair.');
-    } else if (configExists) {
+    } else if (configExists && autodocExists) {
       Logger.info('Repaired $repaired missing item${repaired == 1 ? '' : 's'}.');
     }
     Logger.info('  Config:    $kConfigFileName${configExists ? " (existing)" : ""}');
+    Logger.info('  Autodoc:   $kRuntimeCiDir/autodoc.json${autodocExists ? " (existing)" : ""}');
     Logger.info('  Package:   $packageName');
     Logger.info('  Owner:     $repoOwner');
     Logger.info('  Areas:     ${areaLabels.join(", ")}');
