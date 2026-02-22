@@ -34,9 +34,7 @@ void main(List<String> args) {
   // Check for generated Dart code
   String dartPreview = '';
   if (libDir.isNotEmpty && Directory(libDir).existsSync()) {
-    final generatedFiles = _runSync(
-      'find $libDir -name "*.pb.dart" -o -name "*.pbgrpc.dart" 2>/dev/null | head -5',
-    );
+    final generatedFiles = _runSync('find $libDir -name "*.pb.dart" -o -name "*.pbgrpc.dart" 2>/dev/null | head -5');
     if (generatedFiles.isNotEmpty) {
       final buf = StringBuffer();
       for (final file in generatedFiles.split('\n').where((f) => f.isNotEmpty)) {
