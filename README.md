@@ -10,6 +10,7 @@ Shared CI/CD automation tooling for open-runtime or pieces-app packages. Provide
 - **Audit Trails**: Comprehensive logging of CI/CD actions and decisions.
 - **MCP Integration**: Configuration for Model Context Protocol servers (GitHub, Sentry).
 - **Cross-Platform**: Utilities for tool installation and environment setup.
+- **Template Updating**: Keep local configurations and CI workflows in sync with upstream changes.
 - **Typed CLI Options**: Uses `build_cli` to generate typed and structured command-line options.
 
 ## Installation
@@ -18,7 +19,7 @@ Add `runtime_ci_tooling` to your `dev_dependencies`:
 
 ```yaml
 dev_dependencies:
-  runtime_ci_tooling: ^0.7.1
+  runtime_ci_tooling: ^0.8.0
 ```
 
 Or run:
@@ -57,6 +58,7 @@ dart run scripts/manage_cicd.dart <command> [options]
 - `setup`: Install prerequisites (Node.js, Gemini CLI, gh, jq).
 - `validate`: Validate configuration files.
 - `init`: Initialize configuration (`config.json`, `autodoc.json`) and workflows.
+- `update`: Update templates, configs, and workflows from runtime_ci_tooling.
 - `release`: Run the full local release pipeline.
 - `triage <N>`: Run issue triage for a single issue.
 - `explore`: Run Stage 1 Explorer Agent.
@@ -78,8 +80,8 @@ dart run scripts/triage_cli.dart <command> [options]
 **Usage Examples:**
 - **Single Issue**: `dart run scripts/triage_cli.dart <issue_number>`
 - **Auto Triage**: `dart run scripts/triage_cli.dart --auto`
-- **Pre-Release Scan**: `dart run scripts/triage_cli.dart --pre-release --prev-tag v0.7.0 --version 0.7.1`
-- **Post-Release Loop**: `dart run scripts/triage_cli.dart --post-release --version 0.7.1 --release-tag v0.7.1`
+- **Pre-Release Scan**: `dart run scripts/triage_cli.dart --pre-release --prev-tag v0.7.1 --version 0.8.0`
+- **Post-Release Loop**: `dart run scripts/triage_cli.dart --post-release --version 0.8.0 --release-tag v0.8.0`
 
 Run `dart run scripts/triage_cli.dart --help` for full usage details.
 

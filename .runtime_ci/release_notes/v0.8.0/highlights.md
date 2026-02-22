@@ -1,0 +1,3 @@
+- The new `update` command intelligently syncs CI templates, workflows, and configurations to consumer repositories.
+- Smart update strategies handle files based on category (overwritable, cautious, mergeable, regeneratable) to preserve local customizations.
+- Template versioning is now tracked via a three-way hashing mechanism to detect downstream edits before updating.
