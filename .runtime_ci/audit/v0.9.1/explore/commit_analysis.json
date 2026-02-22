@@ -1,0 +1,45 @@
+{
+  "version": "0.9.1",
+  "previous_version": "v0.9.0",
+  "total_commits": 5,
+  "categories": {
+    "added": [],
+    "changed": [
+      {
+        "description": "Implemented true parallel execution with rate-limit retry for autodoc generation to improve performance.",
+        "pr": "",
+        "commits": [
+          "77885fd"
+        ]
+      },
+      {
+        "description": "Extended the retry mechanism in autodoc to cover transient network errors such as connection resets and timeouts.",
+        "pr": "",
+        "commits": [
+          "6998d02"
+        ]
+      }
+    ],
+    "deprecated": [],
+    "removed": [
+      {
+        "description": "Removed stale root-level orphaned documentation files (QUICKSTART.md and API_REFERENCE.md) since autodoc now writes to module-scoped paths.",
+        "pr": "",
+        "commits": [
+          "5023d82"
+        ]
+      }
+    ],
+    "fixed": [
+      {
+        "description": "Fixed pipeline bugs including duration logging accuracy, replaced unreliable file writing tools with shell commands in the explorer, and updated audit paths for triage runs.",
+        "pr": "",
+        "commits": [
+          "145929a",
+          "27cf3b0"
+        ]
+      }
+    ],
+    "security": []
+  }
+}

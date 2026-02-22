@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-02-22
+
+### Changed
+- Improved performance by adding true parallel execution with rate-limit retry for autodoc generation (fixes #3)
+- Improved the retry mechanism in autodoc to cover transient network errors such as connection resets and timeouts
+
+### Removed
+- Removed stale root-level orphaned documentation files (QUICKSTART.md and API_REFERENCE.md) since autodoc now writes to module-scoped paths
+
+### Fixed
+- Fixed pipeline bugs including duration logging accuracy, replaced unreliable file writing tools with shell commands in the explorer, and updated audit paths for triage runs (fixes #4)
+
 ## [0.9.0] - 2026-02-22
 
 ### Added
@@ -100,6 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed `git add` failure in release process by adding files individually (commit 1d45361)
 
+[0.9.1]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.7.0...v0.7.1

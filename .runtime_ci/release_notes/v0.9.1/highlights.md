@@ -1,0 +1,5 @@
+- Replaced blocking synchronous execution in Autodoc with a true asynchronous worker pool, significantly reducing documentation generation time.
+- Extended Autodoc retry logic to robustly handle transient network failures in addition to API rate limits during CI pipelines.
+- Stabilized the Stage 1 Explorer's JSON artifact writing by explicitly directing the Gemini CLI to use robust shell commands instead of native file-writing tools.
+- Ensured consistent triage run paths by updating hardcoded locations to leverage dynamic environment constants.
+- Updated duration logging to use internal wall-clock stopwatches for guaranteed accuracy across the pipeline.
