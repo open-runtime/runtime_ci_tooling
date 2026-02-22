@@ -13,6 +13,8 @@ executables:
 environment:
   sdk: ^3.9.0
 
+resolution: workspace
+
 dependencies:
   args: ^2.7.0
   build_cli_annotations: ^2.1.1

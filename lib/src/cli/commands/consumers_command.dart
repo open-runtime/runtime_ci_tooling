@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -17,11 +18,15 @@ const int _kDefaultRepoLimit = 1000;
 const int _kDefaultReleaseListLimit = 100;
 const String _kRuntimeCiConfigPath = '.runtime_ci/config.json';
 const String _kLatestReleaseSyncFileName = 'latest_release_sync.json';
+const Duration _kSearchRequestMinInterval = Duration(seconds: 7);
 final RegExp _kDiscoveryFilePattern = RegExp(r'^discovery_run_(\d+)_local_time_\d{2}_\d{2}_\d{2}\.json$');
 final RegExp _kLegacyDiscoveryFilePattern = RegExp(r'^discovery_#(\d+)_local_time_\d{2}_\d{2}_\d{2}\.json$');
 
 /// Discover repos that consume `runtime_ci_tooling`, then sync release artifacts.
 class ConsumersCommand extends Command<void> {
+  Future<void> _searchSerialQueue = Future<void>.value();
+  DateTime? _lastSearchRequestAt;
+
   @override
   final String name = 'consumers';
 
@@ -60,6 +65,13 @@ class ConsumersCommand extends Command<void> {
         help:
             'Resume release sync from existing .consumers/repos/latest_release_sync.json and skip already-complete repos.',
       )
+      ..addFlag(
+        'search-first',
+        defaultsTo: true,
+        help: 'Use org-level code search prefilter before per-repo verification.',
+      )
+      ..addOption('discovery-workers', defaultsTo: '4', help: 'Max concurrent workers for discovery verification.')
+      ..addOption('release-workers', defaultsTo: '4', help: 'Max concurrent workers for release syncing.')
       ..addOption(
         'repo-limit',
         defaultsTo: '$_kDefaultRepoLimit',
@@ -161,6 +173,7 @@ class ConsumersCommand extends Command<void> {
     if (runDiscovery) {
       Logger.header('Consumers Discovery');
       final snapshotTarget = _nextSnapshotTarget(reposDir: reposDir);
+      var lastDiscoveryCheckpointWrite = DateTime.fromMillisecondsSinceEpoch(0);
       if (global.dryRun) {
         Logger.info('[DRY-RUN] Would stream discovery updates to ${snapshotTarget.snapshotPath}');
       } else {
@@ -176,7 +189,9 @@ class ConsumersCommand extends Command<void> {
         );
       }
 
-      final discovery = _discoverConsumers(
+      final discovery = await _discoverConsumers(
+        searchFirst: options.searchFirst,
+        discoveryWorkers: options.discoveryWorkers,
         repoRoot: repoRoot,
         packageName: options.packageName,
         orgs: options.orgs,
@@ -184,6 +199,13 @@ class ConsumersCommand extends Command<void> {
         verbose: global.verbose,
         onProgress: (partial) {
           if (global.dryRun) return;
+          final now = DateTime.now();
+          final shouldFlush =
+              partial.scannedRepos % 10 == 0 ||
+              now.difference(lastDiscoveryCheckpointWrite) >= const Duration(seconds: 2);
+          if (!shouldFlush) {
+            return;
+          }
           _writeDiscoverySnapshotAtPath(
             snapshotPath: snapshotTarget.snapshotPath,
             index: snapshotTarget.index,
@@ -194,6 +216,7 @@ class ConsumersCommand extends Command<void> {
             runStatus: 'in_progress',
             dryRun: false,
           );
+          lastDiscoveryCheckpointWrite = now;
         },
       );
       snapshotResult = _writeDiscoverySnapshotAtPath(
@@ -267,16 +290,43 @@ class ConsumersCommand extends Command<void> {
       );
     }
 
+    final pendingConsumers = <_ConsumerRepo>[];
     for (final consumer in snapshotResult.consumers) {
-      final existing = summaryByRepo[consumer.fullName];
-      if (existing != null && _isCompletedSummaryReusable(existing, exactTag: options.tag)) {
+      final existingSummary = summaryByRepo[consumer.fullName];
+      if (existingSummary != null && _isCompletedSummaryReusable(existingSummary, exactTag: options.tag)) {
         Logger.info('Skipping ${consumer.fullName} (already completed in previous run).');
         continue;
       }
+      pendingConsumers.add(consumer);
+    }
 
+    var completionsSinceFlush = 0;
+    var lastReleaseCheckpointWrite = DateTime.now();
+    Future<void> flushReleaseSummaryIfNeeded({required bool force}) async {
+      if (global.dryRun) return;
+      final now = DateTime.now();
+      final shouldFlush =
+          force ||
+          completionsSinceFlush >= 3 ||
+          now.difference(lastReleaseCheckpointWrite) >= const Duration(seconds: 2);
+      if (!shouldFlush) return;
+      _writeReleaseSummary(
+        releaseSummaryPath: releaseSummaryPath,
+        sourceSnapshotPath: snapshotResult.snapshotPath,
+        criteria: criteria,
+        packageName: options.packageName,
+        repoCount: snapshotResult.consumers.length,
+        summaries: summaryByRepo.values.toList(),
+        runStatus: 'in_progress',
+      );
+      completionsSinceFlush = 0;
+      lastReleaseCheckpointWrite = now;
+    }
+
+    Future<void> processConsumer(_ConsumerRepo consumer) async {
       Logger.info('');
       Logger.header('Sync ${consumer.fullName}');
-      final summary = _syncRepoRelease(
+      final summary = await _syncRepoRelease(
         repoRoot: repoRoot,
         outputDir: outputDir.path,
         consumer: consumer,
@@ -287,18 +337,23 @@ class ConsumersCommand extends Command<void> {
         dryRun: global.dryRun,
       );
       summaryByRepo[consumer.fullName] = summary;
+      completionsSinceFlush++;
+      await flushReleaseSummaryIfNeeded(force: false);
+    }
 
-      if (!global.dryRun) {
-        _writeReleaseSummary(
-          releaseSummaryPath: releaseSummaryPath,
-          sourceSnapshotPath: snapshotResult.snapshotPath,
-          criteria: criteria,
-          packageName: options.packageName,
-          repoCount: snapshotResult.consumers.length,
-          summaries: summaryByRepo.values.toList(),
-          runStatus: 'in_progress',
+    if (pendingConsumers.isNotEmpty) {
+      if (options.releaseWorkers <= 1) {
+        for (final consumer in pendingConsumers) {
+          await processConsumer(consumer);
+        }
+      } else {
+        await _forEachConcurrent<_ConsumerRepo>(
+          items: pendingConsumers,
+          concurrency: options.releaseWorkers,
+          action: processConsumer,
         );
       }
+      await flushReleaseSummaryIfNeeded(force: true);
     }
 
     final counts = _countReleaseStatuses(summaryByRepo.values);
@@ -342,74 +397,96 @@ class ConsumersCommand extends Command<void> {
     }
   }
 
-  _DiscoveryResult _discoverConsumers({
+  Future<_DiscoveryResult> _discoverConsumers({
+    required bool searchFirst,
+    required int discoveryWorkers,
     required String repoRoot,
     required String packageName,
     required List<String> orgs,
     required int repoLimit,
     required bool verbose,
     void Function(_DiscoveryResult partial)? onProgress,
-  }) {
-    final consumers = <_ConsumerRepo>[];
+  }) async {
+    final consumersByRepo = <String, _ConsumerRepo>{};
     final failures = <Map<String, String>>[];
     var scannedRepos = 0;
 
-    for (final org in orgs) {
-      Logger.info('Scanning org: $org');
-      final repos = _listReposForOrg(repoRoot: repoRoot, org: org, repoLimit: repoLimit, verbose: verbose);
-
-      for (final repo in repos) {
-        scannedRepos++;
-        if (repo.repo == packageName) {
-          continue;
-        }
-        final consumer = _discoverConsumerInRepo(
-          repoRoot: repoRoot,
-          packageName: packageName,
-          descriptor: repo,
-          verbose: verbose,
-        );
-        if (consumer != null) {
-          consumers.add(consumer);
-          Logger.success('  Consumer: ${consumer.fullName}');
-          onProgress?.call(
-            _DiscoveryResult(
-              consumers: List<_ConsumerRepo>.from(consumers),
-              scannedRepos: scannedRepos,
-              failures: List<Map<String, String>>.from(failures),
-            ),
-          );
-        } else if (scannedRepos % 25 == 0) {
-          onProgress?.call(
-            _DiscoveryResult(
-              consumers: List<_ConsumerRepo>.from(consumers),
-              scannedRepos: scannedRepos,
-              failures: List<Map<String, String>>.from(failures),
-            ),
-          );
-        }
-      }
-
-      onProgress?.call(
+    void emitProgress() {
+      if (onProgress == null) return;
+      final snapshotConsumers = consumersByRepo.values.toList()..sort((a, b) => a.fullName.compareTo(b.fullName));
+      onProgress!(
         _DiscoveryResult(
-          consumers: List<_ConsumerRepo>.from(consumers),
+          consumers: snapshotConsumers,
           scannedRepos: scannedRepos,
           failures: List<Map<String, String>>.from(failures),
         ),
       );
     }
 
-    consumers.sort((a, b) => a.fullName.compareTo(b.fullName));
+    for (final org in orgs) {
+      Logger.info('Scanning org: $org');
+      final repos = await _listReposForOrg(repoRoot: repoRoot, org: org, repoLimit: repoLimit, verbose: verbose);
+      if (repos.isEmpty) continue;
+      scannedRepos += repos.length;
+
+      final prefilter = searchFirst
+          ? await _searchFirstCandidatesForOrg(repoRoot: repoRoot, org: org, packageName: packageName, verbose: verbose)
+          : const _OrgSearchPrefilter.failed();
+      final usingFallback = !searchFirst || prefilter.failed || prefilter.incompleteResults;
+      if (usingFallback && searchFirst) {
+        Logger.warn('Search-first prefilter unavailable for $org; falling back to repo-by-repo verification.');
+      }
+
+      final candidatePathsByRepo = usingFallback ? const <String, List<String>>{} : prefilter.repoPathsByFullName;
+      final candidateRepos = repos
+          .where((repo) => repo.repo != packageName)
+          .where((repo) => usingFallback || candidatePathsByRepo.containsKey(repo.fullName))
+          .toList();
+      if (candidateRepos.isEmpty) {
+        emitProgress();
+        continue;
+      }
+
+      var processedCandidates = 0;
+      await _forEachConcurrent<_RepoDescriptor>(
+        items: candidateRepos,
+        concurrency: discoveryWorkers,
+        action: (_RepoDescriptor repo) async {
+          final prefilterPaths = candidatePathsByRepo[repo.fullName] ?? const <String>[];
+          final consumer = await _discoverConsumerInRepo(
+            allowRepoSearch: usingFallback,
+            orgSearchUsed: !usingFallback,
+            prefilterPaths: prefilterPaths,
+            repoRoot: repoRoot,
+            packageName: packageName,
+            descriptor: repo,
+            verbose: verbose,
+          );
+          processedCandidates++;
+          if (consumer != null) {
+            consumersByRepo[consumer.fullName] = consumer;
+            Logger.success('  Consumer: ${consumer.fullName}');
+            emitProgress();
+          } else if (processedCandidates % 25 == 0) {
+            emitProgress();
+          }
+        },
+      );
+
+      emitProgress();
+    }
+
+    final consumers = consumersByRepo.values.toList()..sort((a, b) => a.fullName.compareTo(b.fullName));
     return _DiscoveryResult(consumers: consumers, scannedRepos: scannedRepos, failures: failures);
   }
 
-  List<_RepoDescriptor> _listReposForOrg({
+  Future<List<_RepoDescriptor>> _listReposForOrg({
     required String repoRoot,
     required String org,
     required int repoLimit,
     required bool verbose,
-  }) {
-    final result = _runProcess(
+  }) async {
+    final result = await _runProcess(
       executable: 'gh',
       args: ['repo', 'list', org, '--limit', '$repoLimit', '--json', 'name,nameWithOwner,isArchived'],
       cwd: repoRoot,
@@ -449,12 +526,109 @@ class ConsumersCommand extends Command<void> {
     }
   }
 
-  _ConsumerRepo? _discoverConsumerInRepo({
+  Future<_OrgSearchPrefilter> _searchFirstCandidatesForOrg({
+    required String repoRoot,
+    required String org,
+    required String packageName,
+    required bool verbose,
+  }) async {
+    final queries = <_OrgSearchQuery>[
+      _OrgSearchQuery(query: '$packageName org:$org filename:pubspec.yaml', signal: 'org_search_pubspec'),
+      _OrgSearchQuery(query: '$packageName org:$org', signal: 'org_search_general'),
+      _OrgSearchQuery(query: 'filename:config.json path:.runtime_ci org:$org', signal: 'org_search_runtime_ci_config'),
+    ];
+
+    final pathsByRepo = <String, Set<String>>{};
+    var anyIncomplete = false;
+
+    for (final query in queries) {
+      final result = await _searchCodeByOrg(repoRoot: repoRoot, query: query.query, verbose: verbose);
+      if (result.failed) {
+        return const _OrgSearchPrefilter.failed();
+      }
+      if (result.incompleteResults) {
+        anyIncomplete = true;
+      }
+      for (final hit in result.hits) {
+        pathsByRepo.putIfAbsent(hit.fullName, () => <String>{}).add(hit.path);
+      }
+    }
+
+    final normalized = <String, List<String>>{};
+    for (final entry in pathsByRepo.entries) {
+      final values = entry.value.toList()..sort();
+      normalized[entry.key] = values;
+    }
+    return _OrgSearchPrefilter(failed: false, incompleteResults: anyIncomplete, repoPathsByFullName: normalized);
+  }
+
+  Future<_OrgSearchResult> _searchCodeByOrg({
+    required String repoRoot,
+    required String query,
+    required bool verbose,
+  }) async {
+    final hits = <_OrgSearchHit>[];
+    var page = 1;
+    var incompleteResults = false;
+
+    while (true) {
+      final encodedQuery = Uri.encodeQueryComponent(query);
+      final result = await _searchCodeApiRequest(
+        repoRoot: repoRoot,
+        args: ['api', 'search/code?q=$encodedQuery&per_page=100&page=$page'],
+        verbose: verbose,
+      );
+      if (result.exitCode != 0) {
+        return const _OrgSearchResult.failed();
+      }
+
+      final stdout = (result.stdout as String).trim();
+      if (stdout.isEmpty) break;
+
+      try {
+        final parsed = json.decode(stdout);
+        if (parsed is! Map<String, dynamic>) {
+          return const _OrgSearchResult.failed();
+        }
+        incompleteResults = incompleteResults || parsed['incomplete_results'] == true;
+
+        final items = parsed['items'];
+        if (items is! List || items.isEmpty) {
+          break;
+        }
+
+        var itemCount = 0;
+        for (final item in items.whereType<Map<String, dynamic>>()) {
+          final repository = item['repository'];
+          if (repository is! Map<String, dynamic>) continue;
+          final fullName = repository['full_name']?.toString().trim() ?? '';
+          final path = item['path']?.toString().trim() ?? '';
+          if (fullName.isEmpty || path.isEmpty) continue;
+          hits.add(_OrgSearchHit(fullName: fullName, path: path));
+          itemCount++;
+        }
+
+        if (itemCount < 100) {
+          break;
+        }
+        page++;
+      } catch (_) {
+        return const _OrgSearchResult.failed();
+      }
+    }
+
+    return _OrgSearchResult(failed: false, incompleteResults: incompleteResults, hits: hits);
+  }
+
+  Future<_ConsumerRepo?> _discoverConsumerInRepo({
+    required bool allowRepoSearch,
+    required bool orgSearchUsed,
+    required List<String> prefilterPaths,
     required String repoRoot,
     required String packageName,
     required _RepoDescriptor descriptor,
     required bool verbose,
-  }) {
+  }) async {
     final fullName = descriptor.fullName;
     var pubspec = _fetchPubspec(repoRoot: repoRoot, fullName: fullName, verbose: verbose);
     var dependencyConstraint = _readDependencyConstraint(
