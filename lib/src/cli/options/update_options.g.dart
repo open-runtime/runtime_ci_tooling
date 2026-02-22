@@ -16,19 +16,10 @@ UpdateOptions _$parseUpdateOptionsResult(ArgResults result) => UpdateOptions(
 );
 
 ArgParser _$populateUpdateOptionsParser(ArgParser parser) => parser
-  ..addFlag(
-    'force',
-    help: 'Overwrite all files regardless of local customizations',
-  )
-  ..addFlag(
-    'templates',
-    help: 'Only update template files (.gemini/ commands and settings)',
-  )
+  ..addFlag('force', help: 'Overwrite all files regardless of local customizations')
+  ..addFlag('templates', help: 'Only update template files (.gemini/ commands and settings)')
   ..addFlag('config', help: 'Only merge new keys into .runtime_ci/config.json')
-  ..addFlag(
-    'workflows',
-    help: 'Only update GitHub workflow files (.github/workflows/)',
-  )
+  ..addFlag('workflows', help: 'Only update GitHub workflow files (.github/workflows/)')
   ..addFlag('autodoc', help: 'Re-scan lib/src/ and update autodoc.json modules')
   ..addFlag('backup', help: 'Write .bak backup before overwriting files');
 
