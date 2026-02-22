@@ -60,7 +60,7 @@ jobs:
       - uses: dart-lang/setup-dart@v1.7.1
         if: steps.trigger.outputs.run == 'true'
         with:
-          sdk: "stable"
+          sdk: "3.9.2"
 
       - name: Cache Dart pub dependencies
         if: steps.trigger.outputs.run == 'true'

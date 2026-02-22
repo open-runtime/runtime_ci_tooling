@@ -78,7 +78,7 @@ jobs:
 
       - uses: dart-lang/setup-dart@v1.7.1
         with:
-          sdk: "stable"
+          sdk: "3.9.2"
 
       - name: Cache Dart pub dependencies
         uses: actions/cache@v5.0.3
@@ -149,7 +149,7 @@ jobs:
 
       - uses: dart-lang/setup-dart@v1.7.1
         with:
-          sdk: "stable"
+          sdk: "3.9.2"
 
       - name: Cache Dart pub dependencies
         uses: actions/cache@v5.0.3
@@ -227,7 +227,7 @@ jobs:
 
       - uses: dart-lang/setup-dart@v1.7.1
         with:
-          sdk: "stable"
+          sdk: "3.9.2"
 
       - name: Cache Dart pub dependencies
         uses: actions/cache@v5.0.3
@@ -312,7 +312,7 @@ jobs:
 
       - uses: dart-lang/setup-dart@v1.7.1
         with:
-          sdk: "stable"
+          sdk: "3.9.2"
 
       - name: Cache Dart pub dependencies
         uses: actions/cache@v5.0.3
@@ -414,7 +414,7 @@ jobs:
 
       - uses: dart-lang/setup-dart@v1.7.1
         with:
-          sdk: "stable"
+          sdk: "3.9.2"
 
       - name: Cache Dart pub dependencies
         uses: actions/cache@v5.0.3
@@ -536,7 +536,7 @@ jobs:
 
       - uses: dart-lang/setup-dart@v1.7.1
         with:
-          sdk: "stable"
+          sdk: "3.9.2"
 
       - name: Cache Dart pub dependencies
         uses: actions/cache@v5.0.3
@@ -655,7 +655,7 @@ jobs:
 
       - uses: dart-lang/setup-dart@v1.7.1
         with:
-          sdk: "stable"
+          sdk: "3.9.2"
 
       - name: Cache Dart pub dependencies
         uses: actions/cache@v5.0.3
