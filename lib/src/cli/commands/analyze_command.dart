@@ -24,9 +24,10 @@ class AnalyzeCommand extends Command<void> {
 
     Logger.header('Running dart analyze');
 
+    // --fatal-infos is non-negatable (infos are non-fatal by default).
+    // --[no-]fatal-warnings supports negation; disable it so only errors fail CI.
     final result = Process.runSync(Platform.resolvedExecutable, [
       'analyze',
-      '--no-fatal-infos',
       '--no-fatal-warnings',
     ], workingDirectory: repoRoot);
 
