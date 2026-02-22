@@ -1,0 +1,3 @@
+- **Auto-generated Autodoc Configuration'( — The `init` command now intelligently scans your `lib/src/` subdirectories and automatically generates a `.runtime_ci/autodoc.json` file.
+- **Pipeline Execution Fixed** — Resolved a `ModelNotFoundError` by correctly updating the Gemini Pro model ID to `gemini-3.1-pro-preview` across all AI-powered pipeline stages.
+- **Completed Autodoc Prompts** — Finalized the implementation of remaining autodoc prompts, including a brand new migration guide generator.

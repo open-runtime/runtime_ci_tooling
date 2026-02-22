@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-02-22
+
+### Added
+- Added `autodoc.json` generation support in the `init` command
+
+### Changed
+- Fixed formatting in `init_command.dart` and `autodoc_api_reference_prompt.dart`
+
+### Fixed
+- Completed unfinished autodoc prompt implementations
+- Corrected Gemini model ID to `gemini-3.1-pro-preview` to resolve `ModelNotFoundError` in AI-powered pipeline stages
+
 ## [0.6.0] - 2026-02-22
 
 ### Breaking Changes
@@ -49,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed `git add` failure in release process by adding files individually (commit 1d45361)
 
+[0.7.0]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.4.0...v0.4.1
