@@ -35,12 +35,12 @@ export 'package:args/command_runner.dart' show UsageException;
 /// - test, analyze, verify-protos: Code quality
 class ManageCicdCli extends CommandRunner<void> {
   ManageCicdCli()
-      : super(
-          'manage_cicd',
-          'CI/CD Automation CLI\n\n'
-              'Cross-platform tooling for managing AI-powered release pipelines '
-              'locally and in CI.',
-        ) {
+    : super(
+        'manage_cicd',
+        'CI/CD Automation CLI\n\n'
+            'Cross-platform tooling for managing AI-powered release pipelines '
+            'locally and in CI.',
+      ) {
     GlobalOptionsArgParser.populateParser(argParser);
     _addCommands();
   }

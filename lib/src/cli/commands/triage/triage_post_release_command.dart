@@ -18,8 +18,7 @@ class TriagePostReleaseCommand extends Command<void> {
   final String name = 'post-release';
 
   @override
-  final String description =
-      'Close loop after release (requires --version and --release-tag).';
+  final String description = 'Close loop after release (requires --version and --release-tag).';
 
   TriagePostReleaseCommand() {
     VersionOptionsArgParser.populateParser(argParser);
@@ -40,8 +39,7 @@ class TriagePostReleaseCommand extends Command<void> {
     final triageOpts = TriageOptions.fromArgResults(argResults!);
 
     if (versionOpts.version == null || releaseOpts.releaseTag == null) {
-      Logger.error(
-          'post-release requires --version <ver> and --release-tag <tag>');
+      Logger.error('post-release requires --version <ver> and --release-tag <tag>');
       exit(1);
     }
 
@@ -55,11 +53,9 @@ class TriagePostReleaseCommand extends Command<void> {
       final runDir = createTriageRunDir(repoRoot);
 
       // Find the manifest: explicit path, or search recent runs
-      final resolvedManifest =
-          releaseOpts.manifest ?? findLatestManifest(repoRoot);
+      final resolvedManifest = releaseOpts.manifest ?? findLatestManifest(repoRoot);
       if (resolvedManifest == null) {
-        Logger.error(
-            'No issue_manifest.json found. Run pre-release first, or pass --manifest <path>.');
+        Logger.error('No issue_manifest.json found. Run pre-release first, or pass --manifest <path>.');
         exit(1);
       }
 

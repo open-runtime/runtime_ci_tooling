@@ -20,8 +20,7 @@ class ArchiveRunCommand extends Command<void> {
   final String name = 'archive-run';
 
   @override
-  final String description =
-      'Archive .runtime_ci/runs/ to .runtime_ci/audit/vX.X.X/ for permanent storage.';
+  final String description = 'Archive .runtime_ci/runs/ to .runtime_ci/audit/vX.X.X/ for permanent storage.';
 
   ArchiveRunCommand() {
     ArchiveRunOptionsArgParser.populateParser(argParser);
@@ -54,10 +53,8 @@ class ArchiveRunCommand extends Command<void> {
     if (runDirPath == null) {
       runDirPath = RunContext.findLatestRun(repoRoot);
       if (runDirPath == null) {
-        Logger.warn(
-            'No $kCicdRunsDir/ directory found — nothing to archive.');
-        Logger.info(
-            'This is expected if audit trail artifacts were not transferred between jobs.');
+        Logger.warn('No $kCicdRunsDir/ directory found — nothing to archive.');
+        Logger.info('This is expected if audit trail artifacts were not transferred between jobs.');
         return;
       }
       Logger.info('Using latest run: $runDirPath');

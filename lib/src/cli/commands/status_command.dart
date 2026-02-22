@@ -73,8 +73,10 @@ class StatusCommand extends Command<void> {
     for (final tool in [..._kRequiredTools, ..._kOptionalTools]) {
       if (CiProcessRunner.commandExists(tool)) {
         final version = CiProcessRunner.runSync(
-            '$tool --version 2>/dev/null || echo "installed"', repoRoot,
-            verbose: global.verbose);
+          '$tool --version 2>/dev/null || echo "installed"',
+          repoRoot,
+          verbose: global.verbose,
+        );
         Logger.success('  $tool: $version');
       } else {
         Logger.error('  $tool: NOT INSTALLED');
@@ -85,27 +87,22 @@ class StatusCommand extends Command<void> {
     Logger.info('');
     Logger.info('Environment:');
     final geminiKey = Platform.environment['GEMINI_API_KEY'];
-    Logger.info(
-        '  GEMINI_API_KEY: ${geminiKey != null ? "set (${geminiKey.length} chars)" : "NOT SET"}');
-    final ghToken = Platform.environment['GH_TOKEN'] ??
-        Platform.environment['GITHUB_TOKEN'];
+    Logger.info('  GEMINI_API_KEY: ${geminiKey != null ? "set (${geminiKey.length} chars)" : "NOT SET"}');
+    final ghToken = Platform.environment['GH_TOKEN'] ?? Platform.environment['GITHUB_TOKEN'];
     Logger.info('  GitHub token: ${ghToken != null ? "set" : "NOT SET"}');
 
     // Check MCP servers
     Logger.info('');
     Logger.info('MCP servers:');
     try {
-      final settings = json.decode(
-          File('$repoRoot/.gemini/settings.json').readAsStringSync());
-      final mcpServers =
-          settings['mcpServers'] as Map<String, dynamic>?;
+      final settings = json.decode(File('$repoRoot/.gemini/settings.json').readAsStringSync());
+      final mcpServers = settings['mcpServers'] as Map<String, dynamic>?;
       if (mcpServers != null && mcpServers.isNotEmpty) {
         for (final server in mcpServers.keys) {
           Logger.success('  $server: configured');
         }
       } else {
-        Logger.info(
-            '  No MCP servers configured. Run: dart run runtime_ci_tooling:manage_cicd configure-mcp');
+        Logger.info('  No MCP servers configured. Run: dart run runtime_ci_tooling:manage_cicd configure-mcp');
       }
     } catch (_) {
       Logger.info('  Could not read MCP configuration');
@@ -126,10 +123,11 @@ class StatusCommand extends Command<void> {
     // Show version info
     Logger.info('');
     final currentVersion = CiProcessRunner.runSync(
-        "awk '/^version:/{print \$2}' pubspec.yaml", repoRoot,
-        verbose: global.verbose);
-    final prevTag =
-        VersionDetection.detectPrevTag(repoRoot, verbose: global.verbose);
+      "awk '/^version:/{print \$2}' pubspec.yaml",
+      repoRoot,
+      verbose: global.verbose,
+    );
+    final prevTag = VersionDetection.detectPrevTag(repoRoot, verbose: global.verbose);
     Logger.info('Package version: $currentVersion');
     Logger.info('Latest tag: $prevTag');
   }

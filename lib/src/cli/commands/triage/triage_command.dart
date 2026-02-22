@@ -22,8 +22,7 @@ class TriageCommand extends Command<void> {
   final String name = 'triage';
 
   @override
-  final String description =
-      'Issue triage pipeline with AI-powered investigation.';
+  final String description = 'Issue triage pipeline with AI-powered investigation.';
 
   TriageCommand() {
     addSubcommand(TriageSingleCommand());

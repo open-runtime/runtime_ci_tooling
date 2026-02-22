@@ -29,15 +29,13 @@ abstract final class ReleaseUtils {
       if (entry.isNotEmpty) {
         buf.writeln('## Changelog');
         buf.writeln();
-        buf.writeln(
-            entry.length > 2000 ? '${entry.substring(0, 2000)}...' : entry);
+        buf.writeln(entry.length > 2000 ? '${entry.substring(0, 2000)}...' : entry);
         buf.writeln();
       }
     }
 
     // Staged file summary
-    final stagedResult = Process.runSync('git', ['diff', '--cached', '--stat'],
-        workingDirectory: repoRoot);
+    final stagedResult = Process.runSync('git', ['diff', '--cached', '--stat'], workingDirectory: repoRoot);
     final stagedStat = (stagedResult.stdout as String).trim();
     if (stagedStat.isNotEmpty) {
       buf.writeln('## Files Modified');
@@ -55,9 +53,7 @@ abstract final class ReleaseUtils {
       if (rationale.isNotEmpty) {
         buf.writeln('## Version Bump Rationale');
         buf.writeln();
-        buf.writeln(rationale.length > 1000
-            ? '${rationale.substring(0, 1000)}...'
-            : rationale);
+        buf.writeln(rationale.length > 1000 ? '${rationale.substring(0, 1000)}...' : rationale);
         buf.writeln();
       }
     }
@@ -86,11 +82,12 @@ abstract final class ReleaseUtils {
 
     // Commit range
     final commitCount = CiProcessRunner.runSync(
-        'git rev-list --count "$prevTag"..HEAD 2>/dev/null', repoRoot,
-        verbose: verbose);
+      'git rev-list --count "$prevTag"..HEAD 2>/dev/null',
+      repoRoot,
+      verbose: verbose,
+    );
     buf.writeln('---');
-    buf.writeln(
-        'Automated release by CI/CD pipeline (Gemini CLI + GitHub Actions)');
+    buf.writeln('Automated release by CI/CD pipeline (Gemini CLI + GitHub Actions)');
     buf.writeln('Commits since $prevTag: $commitCount');
     buf.writeln('Generated: ${DateTime.now().toUtc().toIso8601String()}');
 
@@ -98,10 +95,8 @@ abstract final class ReleaseUtils {
   }
 
   /// Gather VERIFIED contributor usernames scoped to the release commit range.
-  static List<Map<String, String>> gatherVerifiedContributors(
-      String repoRoot, String prevTag) {
-    final repo = Platform.environment['GITHUB_REPOSITORY'] ??
-        '${config.repoOwner}/${config.repoName}';
+  static List<Map<String, String>> gatherVerifiedContributors(String repoRoot, String prevTag) {
+    final repo = Platform.environment['GITHUB_REPOSITORY'] ?? '${config.repoOwner}/${config.repoName}';
 
     // Step 1: Get one commit SHA per unique author email
     final gitResult = Process.runSync('sh', [
@@ -114,10 +109,7 @@ abstract final class ReleaseUtils {
       return [];
     }
 
-    final lines = (gitResult.stdout as String)
-        .trim()
-        .split('\n')
-        .where((l) => l.isNotEmpty);
+    final lines = (gitResult.stdout as String).trim().split('\n').where((l) => l.isNotEmpty);
     final contributors = <Map<String, String>>[];
     final seenLogins = <String>{};
 
@@ -128,8 +120,7 @@ abstract final class ReleaseUtils {
       final email = parts[1];
 
       // Skip bot emails
-      if (email.contains('[bot]') ||
-          email.contains('noreply.github.com') && email.contains('bot')) {
+      if (email.contains('[bot]') || email.contains('noreply.github.com') && email.contains('bot')) {
         continue;
       }
 
@@ -144,9 +135,7 @@ abstract final class ReleaseUtils {
 
         if (ghResult.exitCode == 0) {
           final login = (ghResult.stdout as String).trim();
-          if (login.isNotEmpty &&
-              !login.contains('[bot]') &&
-              !seenLogins.contains(login)) {
+          if (login.isNotEmpty && !login.contains('[bot]') && !seenLogins.contains(login)) {
             seenLogins.add(login);
             contributors.add({'username': login});
           }
@@ -157,16 +146,14 @@ abstract final class ReleaseUtils {
     }
 
     if (contributors.isEmpty) {
-      Logger.warn(
-          'No contributors resolved from GitHub API, falling back to git names');
+      Logger.warn('No contributors resolved from GitHub API, falling back to git names');
       final names = (gitResult.stdout as String)
           .trim()
           .split('\n')
           .where((l) => l.isNotEmpty && !l.contains('[bot]'))
           .map((l) => l.split(' ').length > 1 ? l.split(' ')[1] : l)
           .toSet()
-          .map<Map<String, String>>(
-              (email) => {'username': email.split('@').first})
+          .map<Map<String, String>>((email) => {'username': email.split('@').first})
           .toList();
       return names;
     }
@@ -175,8 +162,7 @@ abstract final class ReleaseUtils {
   }
 
   /// Build fallback release notes from CHANGELOG entry + version bump rationale.
-  static String buildFallbackReleaseNotes(
-      String repoRoot, String version, String prevTag) {
+  static String buildFallbackReleaseNotes(String repoRoot, String version, String prevTag) {
     final buf = StringBuffer();
     buf.writeln('# ${config.repoName} v$version');
     buf.writeln();
@@ -214,10 +200,8 @@ abstract final class ReleaseUtils {
 
   /// Add Keep a Changelog reference-style links to the bottom of CHANGELOG.md.
   static void addChangelogReferenceLinks(String repoRoot, String content) {
-    final server =
-        Platform.environment['GITHUB_SERVER_URL'] ?? 'https://github.com';
-    final repo = Platform.environment['GITHUB_REPOSITORY'] ??
-        '${config.repoOwner}/${config.repoName}';
+    final server = Platform.environment['GITHUB_SERVER_URL'] ?? 'https://github.com';
+    final repo = Platform.environment['GITHUB_REPOSITORY'] ?? '${config.repoOwner}/${config.repoName}';
 
     // Extract all version headers
     final versionPattern = RegExp(r'^## \[([^\]]+)\]', multiLine: true);
@@ -225,10 +209,7 @@ abstract final class ReleaseUtils {
 
     if (matches.isEmpty) return;
 
-    final versions = matches
-        .map((m) => m.group(1)!)
-        .where((v) => v != 'Unreleased')
-        .toList();
+    final versions = matches.map((m) => m.group(1)!).where((v) => v != 'Unreleased').toList();
 
     if (versions.isEmpty) return;
 
@@ -238,8 +219,7 @@ abstract final class ReleaseUtils {
       final version = versions[i];
       if (i + 1 < versions.length) {
         final prevVersion = versions[i + 1];
-        links.writeln(
-            '[$version]: $server/$repo/compare/v$prevVersion...v$version');
+        links.writeln('[$version]: $server/$repo/compare/v$prevVersion...v$version');
       } else {
         links.writeln('[$version]: $server/$repo/releases/tag/v$version');
       }
@@ -249,8 +229,7 @@ abstract final class ReleaseUtils {
     if (linksStr.isEmpty) return;
 
     // Strip any existing reference-link block
-    final existingLinksPattern =
-        RegExp(r'\n*(\[[\w.\-]+\]: https?://[^\n]+\n?)+$');
+    final existingLinksPattern = RegExp(r'\n*(\[[\w.\-]+\]: https?://[^\n]+\n?)+$');
     var cleaned = content.replaceAll(existingLinksPattern, '');
     cleaned = cleaned.trimRight();
 

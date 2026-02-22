@@ -15,28 +15,28 @@ abstract final class VersionDetection {
   /// Detect the previous release tag from git history.
   static String detectPrevTag(String repoRoot, {bool verbose = false}) {
     final result = CiProcessRunner.runSync(
-        "git tag -l 'v*' --sort=-version:refname | head -1", repoRoot,
-        verbose: verbose);
+      "git tag -l 'v*' --sort=-version:refname | head -1",
+      repoRoot,
+      verbose: verbose,
+    );
     if (result.isEmpty) {
       // No tags yet -- use the first commit
-      return CiProcessRunner.runSync(
-          'git rev-list --max-parents=0 HEAD | head -1', repoRoot,
-          verbose: verbose);
+      return CiProcessRunner.runSync('git rev-list --max-parents=0 HEAD | head -1', repoRoot, verbose: verbose);
     }
     return result;
   }
 
   /// Detect the next semantic version based on commit history analysis.
-  static String detectNextVersion(String repoRoot, String prevTag,
-      {bool verbose = false}) {
+  static String detectNextVersion(String repoRoot, String prevTag, {bool verbose = false}) {
     final currentVersion = CiProcessRunner.runSync(
-        "awk '/^version:/{print \$2}' pubspec.yaml", repoRoot,
-        verbose: verbose);
+      "awk '/^version:/{print \$2}' pubspec.yaml",
+      repoRoot,
+      verbose: verbose,
+    );
 
     // Derive bump base from prevTag (not pubspec.yaml) to avoid stale-version
     // collisions.
-    final tagVersion =
-        prevTag.startsWith('v') ? prevTag.substring(1) : prevTag;
+    final tagVersion = prevTag.startsWith('v') ? prevTag.substring(1) : prevTag;
     final parts = tagVersion.split('.');
     if (parts.length != 3 || parts.any((p) => int.tryParse(p) == null)) {
       // prevTag is not a semver tag -- fall back to pubspec
@@ -53,27 +53,26 @@ abstract final class VersionDetection {
 
     // ── Pass 1: Fast regex heuristic ──
     final commits = CiProcessRunner.runSync(
-        'git log "$prevTag"..HEAD --pretty=format:"%s%n%b" 2>/dev/null',
-        repoRoot,
-        verbose: verbose);
+      'git log "$prevTag"..HEAD --pretty=format:"%s%n%b" 2>/dev/null',
+      repoRoot,
+      verbose: verbose,
+    );
     final commitSubjects = CiProcessRunner.runSync(
-        'git log "$prevTag"..HEAD --pretty=format:"%s" --no-merges 2>/dev/null',
-        repoRoot,
-        verbose: verbose);
+      'git log "$prevTag"..HEAD --pretty=format:"%s" --no-merges 2>/dev/null',
+      repoRoot,
+      verbose: verbose,
+    );
 
     var bump = 'patch';
-    if (RegExp(r'(BREAKING CHANGE|^[a-z]+(\(.+\))?!:)', multiLine: true)
-        .hasMatch(commits)) {
+    if (RegExp(r'(BREAKING CHANGE|^[a-z]+(\(.+\))?!:)', multiLine: true).hasMatch(commits)) {
       bump = 'major';
-    } else if (RegExp(r'^feat(\(.+\))?:', multiLine: true)
-        .hasMatch(commits)) {
+    } else if (RegExp(r'^feat(\(.+\))?:', multiLine: true).hasMatch(commits)) {
       bump = 'minor';
     } else if (commitSubjects.isNotEmpty &&
-        commitSubjects.split('\n').every(
-              (line) =>
-                  line.trim().isEmpty ||
-                  RegExp(r'^(chore|style|ci|docs|build)(\(.+\))?:')
-                      .hasMatch(line.trim()),
+        commitSubjects
+            .split('\n')
+            .every(
+              (line) => line.trim().isEmpty || RegExp(r'^(chore|style|ci|docs|build)(\(.+\))?:').hasMatch(line.trim()),
             )) {
       bump = 'none';
     }
@@ -81,25 +80,30 @@ abstract final class VersionDetection {
     Logger.info('  Regex heuristic: $bump');
 
     // ── Pass 2: Gemini analysis (overrides regex if available) ──
-    if (CiProcessRunner.commandExists('gemini') &&
-        Platform.environment['GEMINI_API_KEY'] != null) {
+    if (CiProcessRunner.commandExists('gemini') && Platform.environment['GEMINI_API_KEY'] != null) {
       final commitCount = CiProcessRunner.runSync(
-          'git rev-list --count "$prevTag"..HEAD 2>/dev/null', repoRoot,
-          verbose: verbose);
+        'git rev-list --count "$prevTag"..HEAD 2>/dev/null',
+        repoRoot,
+        verbose: verbose,
+      );
       final changedFiles = CiProcessRunner.runSync(
-          'git diff --name-only "$prevTag"..HEAD 2>/dev/null | head -30',
-          repoRoot,
-          verbose: verbose);
+        'git diff --name-only "$prevTag"..HEAD 2>/dev/null | head -30',
+        repoRoot,
+        verbose: verbose,
+      );
       final diffStat = CiProcessRunner.runSync(
-          'git diff --stat "$prevTag"..HEAD 2>/dev/null | tail -5', repoRoot,
-          verbose: verbose);
+        'git diff --stat "$prevTag"..HEAD 2>/dev/null | tail -5',
+        repoRoot,
+        verbose: verbose,
+      );
       final existingTags = CiProcessRunner.runSync(
-          "git tag -l 'v*' --sort=-version:refname | head -10", repoRoot,
-          verbose: verbose);
+        "git tag -l 'v*' --sort=-version:refname | head -10",
+        repoRoot,
+        verbose: verbose,
+      );
       final commitSummary = commits.split('\n').take(50).join('\n');
 
-      final versionAnalysisDir =
-          Directory('$repoRoot/$kCicdRunsDir/version_analysis');
+      final versionAnalysisDir = Directory('$repoRoot/$kCicdRunsDir/version_analysis');
       versionAnalysisDir.createSync(recursive: true);
       final bumpJsonPath = '${versionAnalysisDir.path}/version_bump.json';
       final prompt =
@@ -152,28 +156,18 @@ abstract final class VersionDetection {
 
       // Save raw Gemini response for audit trail
       if (geminiResult.isNotEmpty) {
-        File('${versionAnalysisDir.path}/gemini_response.json')
-            .writeAsStringSync(geminiResult);
+        File('${versionAnalysisDir.path}/gemini_response.json').writeAsStringSync(geminiResult);
       }
 
       if (geminiResult.isNotEmpty && File(bumpJsonPath).existsSync()) {
         try {
-          final bumpData = json.decode(File(bumpJsonPath).readAsStringSync())
-              as Map<String, dynamic>;
-          final rawBump = (bumpData['bump'] as String?)
-              ?.trim()
-              .toLowerCase()
-              .replaceAll(RegExp(r'[^a-z]'), '');
-          if (rawBump == 'major' ||
-              rawBump == 'minor' ||
-              rawBump == 'patch' ||
-              rawBump == 'none') {
-            Logger.info(
-                '  Gemini analysis: $rawBump (overriding regex: $bump)');
+          final bumpData = json.decode(File(bumpJsonPath).readAsStringSync()) as Map<String, dynamic>;
+          final rawBump = (bumpData['bump'] as String?)?.trim().toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
+          if (rawBump == 'major' || rawBump == 'minor' || rawBump == 'patch' || rawBump == 'none') {
+            Logger.info('  Gemini analysis: $rawBump (overriding regex: $bump)');
             bump = rawBump!;
           } else {
-            Logger.info(
-                '  Gemini returned unexpected: "$rawBump", using regex: $bump');
+            Logger.info('  Gemini returned unexpected: "$rawBump", using regex: $bump');
           }
         } catch (e) {
           Logger.info('  Gemini parse error: $e, using regex: $bump');
@@ -182,8 +176,7 @@ abstract final class VersionDetection {
         Logger.info('  Gemini unavailable, using regex: $bump');
       }
     } else {
-      Logger.info(
-          '  Gemini not available for version analysis, using regex heuristic');
+      Logger.info('  Gemini not available for version analysis, using regex heuristic');
     }
 
     // If no release is needed, return the current version unchanged
@@ -209,8 +202,7 @@ abstract final class VersionDetection {
 
     // Guard: ensure version never goes backward
     if (compareVersions(nextVersion, currentVersion) < 0) {
-      Logger.warn(
-          'Version regression detected: $nextVersion < $currentVersion. Using $currentVersion.');
+      Logger.warn('Version regression detected: $nextVersion < $currentVersion. Using $currentVersion.');
       return currentVersion;
     }
 

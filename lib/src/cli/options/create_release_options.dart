@@ -13,10 +13,7 @@ class CreateReleaseOptions {
   @CliOption(help: 'GitHub repository slug owner/repo')
   final String? repo;
 
-  const CreateReleaseOptions({
-    this.artifactsDir,
-    this.repo,
-  });
+  const CreateReleaseOptions({this.artifactsDir, this.repo});
 
   factory CreateReleaseOptions.fromArgResults(ArgResults results) {
     return _$parseCreateReleaseOptionsResult(results);

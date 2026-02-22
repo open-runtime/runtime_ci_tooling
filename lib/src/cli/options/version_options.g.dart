@@ -6,10 +6,8 @@ part of 'version_options.dart';
 // CliGenerator
 // **************************************************************************
 
-VersionOptions _$parseVersionOptionsResult(ArgResults result) => VersionOptions(
-  prevTag: result['prev-tag'] as String?,
-  version: result['version'] as String?,
-);
+VersionOptions _$parseVersionOptionsResult(ArgResults result) =>
+    VersionOptions(prevTag: result['prev-tag'] as String?, version: result['version'] as String?);
 
 ArgParser _$populateVersionOptionsParser(ArgParser parser) => parser
   ..addOption('prev-tag', help: 'Override previous tag detection')

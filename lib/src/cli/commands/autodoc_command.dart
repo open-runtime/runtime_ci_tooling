@@ -24,8 +24,7 @@ class AutodocCommand extends Command<void> {
   final String name = 'autodoc';
 
   @override
-  final String description =
-      'Generate/update module docs (--init, --force, --module, --dry-run).';
+  final String description = 'Generate/update module docs (--init, --force, --module, --dry-run).';
 
   AutodocCommand() {
     AutodocOptionsArgParser.populateParser(argParser);
@@ -60,35 +59,27 @@ class AutodocCommand extends Command<void> {
     }
 
     if (init) {
-      Logger.info(
-          '--init: autodoc.json should be created manually or already exists.');
+      Logger.info('--init: autodoc.json should be created manually or already exists.');
       if (File(configPath).existsSync()) {
         Logger.success('autodoc.json exists at $configPath');
       } else {
-        Logger.error(
-            'autodoc.json not found. Create it at $kRuntimeCiDir/autodoc.json');
+        Logger.error('autodoc.json not found. Create it at $kRuntimeCiDir/autodoc.json');
       }
       return;
     }
 
     if (!File(configPath).existsSync()) {
-      Logger.error(
-          'autodoc.json not found at $kRuntimeCiDir/autodoc.json');
-      Logger.error(
-          'Run: dart run runtime_ci_tooling:manage_cicd autodoc --init');
+      Logger.error('autodoc.json not found at $kRuntimeCiDir/autodoc.json');
+      Logger.error('Run: dart run runtime_ci_tooling:manage_cicd autodoc --init');
       return;
     }
 
     // Load config
     final configContent = File(configPath).readAsStringSync();
-    final autodocConfig =
-        json.decode(configContent) as Map<String, dynamic>;
-    final modules =
-        (autodocConfig['modules'] as List).cast<Map<String, dynamic>>();
-    final maxConcurrent =
-        (autodocConfig['max_concurrent'] as int?) ?? 4;
-    final templates =
-        (autodocConfig['templates'] as Map<String, dynamic>?) ?? {};
+    final autodocConfig = json.decode(configContent) as Map<String, dynamic>;
+    final modules = (autodocConfig['modules'] as List).cast<Map<String, dynamic>>();
+    final maxConcurrent = (autodocConfig['max_concurrent'] as int?) ?? 4;
+    final templates = (autodocConfig['templates'] as Map<String, dynamic>?) ?? {};
 
     if (!GeminiUtils.geminiAvailable(warnOnly: true)) {
       Logger.warn('Gemini unavailable -- skipping autodoc generation.');
@@ -116,15 +107,11 @@ class AutodocCommand extends Command<void> {
 
       final name = module['name'] as String;
       final outputPath = '$repoRoot/${module['output_path']}';
-      final libPaths =
-          (module['lib_paths'] as List?)?.cast<String>() ?? [];
-      final generateTypes =
-          (module['generate'] as List).cast<String>();
-      final libDir =
-          libPaths.isNotEmpty ? '$repoRoot/${libPaths.first}' : '';
+      final libPaths = (module['lib_paths'] as List?)?.cast<String>() ?? [];
+      final generateTypes = (module['generate'] as List).cast<String>();
+      final libDir = libPaths.isNotEmpty ? '$repoRoot/${libPaths.first}' : '';
 
-      Logger.info(
-          '  $id ($name): ${force ? "forced" : "changed"} -> generating ${generateTypes.join(", ")}');
+      Logger.info('  $id ($name): ${force ? "forced" : "changed"} -> generating ${generateTypes.join(", ")}');
 
       if (dryRun) {
         updatedModules.add(id);
@@ -168,7 +155,8 @@ class AutodocCommand extends Command<void> {
     if (dryRun) {
       Logger.info('');
       Logger.info(
-          '[DRY-RUN] Would generate docs for ${updatedModules.length} modules, skipped $skippedCount unchanged');
+        '[DRY-RUN] Would generate docs for ${updatedModules.length} modules, skipped $skippedCount unchanged',
+      );
       for (final id in updatedModules) {
         Logger.info('  - $id');
       }
@@ -176,15 +164,13 @@ class AutodocCommand extends Command<void> {
     }
 
     if (tasks.isEmpty) {
-      Logger.success(
-          'All $skippedCount modules unchanged. Nothing to generate.');
+      Logger.success('All $skippedCount modules unchanged. Nothing to generate.');
       return;
     }
 
     // Execute in parallel batches
     Logger.info('');
-    Logger.info(
-        'Running ${tasks.length} Gemini doc generation tasks (max $maxConcurrent parallel)...');
+    Logger.info('Running ${tasks.length} Gemini doc generation tasks (max $maxConcurrent parallel)...');
 
     for (var i = 0; i < tasks.length; i += maxConcurrent) {
       final batch = tasks.skip(i).take(maxConcurrent).toList();
@@ -192,11 +178,9 @@ class AutodocCommand extends Command<void> {
     }
 
     // Save updated config with new hashes
-    File(configPath).writeAsStringSync(
-        const JsonEncoder.withIndent('  ').convert(autodocConfig));
+    File(configPath).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(autodocConfig));
 
-    Logger.success(
-        'Generated docs for ${updatedModules.length} modules, skipped $skippedCount unchanged.');
+    Logger.success('Generated docs for ${updatedModules.length} modules, skipped $skippedCount unchanged.');
     Logger.info('Updated hashes saved to $kRuntimeCiDir/autodoc.json');
 
     StepSummary.write('''
@@ -251,9 +235,10 @@ ${StepSummary.artifactLink()}
     }
 
     final prompt = CiProcessRunner.runSync(
-        'dart run $repoRoot/$templatePath ${promptArgs.map((a) => '"$a"').join(' ')}',
-        repoRoot,
-        verbose: verbose);
+      'dart run $repoRoot/$templatePath ${promptArgs.map((a) => '"$a"').join(' ')}',
+      repoRoot,
+      verbose: verbose,
+    );
 
     if (prompt.isEmpty) {
       Logger.warn('  [$moduleId] Empty prompt for $docType, skipping');
@@ -261,9 +246,7 @@ ${StepSummary.artifactLink()}
     }
 
     // Build context includes
-    final includes = <String>[
-      '@${sourceDir.replaceFirst('$repoRoot/', '')}'
-    ];
+    final includes = <String>['@${sourceDir.replaceFirst('$repoRoot/', '')}'];
     if (libDir.isNotEmpty) {
       final relLib = libDir.replaceFirst('$repoRoot/', '');
       if (Directory(libDir).existsSync()) includes.add('@$relLib');
@@ -296,10 +279,7 @@ Do not skip any -- completeness is more important than brevity.
 
     final pass1Result = Process.runSync(
       'sh',
-      [
-        '-c',
-        'cat ${pass1Prompt.path} | gemini --yolo -m $_kGeminiProModel ${includes.join(" ")}',
-      ],
+      ['-c', 'cat ${pass1Prompt.path} | gemini --yolo -m $_kGeminiProModel ${includes.join(" ")}'],
       workingDirectory: repoRoot,
       environment: {...Platform.environment},
     );
@@ -307,15 +287,13 @@ Do not skip any -- completeness is more important than brevity.
     if (pass1Prompt.existsSync()) pass1Prompt.deleteSync();
 
     if (pass1Result.exitCode != 0) {
-      Logger.warn(
-          '  [$moduleId] Pass 1 failed: ${(pass1Result.stderr as String).trim()}');
+      Logger.warn('  [$moduleId] Pass 1 failed: ${(pass1Result.stderr as String).trim()}');
       return;
     }
 
     final outputFile = File(absOutputFile);
     if (!outputFile.existsSync() || outputFile.lengthSync() < 100) {
-      Logger.warn(
-          '  [$moduleId] Pass 1 did not produce $outputFileName');
+      Logger.warn('  [$moduleId] Pass 1 did not produce $outputFileName');
       return;
     }
 
@@ -390,10 +368,7 @@ Write the corrected file to the same path: $absOutputFile
 
     final pass2Result = Process.runSync(
       'sh',
-      [
-        '-c',
-        'cat ${pass2Prompt.path} | gemini --yolo -m $_kGeminiProModel ${includes.join(" ")}',
-      ],
+      ['-c', 'cat ${pass2Prompt.path} | gemini --yolo -m $_kGeminiProModel ${includes.join(" ")}'],
       workingDirectory: repoRoot,
       environment: {...Platform.environment},
     );
@@ -401,8 +376,7 @@ Write the corrected file to the same path: $absOutputFile
     if (pass2Prompt.existsSync()) pass2Prompt.deleteSync();
 
     if (pass2Result.exitCode != 0) {
-      Logger.warn(
-          '  [$moduleId] Pass 2 failed (keeping Pass 1 output): ${(pass2Result.stderr as String).trim()}');
+      Logger.warn('  [$moduleId] Pass 2 failed (keeping Pass 1 output): ${(pass2Result.stderr as String).trim()}');
     }
 
     // Verify final output
@@ -410,8 +384,7 @@ Write the corrected file to the same path: $absOutputFile
       final finalSize = outputFile.lengthSync();
       final delta = finalSize - pass1Size;
       final deltaStr = delta >= 0 ? '+$delta' : '$delta';
-      Logger.success(
-          '  [$moduleId] $outputFileName: $finalSize bytes ($deltaStr from review)');
+      Logger.success('  [$moduleId] $outputFileName: $finalSize bytes ($deltaStr from review)');
       return;
     }
 

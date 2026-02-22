@@ -52,27 +52,26 @@ class ComposeCommand extends Command<void> {
     }
 
     final ctx = RunContext.create(repoRoot, 'compose');
-    final prevTag = versionOpts.prevTag ??
-        VersionDetection.detectPrevTag(repoRoot, verbose: global.verbose);
-    final newVersion = versionOpts.version ??
-        VersionDetection.detectNextVersion(repoRoot, prevTag,
-            verbose: global.verbose);
+    final prevTag = versionOpts.prevTag ?? VersionDetection.detectPrevTag(repoRoot, verbose: global.verbose);
+    final newVersion =
+        versionOpts.version ?? VersionDetection.detectNextVersion(repoRoot, prevTag, verbose: global.verbose);
 
     Logger.info('Previous tag: $prevTag');
     Logger.info('New version: $newVersion');
     Logger.info('Run dir: ${ctx.runDir}');
 
     // Generate prompt via Dart template
-    final composerScript =
-        PromptResolver.promptScript('gemini_changelog_composer_prompt.dart');
+    final composerScript = PromptResolver.promptScript('gemini_changelog_composer_prompt.dart');
     Logger.info('Generating composer prompt from $composerScript...');
     if (!File(composerScript).existsSync()) {
       Logger.error('Prompt script not found: $composerScript');
       exit(1);
     }
     final prompt = CiProcessRunner.runSync(
-        'dart run $composerScript "$prevTag" "$newVersion"', repoRoot,
-        verbose: global.verbose);
+      'dart run $composerScript "$prevTag" "$newVersion"',
+      repoRoot,
+      verbose: global.verbose,
+    );
     if (prompt.isEmpty) {
       Logger.error('Composer prompt generator produced empty output.');
       exit(1);
@@ -80,8 +79,7 @@ class ComposeCommand extends Command<void> {
     ctx.savePrompt('compose', prompt);
 
     if (global.dryRun) {
-      Logger.info(
-          '[DRY-RUN] Would run Gemini CLI with composer prompt (${prompt.length} chars)');
+      Logger.info('[DRY-RUN] Would run Gemini CLI with composer prompt (${prompt.length} chars)');
       return;
     }
 
@@ -89,11 +87,7 @@ class ComposeCommand extends Command<void> {
 
     // Build the @ includes for file context.
     final includes = <String>[];
-    final artifactNames = [
-      'commit_analysis.json',
-      'pr_data.json',
-      'breaking_changes.json',
-    ];
+    final artifactNames = ['commit_analysis.json', 'pr_data.json', 'breaking_changes.json'];
     for (final name in artifactNames) {
       if (File('/tmp/$name').existsSync()) {
         includes.add('@/tmp/$name');
@@ -161,8 +155,7 @@ class ComposeCommand extends Command<void> {
           Logger.info('  Duration: ${stats['session']?['duration']}ms');
         }
       } else if (result.exitCode != 0) {
-        Logger.warn(
-            'Gemini CLI produced no JSON output for compose stage.');
+        Logger.warn('Gemini CLI produced no JSON output for compose stage.');
       }
     } catch (e) {
       Logger.warn('Could not parse Gemini response as JSON: $e');
@@ -172,23 +165,19 @@ class ComposeCommand extends Command<void> {
     String changelogContent = '';
     try {
       if (File('$repoRoot/CHANGELOG.md').existsSync()) {
-        changelogContent =
-            File('$repoRoot/CHANGELOG.md').readAsStringSync();
+        changelogContent = File('$repoRoot/CHANGELOG.md').readAsStringSync();
         if (changelogContent.contains('## [$newVersion]')) {
           Logger.success('CHANGELOG.md updated with v$newVersion entry');
         } else {
-          Logger.warn(
-              'CHANGELOG.md exists but does not contain a [$newVersion] entry');
+          Logger.warn('CHANGELOG.md exists but does not contain a [$newVersion] entry');
         }
       }
     } catch (e) {
       Logger.warn('Could not read CHANGELOG.md (encoding error): $e');
       try {
         final bytes = File('$repoRoot/CHANGELOG.md').readAsBytesSync();
-        changelogContent =
-            String.fromCharCodes(bytes.where((b) => b < 128));
-        Logger.info(
-            'Read CHANGELOG.md with ASCII fallback (${changelogContent.length} chars)');
+        changelogContent = String.fromCharCodes(bytes.where((b) => b < 128));
+        Logger.info('Read CHANGELOG.md with ASCII fallback (${changelogContent.length} chars)');
       } catch (_) {
         changelogContent = '';
       }

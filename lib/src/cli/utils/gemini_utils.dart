@@ -10,12 +10,10 @@ abstract final class GeminiUtils {
   static bool geminiAvailable({bool warnOnly = false}) {
     if (!CiProcessRunner.commandExists('gemini')) {
       if (warnOnly) {
-        Logger.warn(
-            'Gemini CLI not installed — skipping Gemini-powered step.');
+        Logger.warn('Gemini CLI not installed — skipping Gemini-powered step.');
         return false;
       }
-      Logger.error(
-          'Gemini CLI is not installed. Run: dart run runtime_ci_tooling:manage_cicd setup');
+      Logger.error('Gemini CLI is not installed. Run: dart run runtime_ci_tooling:manage_cicd setup');
       exit(1);
     }
     final key = Platform.environment['GEMINI_API_KEY'];
@@ -33,8 +31,7 @@ abstract final class GeminiUtils {
   /// Require Gemini CLI to be installed (exit if not).
   static void requireGeminiCli() {
     if (!CiProcessRunner.commandExists('gemini')) {
-      Logger.error(
-          'Gemini CLI is not installed. Run: dart run runtime_ci_tooling:manage_cicd setup');
+      Logger.error('Gemini CLI is not installed. Run: dart run runtime_ci_tooling:manage_cicd setup');
       exit(1);
     }
   }
@@ -44,8 +41,7 @@ abstract final class GeminiUtils {
     final key = Platform.environment['GEMINI_API_KEY'];
     if (key == null || key.isEmpty) {
       Logger.error('GEMINI_API_KEY is not set.');
-      Logger.error(
-          'Set it via: export GEMINI_API_KEY=<your-key-from-aistudio.google.com>');
+      Logger.error('Set it via: export GEMINI_API_KEY=<your-key-from-aistudio.google.com>');
       exit(1);
     }
   }

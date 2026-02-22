@@ -24,8 +24,7 @@ class MergeAuditTrailsCommand extends Command<void> {
   final String name = 'merge-audit-trails';
 
   @override
-  final String description =
-      'Merge CI/CD audit artifacts from multiple jobs (CI use).';
+  final String description = 'Merge CI/CD audit artifacts from multiple jobs (CI use).';
 
   MergeAuditTrailsCommand() {
     MergeAuditTrailsOptionsArgParser.populateParser(argParser);
@@ -44,38 +43,27 @@ class MergeAuditTrailsCommand extends Command<void> {
 
     Logger.header('Merge Audit Trails');
 
-    final incomingDir =
-        matOpts.incomingDir ?? '$kRuntimeCiDir/runs_incoming';
+    final incomingDir = matOpts.incomingDir ?? '$kRuntimeCiDir/runs_incoming';
     final outputDir = matOpts.outputDir ?? kCicdRunsDir;
 
-    final incomingPath = incomingDir.startsWith('/')
-        ? incomingDir
-        : '$repoRoot/$incomingDir';
+    final incomingPath = incomingDir.startsWith('/') ? incomingDir : '$repoRoot/$incomingDir';
     final incoming = Directory(incomingPath);
     if (!incoming.existsSync()) {
       Logger.warn('No incoming audit trails found at $incomingDir');
-      Logger.warn(
-          'Skipping merge (no artifacts uploaded by prior jobs).');
+      Logger.warn('Skipping merge (no artifacts uploaded by prior jobs).');
       return;
     }
 
-    final artifactDirs =
-        incoming.listSync().whereType<Directory>().toList();
+    final artifactDirs = incoming.listSync().whereType<Directory>().toList();
     if (artifactDirs.isEmpty) {
-      Logger.warn(
-          'Incoming directory exists but contains no artifact subdirectories.');
+      Logger.warn('Incoming directory exists but contains no artifact subdirectories.');
       return;
     }
 
     // Create the merged run directory with a unique timestamp
     final now = DateTime.now();
-    final timestamp = now
-        .toIso8601String()
-        .replaceAll(':', '-')
-        .replaceAll('.', '-')
-        .substring(0, 19);
-    final outputPath =
-        outputDir.startsWith('/') ? outputDir : '$repoRoot/$outputDir';
+    final timestamp = now.toIso8601String().replaceAll(':', '-').replaceAll('.', '-').substring(0, 19);
+    final outputPath = outputDir.startsWith('/') ? outputDir : '$repoRoot/$outputDir';
     final mergedRunDir = '$outputPath/run_${timestamp}_merged';
     Directory(mergedRunDir).createSync(recursive: true);
 
@@ -96,36 +84,27 @@ class MergeAuditTrailsCommand extends Command<void> {
             for (final child in entity.listSync()) {
               if (child is Directory) {
                 final phaseName = child.path.split('/').last;
-                FileUtils.copyDirRecursive(
-                    child, Directory('$mergedRunDir/$phaseName'));
+                FileUtils.copyDirRecursive(child, Directory('$mergedRunDir/$phaseName'));
                 totalFiles += FileUtils.countFiles(child);
-                Logger.info(
-                    '  Merged phase: $phaseName (from $artifactName)');
+                Logger.info('  Merged phase: $phaseName (from $artifactName)');
               } else if (child is File) {
                 final fileName = child.path.split('/').last;
                 if (fileName == 'meta.json') {
                   // Collect source meta for the merged meta.json
                   try {
-                    final meta =
-                        json.decode(child.readAsStringSync())
-                            as Map<String, dynamic>;
+                    final meta = json.decode(child.readAsStringSync()) as Map<String, dynamic>;
                     sources.add({'artifact': artifactName, ...meta});
                   } catch (_) {
-                    sources.add({
-                      'artifact': artifactName,
-                      'error': 'failed to parse meta.json',
-                    });
+                    sources.add({'artifact': artifactName, 'error': 'failed to parse meta.json'});
                   }
                 }
               }
             }
           } else {
             // Non-RunContext directory (e.g. version_analysis/) -- copy as-is
-            FileUtils.copyDirRecursive(
-                entity, Directory('$mergedRunDir/$dirName'));
+            FileUtils.copyDirRecursive(entity, Directory('$mergedRunDir/$dirName'));
             totalFiles += FileUtils.countFiles(entity);
-            Logger.info(
-                '  Merged directory: $dirName (from $artifactName)');
+            Logger.info('  Merged directory: $dirName (from $artifactName)');
           }
         }
       }
@@ -142,10 +121,8 @@ class MergeAuditTrailsCommand extends Command<void> {
       'platform': Platform.operatingSystem,
       'dart_version': Platform.version.split(' ').first,
     };
-    File('$mergedRunDir/meta.json').writeAsStringSync(
-        '${const JsonEncoder.withIndent('  ').convert(mergedMeta)}\n');
+    File('$mergedRunDir/meta.json').writeAsStringSync('${const JsonEncoder.withIndent('  ').convert(mergedMeta)}\n');
 
-    Logger.success(
-        'Merged ${artifactDirs.length} audit trail(s) into $mergedRunDir ($totalFiles files)');
+    Logger.success('Merged ${artifactDirs.length} audit trail(s) into $mergedRunDir ($totalFiles files)');
   }
 }

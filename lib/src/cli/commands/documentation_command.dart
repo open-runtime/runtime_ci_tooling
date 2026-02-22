@@ -23,8 +23,7 @@ class DocumentationCommand extends Command<void> {
   final String name = 'documentation';
 
   @override
-  final String description =
-      'Run documentation update via Gemini 3 Pro Preview.';
+  final String description = 'Run documentation update via Gemini 3 Pro Preview.';
 
   DocumentationCommand() {
     VersionOptionsArgParser.populateParser(argParser);
@@ -48,22 +47,21 @@ class DocumentationCommand extends Command<void> {
     }
 
     final ctx = RunContext.create(repoRoot, 'documentation');
-    final prevTag = versionOpts.prevTag ??
-        VersionDetection.detectPrevTag(repoRoot, verbose: global.verbose);
-    final newVersion = versionOpts.version ??
-        VersionDetection.detectNextVersion(repoRoot, prevTag,
-            verbose: global.verbose);
+    final prevTag = versionOpts.prevTag ?? VersionDetection.detectPrevTag(repoRoot, verbose: global.verbose);
+    final newVersion =
+        versionOpts.version ?? VersionDetection.detectNextVersion(repoRoot, prevTag, verbose: global.verbose);
 
-    final docScript =
-        PromptResolver.promptScript('gemini_documentation_prompt.dart');
+    final docScript = PromptResolver.promptScript('gemini_documentation_prompt.dart');
     Logger.info('Generating documentation update prompt from $docScript...');
     if (!File(docScript).existsSync()) {
       Logger.error('Prompt script not found: $docScript');
       exit(1);
     }
     final prompt = CiProcessRunner.runSync(
-        'dart run $docScript "$prevTag" "$newVersion"', repoRoot,
-        verbose: global.verbose);
+      'dart run $docScript "$prevTag" "$newVersion"',
+      repoRoot,
+      verbose: global.verbose,
+    );
     if (prompt.isEmpty) {
       Logger.error('Documentation prompt generator produced empty output.');
       exit(1);
@@ -71,8 +69,7 @@ class DocumentationCommand extends Command<void> {
     ctx.savePrompt('documentation', prompt);
 
     if (global.dryRun) {
-      Logger.info(
-          '[DRY-RUN] Would run Gemini for documentation update (${prompt.length} chars)');
+      Logger.info('[DRY-RUN] Would run Gemini for documentation update (${prompt.length} chars)');
       return;
     }
 
@@ -82,10 +79,8 @@ class DocumentationCommand extends Command<void> {
     final includes = <String>[];
     if (File('/tmp/commit_analysis.json').existsSync()) {
       includes.add('@/tmp/commit_analysis.json');
-    } else if (File('$repoRoot/$kCicdRunsDir/explore/commit_analysis.json')
-        .existsSync()) {
-      includes.add(
-          '@$repoRoot/$kCicdRunsDir/explore/commit_analysis.json');
+    } else if (File('$repoRoot/$kCicdRunsDir/explore/commit_analysis.json').existsSync()) {
+      includes.add('@$repoRoot/$kCicdRunsDir/explore/commit_analysis.json');
     }
     includes.add('@README.md');
 

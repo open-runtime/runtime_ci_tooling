@@ -49,18 +49,19 @@ class VerifyProtosCommand extends Command<void> {
     final generatedFiles = libDir
         .listSync(recursive: true)
         .whereType<File>()
-        .where((f) =>
-            f.path.endsWith('.pb.dart') ||
-            f.path.endsWith('.pbenum.dart') ||
-            f.path.endsWith('.pbgrpc.dart') ||
-            f.path.endsWith('.pbjson.dart'))
+        .where(
+          (f) =>
+              f.path.endsWith('.pb.dart') ||
+              f.path.endsWith('.pbenum.dart') ||
+              f.path.endsWith('.pbgrpc.dart') ||
+              f.path.endsWith('.pbjson.dart'),
+        )
         .toList();
 
     Logger.info('Found ${generatedFiles.length} generated protobuf files');
 
     if (protoFiles.isNotEmpty && generatedFiles.isEmpty) {
-      Logger.error(
-          'Proto files exist but no generated Dart files found. Run protoc.');
+      Logger.error('Proto files exist but no generated Dart files found. Run protoc.');
       exit(1);
     }
 

@@ -9,9 +9,7 @@ class ArchiveRunOptions {
   @CliOption(help: 'Directory containing the CI run to archive')
   final String? runDir;
 
-  const ArchiveRunOptions({
-    this.runDir,
-  });
+  const ArchiveRunOptions({this.runDir});
 
   factory ArchiveRunOptions.fromArgResults(ArgResults results) {
     return _$parseArchiveRunOptionsResult(results);

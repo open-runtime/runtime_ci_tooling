@@ -70,8 +70,7 @@ class TriageAutoCommand extends Command<void> {
 
       // Phase 2: Investigate
       try {
-        results = await investigate_phase.investigate(gamePlan, repoRoot,
-            runDir: runDir, verbose: global.verbose);
+        results = await investigate_phase.investigate(gamePlan, repoRoot, runDir: runDir, verbose: global.verbose);
       } catch (e) {
         Logger.error('Phase 2 INVESTIGATE failed: $e');
         saveCheckpoint(runDir, gamePlan, 'investigate');
@@ -86,8 +85,7 @@ class TriageAutoCommand extends Command<void> {
 
       // Phase 3: Act
       try {
-        decisions = await act_phase.act(gamePlan, results, repoRoot,
-            runDir: runDir);
+        decisions = await act_phase.act(gamePlan, results, repoRoot, runDir: runDir);
       } catch (e) {
         Logger.error('Phase 3 ACT failed: $e');
         saveCheckpoint(runDir, gamePlan, 'act');
@@ -96,8 +94,7 @@ class TriageAutoCommand extends Command<void> {
 
       // Phase 4: Verify
       try {
-        await verify_phase.verify(gamePlan, decisions, repoRoot,
-            runDir: runDir);
+        await verify_phase.verify(gamePlan, decisions, repoRoot, runDir: runDir);
       } catch (e) {
         Logger.error('Phase 4 VERIFY failed: $e');
       }
@@ -112,8 +109,7 @@ class TriageAutoCommand extends Command<void> {
       // Phase 5b: Cross-Repo Link
       if (config.crossRepoEnabled) {
         try {
-          await cross_repo_phase.crossRepoLink(gamePlan, decisions, repoRoot,
-              runDir: runDir);
+          await cross_repo_phase.crossRepoLink(gamePlan, decisions, repoRoot, runDir: runDir);
         } catch (e) {
           Logger.error('Phase 5b CROSS-REPO failed: $e');
         }

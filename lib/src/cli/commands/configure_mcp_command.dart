@@ -32,8 +32,7 @@ class ConfigureMcpCommand extends Command<void> {
 
     Map<String, dynamic> settings;
     try {
-      settings = json.decode(settingsFile.readAsStringSync())
-          as Map<String, dynamic>;
+      settings = json.decode(settingsFile.readAsStringSync()) as Map<String, dynamic>;
     } catch (e) {
       Logger.error('Could not read .gemini/settings.json: $e');
       exit(1);
@@ -43,22 +42,14 @@ class ConfigureMcpCommand extends Command<void> {
     final mcpServers = <String, dynamic>{};
 
     // GitHub MCP Server
-    final ghToken = Platform.environment['GH_TOKEN'] ??
-        Platform.environment['GITHUB_TOKEN'] ??
-        Platform.environment['GITHUB_PAT'];
+    final ghToken =
+        Platform.environment['GH_TOKEN'] ?? Platform.environment['GITHUB_TOKEN'] ?? Platform.environment['GITHUB_PAT'];
 
     if (ghToken != null && ghToken.isNotEmpty) {
       Logger.info('Configuring GitHub MCP server...');
       mcpServers['github'] = {
         'command': 'docker',
-        'args': [
-          'run',
-          '-i',
-          '--rm',
-          '-e',
-          'GITHUB_PERSONAL_ACCESS_TOKEN',
-          'ghcr.io/github/github-mcp-server'
-        ],
+        'args': ['run', '-i', '--rm', '-e', 'GITHUB_PERSONAL_ACCESS_TOKEN', 'ghcr.io/github/github-mcp-server'],
         'env': {'GITHUB_PERSONAL_ACCESS_TOKEN': ghToken},
         'includeTools': [
           'get_issue',
@@ -89,37 +80,30 @@ class ConfigureMcpCommand extends Command<void> {
       };
       Logger.success('GitHub MCP server configured');
     } else {
-      Logger.warn(
-          'No GitHub token found. Set GH_TOKEN or GITHUB_PAT to configure GitHub MCP.');
-      Logger.info(
-          '  export GH_TOKEN=<your-github-personal-access-token>');
+      Logger.warn('No GitHub token found. Set GH_TOKEN or GITHUB_PAT to configure GitHub MCP.');
+      Logger.info('  export GH_TOKEN=<your-github-personal-access-token>');
     }
 
     // Sentry MCP Server
     Logger.info('Configuring Sentry MCP server (remote)...');
     mcpServers['sentry'] = {'url': 'https://mcp.sentry.dev/mcp'};
-    Logger.success(
-        'Sentry MCP server configured (uses OAuth -- browser auth on first use)');
+    Logger.success('Sentry MCP server configured (uses OAuth -- browser auth on first use)');
 
     // Write updated settings
     settings['mcpServers'] = mcpServers;
 
     if (global.dryRun) {
       Logger.info('[DRY-RUN] Would write MCP configuration:');
-      Logger.info(
-          const JsonEncoder.withIndent('  ').convert(settings));
+      Logger.info(const JsonEncoder.withIndent('  ').convert(settings));
       return;
     }
 
-    settingsFile.writeAsStringSync(
-        '${const JsonEncoder.withIndent('  ').convert(settings)}\n');
+    settingsFile.writeAsStringSync('${const JsonEncoder.withIndent('  ').convert(settings)}\n');
     Logger.success('Updated .gemini/settings.json with MCP servers');
 
     Logger.info('');
     Logger.info('To verify MCP servers, run: gemini /mcp');
-    Logger.info(
-        'GitHub MCP tools will be available as: github__<tool_name>');
-    Logger.info(
-        'Sentry MCP tools will be available as: sentry__<tool_name>');
+    Logger.info('GitHub MCP tools will be available as: github__<tool_name>');
+    Logger.info('Sentry MCP tools will be available as: sentry__<tool_name>');
   }
 }

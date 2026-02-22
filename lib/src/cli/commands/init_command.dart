@@ -17,8 +17,7 @@ class InitCommand extends Command<void> {
   final String name = 'init';
 
   @override
-  final String description =
-      'Scan repo and generate .runtime_ci/config.json + scaffold workflows.';
+  final String description = 'Scan repo and generate .runtime_ci/config.json + scaffold workflows.';
 
   @override
   Future<void> run() async {
@@ -39,11 +38,9 @@ class InitCommand extends Command<void> {
     final pubspecFile = File('$repoRoot/pubspec.yaml');
     if (pubspecFile.existsSync()) {
       final content = pubspecFile.readAsStringSync();
-      final nameMatch =
-          RegExp(r'^name:\s*(\S+)', multiLine: true).firstMatch(content);
+      final nameMatch = RegExp(r'^name:\s*(\S+)', multiLine: true).firstMatch(content);
       if (nameMatch != null) packageName = nameMatch.group(1)!;
-      final versionMatch =
-          RegExp(r'^version:\s*(\S+)', multiLine: true).firstMatch(content);
+      final versionMatch = RegExp(r'^version:\s*(\S+)', multiLine: true).firstMatch(content);
       if (versionMatch != null) packageVersion = versionMatch.group(1)!;
       Logger.success('Detected package: $packageName v$packageVersion');
     } else {
@@ -72,17 +69,13 @@ class InitCommand extends Command<void> {
     if (repoOwner == 'unknown') {
       // Fallback: try parsing git remote
       try {
-        final gitResult = Process.runSync(
-            'git', ['remote', 'get-url', 'origin'],
-            workingDirectory: repoRoot);
+        final gitResult = Process.runSync('git', ['remote', 'get-url', 'origin'], workingDirectory: repoRoot);
         if (gitResult.exitCode == 0) {
           final url = (gitResult.stdout as String).trim();
-          final match =
-              RegExp(r'github\.com[:/]([^/]+)/').firstMatch(url);
+          final match = RegExp(r'github\.com[:/]([^/]+)/').firstMatch(url);
           if (match != null) {
             repoOwner = match.group(1)!;
-            Logger.success(
-                'Detected GitHub owner from remote: $repoOwner');
+            Logger.success('Detected GitHub owner from remote: $repoOwner');
           }
         }
       } catch (_) {}
@@ -155,29 +148,13 @@ class InitCommand extends Command<void> {
           },
         },
         'labels': {
-          'type': [
-            'bug',
-            'feature-request',
-            'enhancement',
-            'documentation',
-            'question',
-          ],
+          'type': ['bug', 'feature-request', 'enhancement', 'documentation', 'question'],
           'priority': ['P0-critical', 'P1-high', 'P2-medium', 'P3-low'],
           'area': areaLabels,
         },
-        'thresholds': {
-          'auto_close': 0.9,
-          'suggest_close': 0.7,
-          'comment': 0.5,
-        },
+        'thresholds': {'auto_close': 0.9, 'suggest_close': 0.7, 'comment': 0.5},
         'agents': {
-          'enabled': [
-            'code_analysis',
-            'pr_correlation',
-            'duplicate',
-            'sentiment',
-            'changelog',
-          ],
+          'enabled': ['code_analysis', 'pr_correlation', 'duplicate', 'sentiment', 'changelog'],
           'conditional': {
             'changelog': {'require_file': 'CHANGELOG.md'},
           },
@@ -197,8 +174,7 @@ class InitCommand extends Command<void> {
         },
       };
 
-      configFile.writeAsStringSync(
-          '${const JsonEncoder.withIndent('  ').convert(configData)}\n');
+      configFile.writeAsStringSync('${const JsonEncoder.withIndent('  ').convert(configData)}\n');
       Logger.success('Created $kConfigFileName');
     } else {
       Logger.info('$kConfigFileName already exists (kept as-is)');
@@ -223,14 +199,12 @@ class InitCommand extends Command<void> {
     if (gitignoreFile.existsSync()) {
       final content = gitignoreFile.readAsStringSync();
       if (!content.contains('.runtime_ci/runs/')) {
-        gitignoreFile.writeAsStringSync(
-            '$content\n# Runtime CI audit trails (local only)\n.runtime_ci/runs/\n');
+        gitignoreFile.writeAsStringSync('$content\n# Runtime CI audit trails (local only)\n.runtime_ci/runs/\n');
         Logger.success('Added .runtime_ci/runs/ to .gitignore');
         repaired++;
       }
     } else {
-      gitignoreFile.writeAsStringSync(
-          '# Runtime CI audit trails (local only)\n.runtime_ci/runs/\n');
+      gitignoreFile.writeAsStringSync('# Runtime CI audit trails (local only)\n.runtime_ci/runs/\n');
       Logger.success('Created .gitignore with .runtime_ci/runs/');
       repaired++;
     }
@@ -241,30 +215,22 @@ class InitCommand extends Command<void> {
     if (configExists && repaired == 0) {
       Logger.info('All items present — nothing to repair.');
     } else if (configExists) {
-      Logger.info(
-          'Repaired $repaired missing item${repaired == 1 ? '' : 's'}.');
+      Logger.info('Repaired $repaired missing item${repaired == 1 ? '' : 's'}.');
     }
-    Logger.info(
-        '  Config:    $kConfigFileName${configExists ? " (existing)" : ""}');
+    Logger.info('  Config:    $kConfigFileName${configExists ? " (existing)" : ""}');
     Logger.info('  Package:   $packageName');
     Logger.info('  Owner:     $repoOwner');
     Logger.info('  Areas:     ${areaLabels.join(", ")}');
     Logger.info('  Changelog: ${hadChangelog ? "found" : "created"}');
-    Logger.info(
-        '  .github/:  ${hasGithub ? "exists (not overwritten)" : "not found"}');
-    Logger.info(
-        '  .gemini/:  ${hasGemini ? "exists (not overwritten)" : "not found"}');
+    Logger.info('  .github/:  ${hasGithub ? "exists (not overwritten)" : "not found"}');
+    Logger.info('  .gemini/:  ${hasGemini ? "exists (not overwritten)" : "not found"}');
     print('');
     if (!configExists) {
       Logger.info('Next steps:');
-      Logger.info(
-          '  1. Review .runtime_ci/config.json and customize area labels, cross-repo, etc.');
-      Logger.info(
-          '  2. Add runtime_ci_tooling as a dev_dependency in pubspec.yaml');
-      Logger.info(
-          '  3. Run: dart run runtime_ci_tooling:manage_cicd setup');
-      Logger.info(
-          '  4. Run: dart run runtime_ci_tooling:manage_cicd status');
+      Logger.info('  1. Review .runtime_ci/config.json and customize area labels, cross-repo, etc.');
+      Logger.info('  2. Add runtime_ci_tooling as a dev_dependency in pubspec.yaml');
+      Logger.info('  3. Run: dart run runtime_ci_tooling:manage_cicd setup');
+      Logger.info('  4. Run: dart run runtime_ci_tooling:manage_cicd status');
     }
   }
 }

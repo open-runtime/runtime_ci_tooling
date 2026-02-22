@@ -26,8 +26,7 @@ class TriageResumeCommand extends Command<void> {
   final String description = 'Resume a previously interrupted triage run.';
 
   @override
-  String get invocation =>
-      '${runner!.executableName} triage resume <run_id>';
+  String get invocation => '${runner!.executableName} triage resume <run_id>';
 
   @override
   Future<void> run() async {
@@ -63,11 +62,9 @@ class TriageResumeCommand extends Command<void> {
 
       Logger.header('Resuming Triage Run: $runId');
 
-      final checkpoint = json.decode(checkpointFile.readAsStringSync())
-          as Map<String, dynamic>;
+      final checkpoint = json.decode(checkpointFile.readAsStringSync()) as Map<String, dynamic>;
       final lastPhase = checkpoint['last_completed_phase'] as String;
-      final gamePlan = GamePlan.fromJson(
-          checkpoint['game_plan'] as Map<String, dynamic>);
+      final gamePlan = GamePlan.fromJson(checkpoint['game_plan'] as Map<String, dynamic>);
 
       Logger.info('  Last completed phase: $lastPhase');
       Logger.info('  Issues: ${gamePlan.issues.length}');
@@ -79,9 +76,7 @@ class TriageResumeCommand extends Command<void> {
       if (lastPhase == 'plan' || lastPhase == 'investigate') {
         if (lastPhase == 'plan') {
           try {
-            results = await investigate_phase.investigate(
-                gamePlan, repoRoot,
-                runDir: runDir, verbose: global.verbose);
+            results = await investigate_phase.investigate(gamePlan, repoRoot, runDir: runDir, verbose: global.verbose);
           } catch (e) {
             Logger.error('Phase 2 INVESTIGATE failed on resume: $e');
             saveCheckpoint(runDir, gamePlan, 'investigate');
@@ -93,8 +88,7 @@ class TriageResumeCommand extends Command<void> {
 
         if (!global.dryRun) {
           try {
-            decisions = await act_phase.act(gamePlan, results, repoRoot,
-                runDir: runDir);
+            decisions = await act_phase.act(gamePlan, results, repoRoot, runDir: runDir);
           } catch (e) {
             Logger.error('Phase 3 ACT failed on resume: $e');
             saveCheckpoint(runDir, gamePlan, 'act');
@@ -110,24 +104,20 @@ class TriageResumeCommand extends Command<void> {
 
       if (decisions != null) {
         try {
-          await verify_phase.verify(gamePlan, decisions, repoRoot,
-              runDir: runDir);
+          await verify_phase.verify(gamePlan, decisions, repoRoot, runDir: runDir);
         } catch (e) {
           Logger.error('Phase 4 VERIFY failed on resume: $e');
         }
 
         try {
-          await link_phase.link(gamePlan, decisions, repoRoot,
-              runDir: runDir);
+          await link_phase.link(gamePlan, decisions, repoRoot, runDir: runDir);
         } catch (e) {
           Logger.error('Phase 5 LINK failed on resume: $e');
         }
 
         if (config.crossRepoEnabled) {
           try {
-            await cross_repo_phase.crossRepoLink(
-                gamePlan, decisions, repoRoot,
-                runDir: runDir);
+            await cross_repo_phase.crossRepoLink(gamePlan, decisions, repoRoot, runDir: runDir);
           } catch (e) {
             Logger.error('Phase 5b CROSS-REPO failed on resume: $e');
           }

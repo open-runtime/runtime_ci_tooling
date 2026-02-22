@@ -27,29 +27,22 @@ abstract final class PromptResolver {
     // Try 1: Look for the package in .dart_tool/package_config.json
     var dir = Directory.current;
     for (var i = 0; i < 10; i++) {
-      final configFile =
-          File('${dir.path}/.dart_tool/package_config.json');
+      final configFile = File('${dir.path}/.dart_tool/package_config.json');
       if (configFile.existsSync()) {
         try {
-          final configJson = json.decode(configFile.readAsStringSync())
-              as Map<String, dynamic>;
-          final packages =
-              configJson['packages'] as List<dynamic>? ?? [];
+          final configJson = json.decode(configFile.readAsStringSync()) as Map<String, dynamic>;
+          final packages = configJson['packages'] as List<dynamic>? ?? [];
           for (final pkg in packages) {
-            if (pkg is Map<String, dynamic> &&
-                pkg['name'] == 'runtime_ci_tooling') {
+            if (pkg is Map<String, dynamic> && pkg['name'] == 'runtime_ci_tooling') {
               final rootUri = pkg['rootUri'] as String? ?? '';
               if (rootUri.startsWith('file://')) {
                 return Uri.parse(rootUri).toFilePath();
               }
               // Relative URI -- resolve against the .dart_tool/ directory
-              final resolved = Uri.parse('${dir.path}/.dart_tool/')
-                  .resolve(rootUri);
+              final resolved = Uri.parse('${dir.path}/.dart_tool/').resolve(rootUri);
               final resolvedPath = resolved.toFilePath();
               // Strip trailing slash
-              return resolvedPath.endsWith('/')
-                  ? resolvedPath.substring(0, resolvedPath.length - 1)
-                  : resolvedPath;
+              return resolvedPath.endsWith('/') ? resolvedPath.substring(0, resolvedPath.length - 1) : resolvedPath;
             }
           }
         } catch (_) {}
@@ -65,8 +58,7 @@ abstract final class PromptResolver {
     }
 
     // Fallback
-    Logger.warn(
-        'Could not resolve runtime_ci_tooling package root. Prompt scripts may not be found.');
+    Logger.warn('Could not resolve runtime_ci_tooling package root. Prompt scripts may not be found.');
     return Directory.current.path;
   }
 }

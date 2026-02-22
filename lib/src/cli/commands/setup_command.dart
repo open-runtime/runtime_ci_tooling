@@ -18,8 +18,7 @@ class SetupCommand extends Command<void> {
   final String name = 'setup';
 
   @override
-  final String description =
-      'Install all prerequisites (Node.js, Gemini CLI, gh, jq, tree).';
+  final String description = 'Install all prerequisites (Node.js, Gemini CLI, gh, jq, tree).';
 
   @override
   Future<void> run() async {
@@ -54,9 +53,7 @@ class SetupCommand extends Command<void> {
 
     // Verify Gemini CLI version
     if (CiProcessRunner.commandExists('gemini')) {
-      final version = CiProcessRunner.runSync(
-          'gemini --version', repoRoot,
-          verbose: global.verbose);
+      final version = CiProcessRunner.runSync('gemini --version', repoRoot, verbose: global.verbose);
       Logger.info('Gemini CLI version: $version');
     }
 
@@ -65,23 +62,19 @@ class SetupCommand extends Command<void> {
     if (geminiKey != null && geminiKey.isNotEmpty) {
       Logger.success('GEMINI_API_KEY is set');
     } else {
-      Logger.warn(
-          'GEMINI_API_KEY is not set. Set it via: export GEMINI_API_KEY=<your-key>');
+      Logger.warn('GEMINI_API_KEY is not set. Set it via: export GEMINI_API_KEY=<your-key>');
     }
 
-    final ghToken = Platform.environment['GH_TOKEN'] ??
-        Platform.environment['GITHUB_TOKEN'];
+    final ghToken = Platform.environment['GH_TOKEN'] ?? Platform.environment['GITHUB_TOKEN'];
     if (ghToken != null && ghToken.isNotEmpty) {
       Logger.success('GitHub token is set');
     } else {
-      Logger.info(
-          'No GH_TOKEN/GITHUB_TOKEN set. Run "gh auth login" for GitHub CLI auth.');
+      Logger.info('No GH_TOKEN/GITHUB_TOKEN set. Run "gh auth login" for GitHub CLI auth.');
     }
 
     // Install Dart dependencies
     Logger.info('Installing Dart dependencies...');
-    CiProcessRunner.runSync('dart pub get', repoRoot,
-        verbose: global.verbose);
+    CiProcessRunner.runSync('dart pub get', repoRoot, verbose: global.verbose);
     Logger.success('Dart dependencies installed');
 
     Logger.header('Setup complete');

@@ -86,8 +86,7 @@ class ValidateCommand extends Command<void> {
           }
         }
       } else if (file.endsWith('.dart')) {
-        final result = Process.runSync('dart', ['analyze', path],
-            workingDirectory: repoRoot);
+        final result = Process.runSync('dart', ['analyze', path], workingDirectory: repoRoot);
         if (result.exitCode == 0) {
           Logger.success('Valid Dart: $file');
         } else {
@@ -100,8 +99,7 @@ class ValidateCommand extends Command<void> {
         if (content.contains('prompt') && content.contains('description')) {
           Logger.success('Valid TOML: $file');
         } else {
-          Logger.error(
-              'TOML missing required keys (prompt, description): $file');
+          Logger.error('TOML missing required keys (prompt, description): $file');
           allValid = false;
         }
       } else {
@@ -128,8 +126,7 @@ class ValidateCommand extends Command<void> {
           Logger.warn('Invalid JSON artifact: $artifact -- $e');
         }
       } else {
-        Logger.info(
-            'Not present (expected before first run): $artifact');
+        Logger.info('Not present (expected before first run): $artifact');
       }
     }
 

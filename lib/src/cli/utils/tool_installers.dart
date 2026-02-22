@@ -6,8 +6,7 @@ import 'process_runner.dart';
 /// Cross-platform tool installation utilities.
 abstract final class ToolInstallers {
   /// Install a tool by name, dispatching to the appropriate installer.
-  static Future<void> installTool(String tool,
-      {bool dryRun = false}) async {
+  static Future<void> installTool(String tool, {bool dryRun = false}) async {
     if (dryRun) {
       Logger.info('[DRY-RUN] Would install $tool');
       return;
@@ -56,13 +55,11 @@ abstract final class ToolInstallers {
 
   static Future<void> installGeminiCli() async {
     if (!CiProcessRunner.commandExists('npm')) {
-      Logger.error(
-          'npm is required to install Gemini CLI. Install Node.js first.');
+      Logger.error('npm is required to install Gemini CLI. Install Node.js first.');
       return;
     }
     Logger.info('Installing Gemini CLI via npm...');
-    CiProcessRunner.exec(
-        'npm', ['install', '-g', '@google/gemini-cli@latest']);
+    CiProcessRunner.exec('npm', ['install', '-g', '@google/gemini-cli@latest']);
   }
 
   static Future<void> installGitHubCli() async {
@@ -109,8 +106,7 @@ abstract final class ToolInstallers {
     } else if (Platform.isLinux) {
       CiProcessRunner.exec('sudo', ['apt', 'install', '-y', 'tree']);
     } else if (Platform.isWindows) {
-      Logger.info(
-          'tree is built-in on Windows (limited). For full tree: choco install tree');
+      Logger.info('tree is built-in on Windows (limited). For full tree: choco install tree');
     }
   }
 }

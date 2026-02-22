@@ -9,9 +9,7 @@ class DetermineVersionOptions {
   @CliOption(help: 'Write version outputs to \$GITHUB_OUTPUT for GitHub Actions')
   final bool outputGithubActions;
 
-  const DetermineVersionOptions({
-    this.outputGithubActions = false,
-  });
+  const DetermineVersionOptions({this.outputGithubActions = false});
 
   factory DetermineVersionOptions.fromArgResults(ArgResults results) {
     return _$parseDetermineVersionOptionsResult(results);

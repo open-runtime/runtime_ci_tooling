@@ -9,9 +9,7 @@ class TriageOptions {
   @CliOption(help: 'Override an existing triage lock')
   final bool force;
 
-  const TriageOptions({
-    this.force = false,
-  });
+  const TriageOptions({this.force = false});
 
   /// Parse triage options from ArgResults.
   factory TriageOptions.fromArgResults(ArgResults results) {

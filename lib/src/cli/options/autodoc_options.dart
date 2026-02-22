@@ -17,11 +17,7 @@ class AutodocOptions {
   @CliOption(help: 'Only generate for a specific module')
   final String? module;
 
-  const AutodocOptions({
-    this.init = false,
-    this.force = false,
-    this.module,
-  });
+  const AutodocOptions({this.init = false, this.force = false, this.module});
 
   factory AutodocOptions.fromArgResults(ArgResults results) {
     return _$parseAutodocOptionsResult(results);

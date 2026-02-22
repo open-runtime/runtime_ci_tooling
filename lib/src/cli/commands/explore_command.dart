@@ -25,8 +25,7 @@ class ExploreCommand extends Command<void> {
   final String name = 'explore';
 
   @override
-  final String description =
-      'Run Stage 1 Explorer Agent (Gemini 3 Pro Preview).';
+  final String description = 'Run Stage 1 Explorer Agent (Gemini 3 Pro Preview).';
 
   ExploreCommand() {
     VersionOptionsArgParser.populateParser(argParser);
@@ -45,45 +44,40 @@ class ExploreCommand extends Command<void> {
     Logger.header('Stage 1: Explorer Agent (Gemini 3 Pro Preview)');
 
     if (!GeminiUtils.geminiAvailable(warnOnly: true)) {
-      Logger.warn(
-          'Skipping explore stage (Gemini unavailable). No changelog data will be generated.');
+      Logger.warn('Skipping explore stage (Gemini unavailable). No changelog data will be generated.');
       return;
     }
 
     final ctx = RunContext.create(repoRoot, 'explore');
-    final prevTag = versionOpts.prevTag ??
-        VersionDetection.detectPrevTag(repoRoot, verbose: global.verbose);
-    final newVersion = versionOpts.version ??
-        VersionDetection.detectNextVersion(repoRoot, prevTag,
-            verbose: global.verbose);
+    final prevTag = versionOpts.prevTag ?? VersionDetection.detectPrevTag(repoRoot, verbose: global.verbose);
+    final newVersion =
+        versionOpts.version ?? VersionDetection.detectNextVersion(repoRoot, prevTag, verbose: global.verbose);
 
     Logger.info('Previous tag: $prevTag');
     Logger.info('New version: $newVersion');
     Logger.info('Run dir: ${ctx.runDir}');
 
     // Generate prompt via Dart template
-    final promptScriptPath =
-        PromptResolver.promptScript('gemini_changelog_prompt.dart');
+    final promptScriptPath = PromptResolver.promptScript('gemini_changelog_prompt.dart');
     Logger.info('Generating explorer prompt from $promptScriptPath...');
     if (!File(promptScriptPath).existsSync()) {
       Logger.error('Prompt script not found: $promptScriptPath');
-      Logger.error(
-          'Ensure runtime_ci_tooling is properly installed (dart pub get).');
+      Logger.error('Ensure runtime_ci_tooling is properly installed (dart pub get).');
       exit(1);
     }
     final prompt = CiProcessRunner.runSync(
-        'dart run $promptScriptPath "$prevTag" "$newVersion"', repoRoot,
-        verbose: global.verbose);
+      'dart run $promptScriptPath "$prevTag" "$newVersion"',
+      repoRoot,
+      verbose: global.verbose,
+    );
     if (prompt.isEmpty) {
-      Logger.error(
-          'Prompt generator produced empty output. Check $promptScriptPath');
+      Logger.error('Prompt generator produced empty output. Check $promptScriptPath');
       exit(1);
     }
     ctx.savePrompt('explore', prompt);
 
     if (global.dryRun) {
-      Logger.info(
-          '[DRY-RUN] Would run Gemini CLI with explorer prompt (${prompt.length} chars)');
+      Logger.info('[DRY-RUN] Would run Gemini CLI with explorer prompt (${prompt.length} chars)');
       return;
     }
 
@@ -132,8 +126,7 @@ class ExploreCommand extends Command<void> {
           Logger.info('  Tool calls: ${stats['tools']?['totalCalls']}');
         }
       } else if (result.exitCode != 0) {
-        Logger.warn(
-            'Gemini CLI produced no JSON output. Using fallback artifacts.');
+        Logger.warn('Gemini CLI produced no JSON output. Using fallback artifacts.');
       }
     } catch (e) {
       Logger.warn('Could not parse Gemini response as JSON: $e');
@@ -144,11 +137,7 @@ class ExploreCommand extends Command<void> {
     // Validate artifacts
     Logger.info('');
     Logger.info('Validating Stage 1 artifacts...');
-    final artifactNames = [
-      'commit_analysis.json',
-      'pr_data.json',
-      'breaking_changes.json',
-    ];
+    final artifactNames = ['commit_analysis.json', 'pr_data.json', 'breaking_changes.json'];
     for (final name in artifactNames) {
       final ctxPath = '${ctx.runDir}/explore/$name';
       final tmpPath = '/tmp/$name';
@@ -171,8 +160,7 @@ class ExploreCommand extends Command<void> {
           File(tmpPath).writeAsStringSync('{}');
         }
       } else {
-        Logger.warn(
-            'Missing: $name (Gemini may not have generated this artifact)');
+        Logger.warn('Missing: $name (Gemini may not have generated this artifact)');
         File(tmpPath).writeAsStringSync('{}');
       }
     }

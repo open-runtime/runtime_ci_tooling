@@ -14,10 +14,7 @@ class VersionOptions {
   @CliOption(help: 'Override version (skip auto-detection)')
   final String? version;
 
-  const VersionOptions({
-    this.prevTag,
-    this.version,
-  });
+  const VersionOptions({this.prevTag, this.version});
 
   /// Parse version options from ArgResults.
   factory VersionOptions.fromArgResults(ArgResults results) {

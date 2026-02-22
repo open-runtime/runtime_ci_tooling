@@ -17,8 +17,7 @@ class TriagePreReleaseCommand extends Command<void> {
   final String name = 'pre-release';
 
   @override
-  final String description =
-      'Scan issues for upcoming release (requires --prev-tag and --version).';
+  final String description = 'Scan issues for upcoming release (requires --prev-tag and --version).';
 
   TriagePreReleaseCommand() {
     VersionOptionsArgParser.populateParser(argParser);
@@ -37,8 +36,7 @@ class TriagePreReleaseCommand extends Command<void> {
     final triageOpts = TriageOptions.fromArgResults(argResults!);
 
     if (versionOpts.prevTag == null || versionOpts.version == null) {
-      Logger.error(
-          'pre-release requires --prev-tag <tag> and --version <ver>');
+      Logger.error('pre-release requires --prev-tag <tag> and --version <ver>');
       exit(1);
     }
 

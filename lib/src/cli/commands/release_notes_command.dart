@@ -33,8 +33,7 @@ class ReleaseNotesCommand extends Command<void> {
   final String name = 'release-notes';
 
   @override
-  final String description =
-      'Run Stage 3 Release Notes Author (Gemini 3 Pro Preview).';
+  final String description = 'Run Stage 3 Release Notes Author (Gemini 3 Pro Preview).';
 
   ReleaseNotesCommand() {
     VersionOptionsArgParser.populateParser(argParser);
@@ -56,31 +55,29 @@ class ReleaseNotesCommand extends Command<void> {
       Logger.warn('Skipping release notes (Gemini unavailable).');
       // Create minimal fallback
       final newVersion = versionOpts.version ?? 'unknown';
-      final fallback =
-          '# ${config.repoName} v$newVersion\n\nSee CHANGELOG.md for details.';
+      final fallback = '# ${config.repoName} v$newVersion\n\nSee CHANGELOG.md for details.';
       File('/tmp/release_notes_body.md').writeAsStringSync(fallback);
       return;
     }
 
     final ctx = RunContext.create(repoRoot, 'release-notes');
-    final prevTag = versionOpts.prevTag ??
-        VersionDetection.detectPrevTag(repoRoot, verbose: global.verbose);
-    final newVersion = versionOpts.version ??
-        VersionDetection.detectNextVersion(repoRoot, prevTag,
-            verbose: global.verbose);
+    final prevTag = versionOpts.prevTag ?? VersionDetection.detectPrevTag(repoRoot, verbose: global.verbose);
+    final newVersion =
+        versionOpts.version ?? VersionDetection.detectNextVersion(repoRoot, prevTag, verbose: global.verbose);
 
     // Derive bump type
     final currentVersion = CiProcessRunner.runSync(
-        "awk '/^version:/{print \$2}' pubspec.yaml", repoRoot,
-        verbose: global.verbose);
+      "awk '/^version:/{print \$2}' pubspec.yaml",
+      repoRoot,
+      verbose: global.verbose,
+    );
     final currentParts = currentVersion.split('.');
     final newParts = newVersion.split('.');
     String bumpType = 'minor';
     if (currentParts.length >= 3 && newParts.length >= 3) {
       if (int.tryParse(newParts[0]) != int.tryParse(currentParts[0])) {
         bumpType = 'major';
-      } else if (int.tryParse(newParts[1]) !=
-          int.tryParse(currentParts[1])) {
+      } else if (int.tryParse(newParts[1]) != int.tryParse(currentParts[1])) {
         bumpType = 'minor';
       } else {
         bumpType = 'patch';
@@ -93,26 +90,20 @@ class ReleaseNotesCommand extends Command<void> {
     Logger.info('Run dir: ${ctx.runDir}');
 
     // -- Gather VERIFIED contributor data BEFORE Gemini runs --
-    final releaseNotesDir =
-        Directory('$repoRoot/$kReleaseNotesDir/v$newVersion');
+    final releaseNotesDir = Directory('$repoRoot/$kReleaseNotesDir/v$newVersion');
     releaseNotesDir.createSync(recursive: true);
-    final verifiedContributors =
-        ReleaseUtils.gatherVerifiedContributors(repoRoot, prevTag);
-    File('${releaseNotesDir.path}/contributors.json').writeAsStringSync(
-        const JsonEncoder.withIndent('  ').convert(verifiedContributors));
-    Logger.info(
-        'Verified contributors: ${verifiedContributors.map((c) => '@${c['username']}').join(', ')}');
+    final verifiedContributors = ReleaseUtils.gatherVerifiedContributors(repoRoot, prevTag);
+    File(
+      '${releaseNotesDir.path}/contributors.json',
+    ).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(verifiedContributors));
+    Logger.info('Verified contributors: ${verifiedContributors.map((c) => '@${c['username']}').join(', ')}');
 
     // -- Load issue manifest for verified issue data --
     List<dynamic> verifiedIssues = [];
-    for (final path in [
-      '/tmp/issue_manifest.json',
-      '$repoRoot/$kCicdRunsDir/triage/issue_manifest.json',
-    ]) {
+    for (final path in ['/tmp/issue_manifest.json', '$repoRoot/$kCicdRunsDir/triage/issue_manifest.json']) {
       if (File(path).existsSync()) {
         try {
-          final manifest = json.decode(File(path).readAsStringSync())
-              as Map<String, dynamic>;
+          final manifest = json.decode(File(path).readAsStringSync()) as Map<String, dynamic>;
           verifiedIssues = (manifest['github_issues'] as List?) ?? [];
         } catch (_) {}
         break;
@@ -121,16 +112,17 @@ class ReleaseNotesCommand extends Command<void> {
     Logger.info('Verified issues: ${verifiedIssues.length}');
 
     // Generate prompt
-    final rnScript =
-        PromptResolver.promptScript('gemini_release_notes_author_prompt.dart');
+    final rnScript = PromptResolver.promptScript('gemini_release_notes_author_prompt.dart');
     Logger.info('Generating release notes prompt from $rnScript...');
     if (!File(rnScript).existsSync()) {
       Logger.error('Prompt script not found: $rnScript');
       exit(1);
     }
     final prompt = CiProcessRunner.runSync(
-        'dart run $rnScript "$prevTag" "$newVersion" "$bumpType"', repoRoot,
-        verbose: global.verbose);
+      'dart run $rnScript "$prevTag" "$newVersion" "$bumpType"',
+      repoRoot,
+      verbose: global.verbose,
+    );
     if (prompt.isEmpty) {
       Logger.error('Release notes prompt generator produced empty output.');
       exit(1);
@@ -138,8 +130,7 @@ class ReleaseNotesCommand extends Command<void> {
     ctx.savePrompt('release-notes', prompt);
 
     if (global.dryRun) {
-      Logger.info(
-          '[DRY-RUN] Would run Gemini CLI for release notes (${prompt.length} chars)');
+      Logger.info('[DRY-RUN] Would run Gemini CLI for release notes (${prompt.length} chars)');
       return;
     }
 
@@ -147,11 +138,7 @@ class ReleaseNotesCommand extends Command<void> {
 
     // Build @ includes
     final includes = <String>[];
-    final artifactNames = [
-      'commit_analysis.json',
-      'pr_data.json',
-      'breaking_changes.json',
-    ];
+    final artifactNames = ['commit_analysis.json', 'pr_data.json', 'breaking_changes.json'];
     for (final name in artifactNames) {
       if (File('/tmp/$name').existsSync()) {
         includes.add('@/tmp/$name');
@@ -192,8 +179,7 @@ class ReleaseNotesCommand extends Command<void> {
     if (result.exitCode != 0) {
       Logger.warn('Gemini CLI failed for release notes: ${result.stderr}');
       // Create fallback
-      final fallback =
-          '# ${config.repoName} v$newVersion\n\nSee CHANGELOG.md for details.';
+      final fallback = '# ${config.repoName} v$newVersion\n\nSee CHANGELOG.md for details.';
       File('/tmp/release_notes_body.md').writeAsStringSync(fallback);
       ctx.finalize(exitCode: result.exitCode);
       return;
@@ -216,14 +202,10 @@ class ReleaseNotesCommand extends Command<void> {
     }
 
     // Validate output files
-    final releaseNotesFile =
-        File('${releaseNotesDir.path}/release_notes.md');
-    final migrationFile =
-        File('${releaseNotesDir.path}/migration_guide.md');
-    final linkedIssuesFile =
-        File('${releaseNotesDir.path}/linked_issues.json');
-    final highlightsFile =
-        File('${releaseNotesDir.path}/highlights.md');
+    final releaseNotesFile = File('${releaseNotesDir.path}/release_notes.md');
+    final migrationFile = File('${releaseNotesDir.path}/migration_guide.md');
+    final linkedIssuesFile = File('${releaseNotesDir.path}/linked_issues.json');
+    final highlightsFile = File('${releaseNotesDir.path}/highlights.md');
 
     if (releaseNotesFile.existsSync()) {
       var content = releaseNotesFile.readAsStringSync();
@@ -234,8 +216,7 @@ class ReleaseNotesCommand extends Command<void> {
         content,
         verifiedContributors: verifiedContributors,
         verifiedIssues: verifiedIssues,
-        repoSlug: Platform.environment['GITHUB_REPOSITORY'] ??
-            '${config.repoOwner}/${config.repoName}',
+        repoSlug: Platform.environment['GITHUB_REPOSITORY'] ?? '${config.repoOwner}/${config.repoName}',
         repoRoot: repoRoot,
       );
       Logger.success('Post-processed release notes: ${content.length} chars');
@@ -245,10 +226,8 @@ class ReleaseNotesCommand extends Command<void> {
       File('/tmp/release_notes_body.md').writeAsStringSync(content);
       ctx.saveArtifact('release-notes', 'release_notes.md', content);
     } else {
-      Logger.warn(
-          'Gemini did not produce release_notes.md -- creating from CHANGELOG');
-      final fallback = ReleaseUtils.buildFallbackReleaseNotes(
-          repoRoot, newVersion, prevTag);
+      Logger.warn('Gemini did not produce release_notes.md -- creating from CHANGELOG');
+      final fallback = ReleaseUtils.buildFallbackReleaseNotes(repoRoot, newVersion, prevTag);
       releaseNotesDir.createSync(recursive: true);
       releaseNotesFile.writeAsStringSync(fallback);
       File('/tmp/release_notes_body.md').writeAsStringSync(fallback);
@@ -257,15 +236,13 @@ class ReleaseNotesCommand extends Command<void> {
 
     if (migrationFile.existsSync()) {
       Logger.success('Migration guide: ${migrationFile.lengthSync()} bytes');
-      File('/tmp/migration_guide.md')
-          .writeAsStringSync(migrationFile.readAsStringSync());
+      File('/tmp/migration_guide.md').writeAsStringSync(migrationFile.readAsStringSync());
     } else if (bumpType == 'major') {
       Logger.warn('Major release but no migration guide generated');
     }
 
     if (linkedIssuesFile.existsSync()) {
-      Logger.success(
-          'Linked issues: ${linkedIssuesFile.lengthSync()} bytes');
+      Logger.success('Linked issues: ${linkedIssuesFile.lengthSync()} bytes');
     }
 
     if (highlightsFile.existsSync()) {
@@ -273,16 +250,10 @@ class ReleaseNotesCommand extends Command<void> {
     }
 
     // Build rich step summary
-    final rnContent = releaseNotesFile.existsSync()
-        ? releaseNotesFile.readAsStringSync()
-        : '(not generated)';
-    final migContent =
-        migrationFile.existsSync() ? migrationFile.readAsStringSync() : '';
-    final linkedContent = linkedIssuesFile.existsSync()
-        ? linkedIssuesFile.readAsStringSync()
-        : '';
-    final hlContent =
-        highlightsFile.existsSync() ? highlightsFile.readAsStringSync() : '';
+    final rnContent = releaseNotesFile.existsSync() ? releaseNotesFile.readAsStringSync() : '(not generated)';
+    final migContent = migrationFile.existsSync() ? migrationFile.readAsStringSync() : '';
+    final linkedContent = linkedIssuesFile.existsSync() ? linkedIssuesFile.readAsStringSync() : '';
+    final hlContent = highlightsFile.existsSync() ? highlightsFile.readAsStringSync() : '';
 
     StepSummary.write('''
 ## Stage 3: Release Notes Author Complete
@@ -329,8 +300,7 @@ String _postProcessReleaseNotes(
   contributorsSection.writeln('## Contributors');
   contributorsSection.writeln();
   if (verifiedContributors.isNotEmpty) {
-    contributorsSection
-        .writeln('Thanks to everyone who contributed to this release:');
+    contributorsSection.writeln('Thanks to everyone who contributed to this release:');
     for (final c in verifiedContributors) {
       final username = c['username'] ?? '';
       if (username.isNotEmpty) {
@@ -369,21 +339,17 @@ String _postProcessReleaseNotes(
   );
 
   // -- Validate issue references throughout the document --
-  final issueRefs = RegExp(r'\(#(\d+)\)')
-      .allMatches(result)
-      .map((m) => int.parse(m.group(1)!))
-      .toSet();
+  final issueRefs = RegExp(r'\(#(\d+)\)').allMatches(result).map((m) => int.parse(m.group(1)!)).toSet();
   if (issueRefs.isNotEmpty) {
-    final validIssues =
-        verifiedIssues.map((i) => i['number'] as int? ?? 0).toSet();
+    final validIssues = verifiedIssues.map((i) => i['number'] as int? ?? 0).toSet();
     final fabricated = issueRefs.difference(validIssues);
 
     if (fabricated.isNotEmpty) {
       Logger.warn(
-          'Stripping ${fabricated.length} fabricated issue references: ${fabricated.map((n) => "#$n").join(", ")}');
+        'Stripping ${fabricated.length} fabricated issue references: ${fabricated.map((n) => "#$n").join(", ")}',
+      );
       for (final num in fabricated) {
-        result = result.replaceAll(
-            RegExp(r'- \[#' + num.toString() + r'\]\([^)]*\)[^\n]*\n'), '');
+        result = result.replaceAll(RegExp(r'- \[#' + num.toString() + r'\]\([^)]*\)[^\n]*\n'), '');
         result = result.replaceAll('(#$num)', '');
       }
     }

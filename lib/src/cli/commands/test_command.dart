@@ -24,11 +24,7 @@ class TestCommand extends Command<void> {
 
     Logger.header('Running dart test');
 
-    final result = Process.runSync(
-      Platform.resolvedExecutable,
-      ['test'],
-      workingDirectory: repoRoot,
-    );
+    final result = Process.runSync(Platform.resolvedExecutable, ['test'], workingDirectory: repoRoot);
 
     final stdout = (result.stdout as String).trim();
     if (stdout.isNotEmpty) print(stdout);

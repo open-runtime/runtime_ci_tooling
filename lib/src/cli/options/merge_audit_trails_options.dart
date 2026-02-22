@@ -13,10 +13,7 @@ class MergeAuditTrailsOptions {
   @CliOption(help: 'Output directory for merged audit trails')
   final String? outputDir;
 
-  const MergeAuditTrailsOptions({
-    this.incomingDir,
-    this.outputDir,
-  });
+  const MergeAuditTrailsOptions({this.incomingDir, this.outputDir});
 
   factory MergeAuditTrailsOptions.fromArgResults(ArgResults results) {
     return _$parseMergeAuditTrailsOptionsResult(results);

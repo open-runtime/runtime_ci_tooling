@@ -17,8 +17,7 @@ class VersionCommand extends Command<void> {
   final String name = 'version';
 
   @override
-  final String description =
-      'Show the next SemVer version (no side effects).';
+  final String description = 'Show the next SemVer version (no side effects).';
 
   VersionCommand() {
     VersionOptionsArgParser.populateParser(argParser);
@@ -36,29 +35,27 @@ class VersionCommand extends Command<void> {
 
     Logger.header('Version Detection');
 
-    final prevTag = versionOpts.prevTag ??
-        VersionDetection.detectPrevTag(repoRoot, verbose: global.verbose);
-    final newVersion = versionOpts.version ??
-        VersionDetection.detectNextVersion(repoRoot, prevTag,
-            verbose: global.verbose);
+    final prevTag = versionOpts.prevTag ?? VersionDetection.detectPrevTag(repoRoot, verbose: global.verbose);
+    final newVersion =
+        versionOpts.version ?? VersionDetection.detectNextVersion(repoRoot, prevTag, verbose: global.verbose);
     final currentVersion = CiProcessRunner.runSync(
-        "awk '/^version:/{print \$2}' pubspec.yaml", repoRoot,
-        verbose: global.verbose);
+      "awk '/^version:/{print \$2}' pubspec.yaml",
+      repoRoot,
+      verbose: global.verbose,
+    );
 
     Logger.info('Current version (pubspec.yaml): $currentVersion');
     Logger.info('Previous tag: $prevTag');
     Logger.info('Next version: $newVersion');
 
     // Save version bump rationale if Gemini produced one
-    final rationaleFile = File(
-        '$repoRoot/$kCicdRunsDir/version_analysis/version_bump_rationale.md');
+    final rationaleFile = File('$repoRoot/$kCicdRunsDir/version_analysis/version_bump_rationale.md');
     if (rationaleFile.existsSync()) {
       final bumpDir = Directory('$repoRoot/$kVersionBumpsDir');
       bumpDir.createSync(recursive: true);
       final targetPath = '${bumpDir.path}/v$newVersion.md';
       rationaleFile.copySync(targetPath);
-      Logger.success(
-          'Version bump rationale saved to $kVersionBumpsDir/v$newVersion.md');
+      Logger.success('Version bump rationale saved to $kVersionBumpsDir/v$newVersion.md');
     }
   }
 }

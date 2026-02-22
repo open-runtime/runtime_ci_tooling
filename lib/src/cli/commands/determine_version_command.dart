@@ -25,8 +25,7 @@ class DetermineVersionCommand extends Command<void> {
   final String name = 'determine-version';
 
   @override
-  final String description =
-      'Determine SemVer bump via Gemini + regex (CI: --output-github-actions).';
+  final String description = 'Determine SemVer bump via Gemini + regex (CI: --output-github-actions).';
 
   DetermineVersionCommand() {
     DetermineVersionOptionsArgParser.populateParser(argParser);
@@ -48,22 +47,21 @@ class DetermineVersionCommand extends Command<void> {
 
     final outputGha = dvOpts.outputGithubActions;
 
-    final prevTag = versionOpts.prevTag ??
-        VersionDetection.detectPrevTag(repoRoot, verbose: global.verbose);
-    final newVersion = versionOpts.version ??
-        VersionDetection.detectNextVersion(repoRoot, prevTag,
-            verbose: global.verbose);
+    final prevTag = versionOpts.prevTag ?? VersionDetection.detectPrevTag(repoRoot, verbose: global.verbose);
+    final newVersion =
+        versionOpts.version ?? VersionDetection.detectNextVersion(repoRoot, prevTag, verbose: global.verbose);
     final currentVersion = CiProcessRunner.runSync(
-        "awk '/^version:/{print \$2}' pubspec.yaml", repoRoot,
-        verbose: global.verbose);
+      "awk '/^version:/{print \$2}' pubspec.yaml",
+      repoRoot,
+      verbose: global.verbose,
+    );
 
     // Determine if we should release
     var shouldRelease = newVersion != currentVersion;
 
     // Safety net: if the tag already exists, skip release regardless
     if (shouldRelease) {
-      final tagCheck = Process.runSync('git', ['rev-parse', 'v$newVersion'],
-          workingDirectory: repoRoot);
+      final tagCheck = Process.runSync('git', ['rev-parse', 'v$newVersion'], workingDirectory: repoRoot);
       if (tagCheck.exitCode == 0) {
         Logger.warn('Tag v$newVersion already exists. Skipping release.');
         shouldRelease = false;
@@ -77,25 +75,26 @@ class DetermineVersionCommand extends Command<void> {
 
     // Save version bump rationale if Gemini produced one
     if (shouldRelease) {
-      final rationaleFile = File(
-          '$repoRoot/$kCicdRunsDir/version_analysis/version_bump_rationale.md');
+      final rationaleFile = File('$repoRoot/$kCicdRunsDir/version_analysis/version_bump_rationale.md');
       final bumpDir = Directory('$repoRoot/$kVersionBumpsDir');
       bumpDir.createSync(recursive: true);
       final targetPath = '${bumpDir.path}/v$newVersion.md';
 
       if (rationaleFile.existsSync()) {
         rationaleFile.copySync(targetPath);
-        Logger.success(
-            'Version bump rationale saved to $kVersionBumpsDir/v$newVersion.md');
+        Logger.success('Version bump rationale saved to $kVersionBumpsDir/v$newVersion.md');
       } else {
         // Generate basic rationale
         final commitCount = CiProcessRunner.runSync(
-            'git rev-list --count "$prevTag"..HEAD 2>/dev/null', repoRoot,
-            verbose: global.verbose);
+          'git rev-list --count "$prevTag"..HEAD 2>/dev/null',
+          repoRoot,
+          verbose: global.verbose,
+        );
         final commits = CiProcessRunner.runSync(
-            'git log "$prevTag"..HEAD --oneline --no-merges 2>/dev/null | head -20',
-            repoRoot,
-            verbose: global.verbose);
+          'git log "$prevTag"..HEAD --oneline --no-merges 2>/dev/null | head -20',
+          repoRoot,
+          verbose: global.verbose,
+        );
         File(targetPath).writeAsStringSync(
           '# Version Bump: v$newVersion\n\n'
           '**Date**: ${DateTime.now().toUtc().toIso8601String()}\n'
@@ -103,8 +102,7 @@ class DetermineVersionCommand extends Command<void> {
           '**Commits**: $commitCount\n\n'
           '## Commits\n\n$commits\n',
         );
-        Logger.success(
-            'Basic version rationale saved to $kVersionBumpsDir/v$newVersion.md');
+        Logger.success('Basic version rationale saved to $kVersionBumpsDir/v$newVersion.md');
       }
     }
 
@@ -139,8 +137,7 @@ class DetermineVersionCommand extends Command<void> {
     if (currentParts.length >= 3 && newParts.length >= 3) {
       if (int.tryParse(newParts[0]) != int.tryParse(currentParts[0])) {
         bumpType = 'major';
-      } else if (int.tryParse(newParts[1]) !=
-          int.tryParse(currentParts[1])) {
+      } else if (int.tryParse(newParts[1]) != int.tryParse(currentParts[1])) {
         bumpType = 'minor';
       } else {
         bumpType = 'patch';
@@ -148,8 +145,7 @@ class DetermineVersionCommand extends Command<void> {
     }
 
     // Read version bump rationale for summary
-    final rationaleContent =
-        FileUtils.readFileOr('$repoRoot/$kVersionBumpsDir/v$newVersion.md');
+    final rationaleContent = FileUtils.readFileOr('$repoRoot/$kVersionBumpsDir/v$newVersion.md');
 
     StepSummary.write('''
 ## Version Determination

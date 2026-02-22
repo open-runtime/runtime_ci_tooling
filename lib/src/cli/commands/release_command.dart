@@ -61,79 +61,70 @@ class ReleaseCommand extends Command<void> {
   }
 
   /// Inline version detection (from _runVersion).
-  Future<void> _runVersion(
-      String repoRoot, GlobalOptions global, VersionOptions versionOpts) async {
+  Future<void> _runVersion(String repoRoot, GlobalOptions global, VersionOptions versionOpts) async {
     Logger.header('Version Detection');
 
-    final prevTag = versionOpts.prevTag ??
-        VersionDetection.detectPrevTag(repoRoot, verbose: global.verbose);
-    final newVersion = versionOpts.version ??
-        VersionDetection.detectNextVersion(repoRoot, prevTag,
-            verbose: global.verbose);
+    final prevTag = versionOpts.prevTag ?? VersionDetection.detectPrevTag(repoRoot, verbose: global.verbose);
+    final newVersion =
+        versionOpts.version ?? VersionDetection.detectNextVersion(repoRoot, prevTag, verbose: global.verbose);
     final currentVersion = CiProcessRunner.runSync(
-        "awk '/^version:/{print \$2}' pubspec.yaml", repoRoot,
-        verbose: global.verbose);
+      "awk '/^version:/{print \$2}' pubspec.yaml",
+      repoRoot,
+      verbose: global.verbose,
+    );
 
     Logger.info('Current version (pubspec.yaml): $currentVersion');
     Logger.info('Previous tag: $prevTag');
     Logger.info('Next version: $newVersion');
 
-    final rationaleFile = File(
-        '$repoRoot/$kCicdRunsDir/version_analysis/version_bump_rationale.md');
+    final rationaleFile = File('$repoRoot/$kCicdRunsDir/version_analysis/version_bump_rationale.md');
     if (rationaleFile.existsSync()) {
       final bumpDir = Directory('$repoRoot/$kVersionBumpsDir');
       bumpDir.createSync(recursive: true);
       final targetPath = '${bumpDir.path}/v$newVersion.md';
       rationaleFile.copySync(targetPath);
-      Logger.success(
-          'Version bump rationale saved to $kVersionBumpsDir/v$newVersion.md');
+      Logger.success('Version bump rationale saved to $kVersionBumpsDir/v$newVersion.md');
     }
   }
 
   /// Inline explore stage (from _runExplore).
-  Future<void> _runExplore(
-      String repoRoot, GlobalOptions global, VersionOptions versionOpts) async {
+  Future<void> _runExplore(String repoRoot, GlobalOptions global, VersionOptions versionOpts) async {
     Logger.header('Stage 1: Explorer Agent (Gemini 3 Pro Preview)');
 
     if (!GeminiUtils.geminiAvailable(warnOnly: true)) {
-      Logger.warn(
-          'Skipping explore stage (Gemini unavailable). No changelog data will be generated.');
+      Logger.warn('Skipping explore stage (Gemini unavailable). No changelog data will be generated.');
       return;
     }
 
     final ctx = RunContext.create(repoRoot, 'explore');
-    final prevTag = versionOpts.prevTag ??
-        VersionDetection.detectPrevTag(repoRoot, verbose: global.verbose);
-    final newVersion = versionOpts.version ??
-        VersionDetection.detectNextVersion(repoRoot, prevTag,
-            verbose: global.verbose);
+    final prevTag = versionOpts.prevTag ?? VersionDetection.detectPrevTag(repoRoot, verbose: global.verbose);
+    final newVersion =
+        versionOpts.version ?? VersionDetection.detectNextVersion(repoRoot, prevTag, verbose: global.verbose);
 
     Logger.info('Previous tag: $prevTag');
     Logger.info('New version: $newVersion');
     Logger.info('Run dir: ${ctx.runDir}');
 
-    final promptScriptPath =
-        PromptResolver.promptScript('gemini_changelog_prompt.dart');
+    final promptScriptPath = PromptResolver.promptScript('gemini_changelog_prompt.dart');
     Logger.info('Generating explorer prompt from $promptScriptPath...');
     if (!File(promptScriptPath).existsSync()) {
       Logger.error('Prompt script not found: $promptScriptPath');
-      Logger.error(
-          'Ensure runtime_ci_tooling is properly installed (dart pub get).');
+      Logger.error('Ensure runtime_ci_tooling is properly installed (dart pub get).');
       exit(1);
     }
     final prompt = CiProcessRunner.runSync(
-        'dart run $promptScriptPath "$prevTag" "$newVersion"', repoRoot,
-        verbose: global.verbose);
+      'dart run $promptScriptPath "$prevTag" "$newVersion"',
+      repoRoot,
+      verbose: global.verbose,
+    );
     if (prompt.isEmpty) {
-      Logger.error(
-          'Prompt generator produced empty output. Check $promptScriptPath');
+      Logger.error('Prompt generator produced empty output. Check $promptScriptPath');
       exit(1);
     }
     ctx.savePrompt('explore', prompt);
 
     if (global.dryRun) {
-      Logger.info(
-          '[DRY-RUN] Would run Gemini CLI with explorer prompt (${prompt.length} chars)');
+      Logger.info('[DRY-RUN] Would run Gemini CLI with explorer prompt (${prompt.length} chars)');
       return;
     }
 
@@ -179,8 +170,7 @@ class ReleaseCommand extends Command<void> {
           Logger.info('  Tool calls: ${stats['tools']?['totalCalls']}');
         }
       } else if (result.exitCode != 0) {
-        Logger.warn(
-            'Gemini CLI produced no JSON output. Using fallback artifacts.');
+        Logger.warn('Gemini CLI produced no JSON output. Using fallback artifacts.');
       }
     } catch (e) {
       Logger.warn('Could not parse Gemini response as JSON: $e');
@@ -190,11 +180,7 @@ class ReleaseCommand extends Command<void> {
 
     Logger.info('');
     Logger.info('Validating Stage 1 artifacts...');
-    final artifactNames = [
-      'commit_analysis.json',
-      'pr_data.json',
-      'breaking_changes.json',
-    ];
+    final artifactNames = ['commit_analysis.json', 'pr_data.json', 'breaking_changes.json'];
     for (final name in artifactNames) {
       final ctxPath = '${ctx.runDir}/explore/$name';
       final tmpPath = '/tmp/$name';
@@ -210,22 +196,19 @@ class ReleaseCommand extends Command<void> {
         try {
           final content = source.readAsStringSync();
           json.decode(content);
-          Logger.success(
-              'Valid: ${source.path} (${source.lengthSync()} bytes)');
+          Logger.success('Valid: ${source.path} (${source.lengthSync()} bytes)');
           source.copySync(tmpPath);
         } catch (e) {
           Logger.warn('Invalid JSON: ${source.path} -- $e');
           File(tmpPath).writeAsStringSync('{}');
         }
       } else {
-        Logger.warn(
-            'Missing: $name (Gemini may not have generated this artifact)');
+        Logger.warn('Missing: $name (Gemini may not have generated this artifact)');
         File(tmpPath).writeAsStringSync('{}');
       }
     }
 
-    Logger.success(
-        'Stage 1 complete. Artifacts available in /tmp/ for upload.');
+    Logger.success('Stage 1 complete. Artifacts available in /tmp/ for upload.');
 
     final commitJson = FileUtils.readFileOr('/tmp/commit_analysis.json');
     final prJson = FileUtils.readFileOr('/tmp/pr_data.json');
@@ -249,8 +232,7 @@ ${StepSummary.artifactLink()}
   }
 
   /// Inline compose stage (from _runCompose).
-  Future<void> _runCompose(
-      String repoRoot, GlobalOptions global, VersionOptions versionOpts) async {
+  Future<void> _runCompose(String repoRoot, GlobalOptions global, VersionOptions versionOpts) async {
     Logger.header('Stage 2: Changelog Composer (Gemini Pro)');
 
     if (!GeminiUtils.geminiAvailable(warnOnly: true)) {
@@ -259,26 +241,25 @@ ${StepSummary.artifactLink()}
     }
 
     final ctx = RunContext.create(repoRoot, 'compose');
-    final prevTag = versionOpts.prevTag ??
-        VersionDetection.detectPrevTag(repoRoot, verbose: global.verbose);
-    final newVersion = versionOpts.version ??
-        VersionDetection.detectNextVersion(repoRoot, prevTag,
-            verbose: global.verbose);
+    final prevTag = versionOpts.prevTag ?? VersionDetection.detectPrevTag(repoRoot, verbose: global.verbose);
+    final newVersion =
+        versionOpts.version ?? VersionDetection.detectNextVersion(repoRoot, prevTag, verbose: global.verbose);
 
     Logger.info('Previous tag: $prevTag');
     Logger.info('New version: $newVersion');
     Logger.info('Run dir: ${ctx.runDir}');
 
-    final composerScript =
-        PromptResolver.promptScript('gemini_changelog_composer_prompt.dart');
+    final composerScript = PromptResolver.promptScript('gemini_changelog_composer_prompt.dart');
     Logger.info('Generating composer prompt from $composerScript...');
     if (!File(composerScript).existsSync()) {
       Logger.error('Prompt script not found: $composerScript');
       exit(1);
     }
     final prompt = CiProcessRunner.runSync(
-        'dart run $composerScript "$prevTag" "$newVersion"', repoRoot,
-        verbose: global.verbose);
+      'dart run $composerScript "$prevTag" "$newVersion"',
+      repoRoot,
+      verbose: global.verbose,
+    );
     if (prompt.isEmpty) {
       Logger.error('Composer prompt generator produced empty output.');
       exit(1);
@@ -286,19 +267,14 @@ ${StepSummary.artifactLink()}
     ctx.savePrompt('compose', prompt);
 
     if (global.dryRun) {
-      Logger.info(
-          '[DRY-RUN] Would run Gemini CLI with composer prompt (${prompt.length} chars)');
+      Logger.info('[DRY-RUN] Would run Gemini CLI with composer prompt (${prompt.length} chars)');
       return;
     }
 
     final promptPath = ctx.artifactPath('compose', 'prompt.txt');
 
     final includes = <String>[];
-    final artifactNames = [
-      'commit_analysis.json',
-      'pr_data.json',
-      'breaking_changes.json',
-    ];
+    final artifactNames = ['commit_analysis.json', 'pr_data.json', 'breaking_changes.json'];
     for (final name in artifactNames) {
       if (File('/tmp/$name').existsSync()) {
         includes.add('@/tmp/$name');
@@ -364,8 +340,7 @@ ${StepSummary.artifactLink()}
           Logger.info('  Duration: ${stats['session']?['duration']}ms');
         }
       } else if (result.exitCode != 0) {
-        Logger.warn(
-            'Gemini CLI produced no JSON output for compose stage.');
+        Logger.warn('Gemini CLI produced no JSON output for compose stage.');
       }
     } catch (e) {
       Logger.warn('Could not parse Gemini response as JSON: $e');
@@ -374,23 +349,19 @@ ${StepSummary.artifactLink()}
     String changelogContent = '';
     try {
       if (File('$repoRoot/CHANGELOG.md').existsSync()) {
-        changelogContent =
-            File('$repoRoot/CHANGELOG.md').readAsStringSync();
+        changelogContent = File('$repoRoot/CHANGELOG.md').readAsStringSync();
         if (changelogContent.contains('## [$newVersion]')) {
           Logger.success('CHANGELOG.md updated with v$newVersion entry');
         } else {
-          Logger.warn(
-              'CHANGELOG.md exists but does not contain a [$newVersion] entry');
+          Logger.warn('CHANGELOG.md exists but does not contain a [$newVersion] entry');
         }
       }
     } catch (e) {
       Logger.warn('Could not read CHANGELOG.md (encoding error): $e');
       try {
         final bytes = File('$repoRoot/CHANGELOG.md').readAsBytesSync();
-        changelogContent =
-            String.fromCharCodes(bytes.where((b) => b < 128));
-        Logger.info(
-            'Read CHANGELOG.md with ASCII fallback (${changelogContent.length} chars)');
+        changelogContent = String.fromCharCodes(bytes.where((b) => b < 128));
+        Logger.info('Read CHANGELOG.md with ASCII fallback (${changelogContent.length} chars)');
       } catch (_) {
         changelogContent = '';
       }

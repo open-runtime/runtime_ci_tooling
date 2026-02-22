@@ -6,8 +6,7 @@ part of 'triage_options.dart';
 // CliGenerator
 // **************************************************************************
 
-TriageOptions _$parseTriageOptionsResult(ArgResults result) =>
-    TriageOptions(force: result['force'] as bool);
+TriageOptions _$parseTriageOptionsResult(ArgResults result) => TriageOptions(force: result['force'] as bool);
 
 ArgParser _$populateTriageOptionsParser(ArgParser parser) =>
     parser..addFlag('force', help: 'Override an existing triage lock');

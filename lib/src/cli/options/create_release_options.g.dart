@@ -7,21 +7,13 @@ part of 'create_release_options.dart';
 // **************************************************************************
 
 CreateReleaseOptions _$parseCreateReleaseOptionsResult(ArgResults result) =>
-    CreateReleaseOptions(
-      artifactsDir: result['artifacts-dir'] as String?,
-      repo: result['repo'] as String?,
-    );
+    CreateReleaseOptions(artifactsDir: result['artifacts-dir'] as String?, repo: result['repo'] as String?);
 
 ArgParser _$populateCreateReleaseOptionsParser(ArgParser parser) => parser
-  ..addOption(
-    'artifacts-dir',
-    help: 'Directory containing downloaded CI artifacts',
-  )
+  ..addOption('artifacts-dir', help: 'Directory containing downloaded CI artifacts')
   ..addOption('repo', help: 'GitHub repository slug owner/repo');
 
-final _$parserForCreateReleaseOptions = _$populateCreateReleaseOptionsParser(
-  ArgParser(),
-);
+final _$parserForCreateReleaseOptions = _$populateCreateReleaseOptionsParser(ArgParser());
 
 CreateReleaseOptions parseCreateReleaseOptions(List<String> args) {
   final result = _$parserForCreateReleaseOptions.parse(args);

@@ -17,11 +17,7 @@ class PostReleaseTriageOptions {
   @CliOption(help: 'Path to issue_manifest.json')
   final String? manifest;
 
-  const PostReleaseTriageOptions({
-    this.releaseTag,
-    this.releaseUrl,
-    this.manifest,
-  });
+  const PostReleaseTriageOptions({this.releaseTag, this.releaseUrl, this.manifest});
 
   factory PostReleaseTriageOptions.fromArgResults(ArgResults results) {
     return _$parsePostReleaseTriageOptionsResult(results);

@@ -16,10 +16,7 @@ class GlobalOptions {
   @CliOption(abbr: 'v', help: 'Show detailed command output')
   final bool verbose;
 
-  const GlobalOptions({
-    this.dryRun = false,
-    this.verbose = false,
-  });
+  const GlobalOptions({this.dryRun = false, this.verbose = false});
 
   /// Parse global options from ArgResults.
   factory GlobalOptions.fromArgResults(ArgResults results) {

@@ -24,11 +24,11 @@ class AnalyzeCommand extends Command<void> {
 
     Logger.header('Running dart analyze');
 
-    final result = Process.runSync(
-      Platform.resolvedExecutable,
-      ['analyze', '--fatal-infos=false', '--fatal-warnings=false'],
-      workingDirectory: repoRoot,
-    );
+    final result = Process.runSync(Platform.resolvedExecutable, [
+      'analyze',
+      '--fatal-infos=false',
+      '--fatal-warnings=false',
+    ], workingDirectory: repoRoot);
 
     final stdout = (result.stdout as String).trim();
     if (stdout.isNotEmpty) print(stdout);

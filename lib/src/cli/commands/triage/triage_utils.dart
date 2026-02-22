@@ -15,22 +15,18 @@ bool acquireTriageLock(bool force) {
 
   if (lockFile.existsSync()) {
     try {
-      final lockData =
-          json.decode(lockFile.readAsStringSync()) as Map<String, dynamic>;
+      final lockData = json.decode(lockFile.readAsStringSync()) as Map<String, dynamic>;
       final lockPid = lockData['pid'] as int;
 
       try {
         Process.killPid(lockPid, ProcessSignal.sigusr1);
         // Process exists -- another triage is running
         if (!force) {
-          Logger.error(
-              'Triage already running (PID: $lockPid, started: ${lockData['started']}).');
-          Logger.error(
-              'Use --force to override, or wait for it to finish.');
+          Logger.error('Triage already running (PID: $lockPid, started: ${lockData['started']}).');
+          Logger.error('Use --force to override, or wait for it to finish.');
           return false;
         }
-        Logger.warn(
-            'Warning: Overriding existing lock (PID: $lockPid) with --force');
+        Logger.warn('Warning: Overriding existing lock (PID: $lockPid) with --force');
       } catch (_) {
         // Process doesn't exist -- stale lock, safe to clean up
         Logger.info('Cleaned up stale lock from PID $lockPid');
@@ -42,8 +38,7 @@ bool acquireTriageLock(bool force) {
   }
 
   // Write our lock
-  lockFile.writeAsStringSync(
-      json.encode({'pid': pid, 'started': DateTime.now().toIso8601String()}));
+  lockFile.writeAsStringSync(json.encode({'pid': pid, 'started': DateTime.now().toIso8601String()}));
   return true;
 }
 
@@ -59,11 +54,7 @@ void releaseTriageLock() {
 
 /// Create a unique run directory for this triage session.
 String createTriageRunDir(String repoRoot) {
-  final timestamp = DateTime.now()
-      .toIso8601String()
-      .replaceAll(':', '-')
-      .replaceAll('.', '-')
-      .substring(0, 19);
+  final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').replaceAll('.', '-').substring(0, 19);
   final runId = 'triage_${timestamp}_$pid';
   final runDir = Directory('$repoRoot/.cicd_runs/$runId');
   runDir.createSync(recursive: true);
@@ -83,13 +74,11 @@ void saveCheckpoint(String runDir, GamePlan plan, String lastPhase) {
     }),
   );
   Logger.info('Checkpoint saved to $runDir/checkpoint.json');
-  Logger.info(
-      'Resume with: manage_cicd triage resume ${runDir.split('/').last}');
+  Logger.info('Resume with: manage_cicd triage resume ${runDir.split('/').last}');
 }
 
 /// Load cached investigation results from a game plan.
-Map<int, List<InvestigationResult>> loadCachedResults(
-    String runDir, GamePlan plan) {
+Map<int, List<InvestigationResult>> loadCachedResults(String runDir, GamePlan plan) {
   final results = <int, List<InvestigationResult>>{};
   for (final issue in plan.issues) {
     results[issue.number] = [];
@@ -107,11 +96,8 @@ List<TriageDecision> loadCachedDecisions(String runDir) {
   final decisionsFile = File('$runDir/triage_decisions.json');
   if (!decisionsFile.existsSync()) return [];
   try {
-    final data = json.decode(decisionsFile.readAsStringSync())
-        as Map<String, dynamic>;
-    return (data['decisions'] as List<dynamic>)
-        .map((d) => TriageDecision.fromJson(d as Map<String, dynamic>))
-        .toList();
+    final data = json.decode(decisionsFile.readAsStringSync()) as Map<String, dynamic>;
+    return (data['decisions'] as List<dynamic>).map((d) => TriageDecision.fromJson(d as Map<String, dynamic>)).toList();
   } catch (_) {
     return [];
   }
@@ -122,8 +108,7 @@ String? findLatestManifest(String repoRoot) {
   final runsDir = Directory('$repoRoot/.cicd_runs');
   if (!runsDir.existsSync()) return null;
 
-  final runs = runsDir.listSync().whereType<Directory>().toList()
-    ..sort((a, b) => b.path.compareTo(a.path));
+  final runs = runsDir.listSync().whereType<Directory>().toList()..sort((a, b) => b.path.compareTo(a.path));
 
   for (final run in runs) {
     final manifest = File('${run.path}/issue_manifest.json');
