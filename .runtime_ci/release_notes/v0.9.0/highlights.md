@@ -1,0 +1,4 @@
+- Added the `update-all` subcommand to batch-update managed packages recursively using a concurrent worker pool.
+- Dramatically improved `consumers` tooling performance with a GitHub code search prefilter and concurrent processing workers.
+- Introduced config-driven CI workflow generation using `.runtime_ci/config.json` that preserves user-customized sections across updates.
+- Enhanced the git pre-commit hook to automatically strip `resolution: workspace` from `pubspec.yaml` to maintain standalone CI compatibility.

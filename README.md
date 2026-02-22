@@ -19,7 +19,7 @@ Add `runtime_ci_tooling` to your `dev_dependencies`:
 
 ```yaml
 dev_dependencies:
-  runtime_ci_tooling: ^0.8.0
+  runtime_ci_tooling: ^0.9.0
 ```
 
 Or run:
@@ -34,7 +34,7 @@ The tooling expects configuration to be present in the `.runtime_ci/` directory.
 You can generate a default configuration and scaffold workflows using:
 
 ```bash
-dart run scripts/manage_cicd.dart init
+dart run bin/manage_cicd.dart init
 ```
 
 This will create:
@@ -44,14 +44,14 @@ This will create:
 
 ## Usage
 
-As of version **v0.7.0**, tools are available as script wrappers in `scripts/` instead of `bin/` executables, and CLI options are strictly typed.
+As of version **v0.9.0**, tools are available as executables in `bin/`, and CLI options are strictly typed.
 
 ### Manage CI/CD
 
 The main entry point for CI/CD operations.
 
 ```bash
-dart run scripts/manage_cicd.dart <command> [options]
+dart run bin/manage_cicd.dart <command> [options]
 ```
 
 **Common Commands:**
@@ -59,6 +59,8 @@ dart run scripts/manage_cicd.dart <command> [options]
 - `validate`: Validate configuration files.
 - `init`: Initialize configuration (`config.json`, `autodoc.json`) and workflows.
 - `update`: Update templates, configs, and workflows from runtime_ci_tooling.
+- `update-all`: Discover and update all runtime_ci_tooling packages under a root directory.
+- `consumers`: Discover runtime_ci_tooling consumers and sync latest release data.
 - `release`: Run the full local release pipeline.
 - `triage <N>`: Run issue triage for a single issue.
 - `explore`: Run Stage 1 Explorer Agent.
@@ -67,23 +69,23 @@ dart run scripts/manage_cicd.dart <command> [options]
 - `autodoc`: Generate/update module documentation.
 - `status`: Show current CI/CD configuration status.
 
-Run `dart run scripts/manage_cicd.dart --help` for full usage details.
+Run `dart run bin/manage_cicd.dart --help` for full usage details.
 
 ### Triage CLI
 
 Specialized tool for issue triage and release management interactions.
 
 ```bash
-dart run scripts/triage_cli.dart <command> [options]
+dart run bin/triage_cli.dart <command> [options]
 ```
 
 **Usage Examples:**
-- **Single Issue**: `dart run scripts/triage_cli.dart <issue_number>`
-- **Auto Triage**: `dart run scripts/triage_cli.dart --auto`
-- **Pre-Release Scan**: `dart run scripts/triage_cli.dart --pre-release --prev-tag v0.7.1 --version 0.8.0`
-- **Post-Release Loop**: `dart run scripts/triage_cli.dart --post-release --version 0.8.0 --release-tag v0.8.0`
+- **Single Issue**: `dart run bin/triage_cli.dart <issue_number>`
+- **Auto Triage**: `dart run bin/triage_cli.dart --auto`
+- **Pre-Release Scan**: `dart run bin/triage_cli.dart --pre-release --prev-tag v0.8.0 --version 0.9.0`
+- **Post-Release Loop**: `dart run bin/triage_cli.dart --post-release --version 0.9.0 --release-tag v0.9.0`
 
-Run `dart run scripts/triage_cli.dart --help` for full usage details.
+Run `dart run bin/triage_cli.dart --help` for full usage details.
 
 ### Documentation Generators
 

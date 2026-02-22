@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-02-22
+
+### Added
+- Added `update-all` command to batch-update managed packages
+- Added concurrent workers, GitHub code search prefilter, and snapshot identity to the `consumers` command
+- Extended pre-commit hook to detect and strip `resolution: workspace` from staged `pubspec.yaml` files
+
+### Changed
+- Updated consumer package metadata to include `usage_signals` and snapshot tests
+- Bumped `autodoc` and `compose-artifacts` CI timeouts to 60 minutes
+- Changed version bump logic to ensure all commit types trigger at least a patch release
+
+### Fixed
+- Fixed standalone CI compatibility by removing `resolution: workspace` from `pubspec.yaml`
+- Fixed `create-release` command to handle concurrent Autodoc commits using `git pull --rebase`
+- Prevented LFS clone failures in CI templates by adding `GIT_LFS_SKIP_SMUDGE=1` to `dart pub get` steps
+- Guaranteed required CI artifacts exist by adding shell fallbacks and removing `continue-on-error`
+- Reverted formatting regressions in `consumers_command.dart`
+
 ## [0.8.0] - 2026-02-22
 
 ### Added
@@ -81,6 +100,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed `git add` failure in release process by adding files individually (commit 1d45361)
 
+[0.9.0]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.6.0...v0.7.0
