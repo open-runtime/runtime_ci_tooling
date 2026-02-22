@@ -47,7 +47,7 @@ void main(List<String> args) {
 
   // Check for gRPC services
   final services = _runSync('grep -r "^service " $sourceDir 2>/dev/null || echo "(no services)"');
-  final messages = _runSync('grep -c "^message " $sourceDir/*.proto 2>/dev/null || echo "0"');
+  final messages = _runSync('grep -rn "^message " $sourceDir 2>/dev/null | head -30');
 
   print('''
 You are a documentation writer for the **$moduleName** module of the
@@ -76,6 +76,11 @@ $libTree
 ### Services Defined
 ```
 $services
+```
+
+### Key Message Types
+```
+$messages
 ```
 
 ## Proto File Preview (first file)

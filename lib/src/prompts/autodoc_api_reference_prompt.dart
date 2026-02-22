@@ -31,6 +31,23 @@ void main(List<String> args) {
 
   final protoContent = _truncate(allProtoContent.toString(), 60000);
 
+  // Check for generated Dart code
+  String dartPreview = '';
+  if (libDir.isNotEmpty && Directory(libDir).existsSync()) {
+    final generatedFiles = _runSync(
+      'find $libDir -name "*.pb.dart" -o -name "*.pbgrpc.dart" 2>/dev/null | head -5',
+    );
+    if (generatedFiles.isNotEmpty) {
+      final buf = StringBuffer();
+      for (final file in generatedFiles.split('\n').where((f) => f.isNotEmpty)) {
+        buf.writeln('// === $file ===');
+        buf.writeln(_truncate(_runSync('cat "$file"'), 10000));
+        buf.writeln();
+      }
+      dartPreview = _truncate(buf.toString(), 30000);
+    }
+  }
+
   print('''
 You are a documentation writer generating an API reference for the
 **$moduleName** module of the $pkg Dart package.
@@ -40,6 +57,8 @@ You are a documentation writer generating an API reference for the
 ```protobuf
 $protoContent
 ```
+
+${dartPreview.isNotEmpty ? '## Generated Dart Code\n\n```dart\n$dartPreview\n```' : ''}
 
 ## Instructions
 
