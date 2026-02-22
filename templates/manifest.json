@@ -30,11 +30,18 @@
       "description": "Gemini /triage command"
     },
     {
+      "id": "config_json",
+      "source": null,
+      "destination": ".runtime_ci/config.json",
+      "category": "mergeable",
+      "description": "Runtime CI config (user-owned, merge new keys only)"
+    },
+    {
       "id": "workflow_ci",
-      "source": "github/workflows/ci.template.yaml",
+      "source": "github/workflows/ci.skeleton.yaml",
       "destination": ".github/workflows/ci.yaml",
-      "category": "cautious",
-      "description": "CI pipeline workflow"
+      "category": "templated",
+      "description": "CI pipeline workflow (config-driven via ci section in config.json)"
     },
     {
       "id": "workflow_release",
@@ -49,13 +56,6 @@
       "destination": ".github/workflows/issue-triage.yaml",
       "category": "cautious",
       "description": "Issue triage workflow"
-    },
-    {
-      "id": "config_json",
-      "source": null,
-      "destination": ".runtime_ci/config.json",
-      "category": "mergeable",
-      "description": "Runtime CI config (user-owned, merge new keys only)"
     },
     {
       "id": "autodoc_json",

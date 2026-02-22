@@ -6,6 +6,7 @@ import 'commands/archive_run_command.dart';
 import 'commands/autodoc_command.dart';
 import 'commands/compose_command.dart';
 import 'commands/configure_mcp_command.dart';
+import 'commands/consumers_command.dart';
 import 'commands/create_release_command.dart';
 import 'commands/determine_version_command.dart';
 import 'commands/documentation_command.dart';
@@ -52,6 +53,7 @@ class ManageCicdCli extends CommandRunner<void> {
     addCommand(AutodocCommand());
     addCommand(ComposeCommand());
     addCommand(ConfigureMcpCommand());
+    addCommand(ConsumersCommand());
     addCommand(CreateReleaseCommand());
     addCommand(DetermineVersionCommand());
     addCommand(DocumentationCommand());

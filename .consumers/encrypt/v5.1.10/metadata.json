@@ -1,0 +1,26 @@
+{
+  "repository": "open-runtime/encrypt",
+  "discovery": {
+    "owner": "open-runtime",
+    "repo": "encrypt",
+    "full_name": "open-runtime/encrypt",
+    "dependency_constraint": null,
+    "dev_dependency_constraint": "{\n  \"git\": {\n    \"url\": \"git@github.com:open-runtime/runtime_ci_tooling.git\",\n    \"tag_pattern\": \"v{{version}}\"\n  },\n  \"version\": \"^0.6.0\"\n}",
+    "matched_path": "pubspec.yaml",
+    "pubspec_path": "pubspec.yaml",
+    "pubspec_sha": "5b5f51a6f28336693108a67bc43d22d844523053",
+    "runtime_ci_config_path": null,
+    "usage_signals": []
+  },
+  "release": {
+    "assets": [],
+    "body": "# encrypt v5.1.10\n\n# Version Bump: v5.1.10\n\n**Date**: 2026-02-22T04:10:24.043893Z\n**Previous**: v5.1.9\n**Commits**: 2\n\n## Commits\n\n05ae806 fix: revert Gemini model ID back to gemini-3.1-pro-preview\nfc77b41 fix: correct Gemini pro model ID to gemini-3-pro-preview\n\n\n---\n[Full Changelog](https://github.com/open-runtime/encrypt/compare/v5.1.9...v5.1.10)\n\n\n---\n[Full Changelog](https://github.com/open-runtime/encrypt/compare/v5.1.9...v5.1.10) | [CHANGELOG.md](https://github.com/open-runtime/encrypt/blob/v5.1.10/CHANGELOG.md)",
+    "createdAt": "2026-02-22T04:15:12Z",
+    "isDraft": false,
+    "isPrerelease": false,
+    "name": "v5.1.10",
+    "publishedAt": "2026-02-22T04:15:13Z",
+    "tagName": "v5.1.10",
+    "url": "https://github.com/open-runtime/encrypt/releases/tag/v5.1.10"
+  }
+}

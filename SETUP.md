@@ -258,25 +258,44 @@ delete_repository, fork_repository, create_repository
 
 ## Step 6: Scaffold GitHub Actions Workflows
 
-The package includes templates for three GitHub Actions workflows. Copy them from
-the templates directory:
+The package includes templates for GitHub Actions workflows. The CI workflow is
+**config-driven** — it renders from `config.json`'s `ci` section automatically.
+Release and issue-triage workflows are copied as cautious templates.
 
 ```bash
-# From your repository root:
+# From your repository root — use the update command to install/regenerate all workflows:
+dart run runtime_ci_tooling:manage_cicd update --workflows
+
+# Or copy non-CI workflows manually:
 mkdir -p .github/workflows
-
-# CI workflow
-cp shared/runtime_ci_tooling/templates/github/workflows/ci.template.yaml \
-   .github/workflows/ci.yaml
-
-# Release pipeline
 cp shared/runtime_ci_tooling/templates/github/workflows/release.template.yaml \
    .github/workflows/release.yaml
-
-# Issue triage
 cp shared/runtime_ci_tooling/templates/github/workflows/issue-triage.template.yaml \
    .github/workflows/issue-triage.yaml
 ```
+
+The CI workflow (`.github/workflows/ci.yaml`) is generated from your `ci` section in
+`.runtime_ci/config.json`. Here are the available keys:
+
+### CI Config Schema (`config.json` → `ci`)
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `dart_sdk` | string | **required** | Dart SDK version (e.g. `"3.9.2"`) |
+| `personal_access_token_secret` | string | `"GITHUB_TOKEN"` | GitHub secret name for PAT |
+| `line_length` | int/string | `120` | Line length for `dart format` checks |
+| `features.proto` | bool | `false` | Enable protobuf generation step |
+| `features.lfs` | bool | `false` | Enable Git LFS checkout |
+| `features.format_check` | bool | `true` | Enable `dart format` check |
+| `features.analysis_cache` | bool | `true` | Cache analysis results across runs |
+| `features.managed_analyze` | bool | `true` | Run `dart analyze` via tooling |
+| `features.managed_test` | bool | `true` | Run `dart test` via tooling |
+| `secrets` | object | `{}` | Additional secrets as `{ "ENV_NAME": "SECRET_NAME" }` |
+| `sub_packages` | list | `[]` | Sub-packages as `[{ "name": "...", "path": "..." }]` |
+
+You can add custom steps before/after tests using user-preservable sections in the
+generated workflow — look for `# --- BEGIN USER: pre-test ---` and
+`# --- END USER: post-test ---` markers.
 
 ### Customize the workflows
 

@@ -276,12 +276,14 @@ class GeminiRunner {
       );
     }
 
-    // Save raw response to audit trail
+    // Save response to audit trail (strip MCP/warning prefix before JSON)
     final rawStdout = result.stdout as String;
     if (task.auditDir != null) {
       final agentsDir = Directory('${task.auditDir}/agents');
       agentsDir.createSync(recursive: true);
-      File('${agentsDir.path}/${task.id}_response.json').writeAsStringSync(rawStdout);
+      final jsonStart = rawStdout.indexOf('{');
+      final cleaned = jsonStart > 0 ? rawStdout.substring(jsonStart) : rawStdout;
+      File('${agentsDir.path}/${task.id}_response.json').writeAsStringSync(cleaned);
     }
 
     // Parse JSON response -- Gemini CLI may output warning lines before JSON

@@ -1,0 +1,26 @@
+{
+  "repository": "open-runtime/runtime_isomorphic_library",
+  "discovery": {
+    "owner": "open-runtime",
+    "repo": "runtime_isomorphic_library",
+    "full_name": "open-runtime/runtime_isomorphic_library",
+    "dependency_constraint": null,
+    "dev_dependency_constraint": "{\n  \"git\": {\n    \"url\": \"git@github.com:open-runtime/runtime_ci_tooling.git\",\n    \"tag_pattern\": \"v{{version}}\"\n  },\n  \"version\": \"^0.6.0\"\n}",
+    "matched_path": "pubspec.yaml",
+    "pubspec_path": "pubspec.yaml",
+    "pubspec_sha": "6cdf15a36a42270d1b1214e6eefbd6785dba66e0",
+    "runtime_ci_config_path": null,
+    "usage_signals": []
+  },
+  "release": {
+    "assets": [],
+    "body": "# runtime_isomorphic_library v1.2.5\n\n# Version Bump: v1.2.5\n\n**Date**: 2026-02-22T04:14:14.354419Z\n**Previous**: v1.2.4\n**Commits**: 2\n\n## Commits\n\n722af3a6 fix: revert Gemini model ID back to gemini-3.1-pro-preview\n902296b6 fix: correct Gemini pro model ID to gemini-3-pro-preview\n\n\n---\n[Full Changelog](https://github.com/open-runtime/runtime_isomorphic_library/compare/v1.2.4...v1.2.5)\n\n\n---\n[Full Changelog](https://github.com/open-runtime/runtime_isomorphic_library/compare/v1.2.4...v1.2.5) | [CHANGELOG.md](https://github.com/open-runtime/runtime_isomorphic_library/blob/v1.2.5/CHANGELOG.md)",
+    "createdAt": "2026-02-22T04:24:57Z",
+    "isDraft": false,
+    "isPrerelease": false,
+    "name": "v1.2.5",
+    "publishedAt": "2026-02-22T04:24:58Z",
+    "tagName": "v1.2.5",
+    "url": "https://github.com/open-runtime/runtime_isomorphic_library/releases/tag/v1.2.5"
+  }
+}

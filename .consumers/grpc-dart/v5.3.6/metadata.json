@@ -1,0 +1,26 @@
+{
+  "repository": "open-runtime/grpc-dart",
+  "discovery": {
+    "owner": "open-runtime",
+    "repo": "grpc-dart",
+    "full_name": "open-runtime/grpc-dart",
+    "dependency_constraint": null,
+    "dev_dependency_constraint": "{\n  \"git\": {\n    \"url\": \"git@github.com:open-runtime/runtime_ci_tooling.git\",\n    \"tag_pattern\": \"v{{version}}\"\n  },\n  \"version\": \"^0.6.0\"\n}",
+    "matched_path": "pubspec.yaml",
+    "pubspec_path": "pubspec.yaml",
+    "pubspec_sha": "39057f97117ca082b73bc94806be932dde81cfac",
+    "runtime_ci_config_path": null,
+    "usage_signals": []
+  },
+  "release": {
+    "assets": [],
+    "body": "# grpc v5.3.6\n\n# Version Bump: v5.3.6\n\n**Date**: 2026-02-22T04:11:07.066903Z\n**Previous**: v5.3.5\n**Commits**: 2\n\n## Commits\n\nd336682 fix: revert Gemini model ID back to gemini-3.1-pro-preview\n3ae1c8e fix: correct Gemini pro model ID to gemini-3-pro-preview\n\n\n---\n[Full Changelog](https://github.com/open-runtime/grpc/compare/v5.3.5...v5.3.6)\n\n\n---\n[Full Changelog](https://github.com/open-runtime/grpc-dart/compare/v5.3.5...v5.3.6) | [CHANGELOG.md](https://github.com/open-runtime/grpc-dart/blob/v5.3.6/CHANGELOG.md)",
+    "createdAt": "2026-02-22T04:18:14Z",
+    "isDraft": false,
+    "isPrerelease": false,
+    "name": "v5.3.6",
+    "publishedAt": "2026-02-22T04:18:15Z",
+    "tagName": "v5.3.6",
+    "url": "https://github.com/open-runtime/grpc-dart/releases/tag/v5.3.6"
+  }
+}

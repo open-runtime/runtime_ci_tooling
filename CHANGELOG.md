@@ -9,8 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added `update` command for intelligently syncing templates (commands, settings, workflows, configs) to consumer repos
+- Config-driven CI workflow generation via `ci` section in `config.json`
+- `WorkflowGenerator` class with Mustache-based skeleton rendering (`ci.skeleton.yaml`)
+- User-preservable sections (`# --- BEGIN USER / END USER ---`) survive workflow regeneration
+- `ci` section defaults in `init` command for new consumers
+- Strict type validation for all `ci` config fields (dart_sdk, features, secrets, pat_secret, line_length)
 
 ### Changed
+- Replaced monolithic `ci.template.yaml` with config-driven `ci.skeleton.yaml`
 - Fixed formatting in `update_options.g.dart`
 
 ## [0.7.1] - 2026-02-22

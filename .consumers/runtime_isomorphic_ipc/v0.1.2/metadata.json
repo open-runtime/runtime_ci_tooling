@@ -1,0 +1,26 @@
+{
+  "repository": "open-runtime/runtime_isomorphic_ipc",
+  "discovery": {
+    "owner": "open-runtime",
+    "repo": "runtime_isomorphic_ipc",
+    "full_name": "open-runtime/runtime_isomorphic_ipc",
+    "dependency_constraint": null,
+    "dev_dependency_constraint": "{\n  \"git\": {\n    \"url\": \"git@github.com:open-runtime/runtime_ci_tooling.git\",\n    \"tag_pattern\": \"v{{version}}\"\n  },\n  \"version\": \"^0.6.0\"\n}",
+    "matched_path": "pubspec.yaml",
+    "pubspec_path": "pubspec.yaml",
+    "pubspec_sha": "c93235409be6b6a74aaf8ee34ff40f08a46fd3ae",
+    "runtime_ci_config_path": null,
+    "usage_signals": []
+  },
+  "release": {
+    "assets": [],
+    "body": "# runtime_isomorphic_ipc v0.1.2\n\n# Version Bump: v0.1.2\n\n**Date**: 2026-02-22T04:19:42.938272Z\n**Previous**: v0.1.1\n**Commits**: 2\n\n## Commits\n\n8e80d6e fix: revert Gemini model ID back to gemini-3.1-pro-preview\n516d46e fix: correct Gemini pro model ID to gemini-3-pro-preview\n\n\n---\n[Full Changelog](https://github.com/open-runtime/runtime_isomorphic_ipc/compare/v0.1.1...v0.1.2)\n\n\n---\n[Full Changelog](https://github.com/open-runtime/runtime_isomorphic_ipc/compare/v0.1.1...v0.1.2) | [CHANGELOG.md](https://github.com/open-runtime/runtime_isomorphic_ipc/blob/v0.1.2/CHANGELOG.md)",
+    "createdAt": "2026-02-22T04:28:35Z",
+    "isDraft": false,
+    "isPrerelease": false,
+    "name": "v0.1.2",
+    "publishedAt": "2026-02-22T04:28:36Z",
+    "tagName": "v0.1.2",
+    "url": "https://github.com/open-runtime/runtime_isomorphic_ipc/releases/tag/v0.1.2"
+  }
+}

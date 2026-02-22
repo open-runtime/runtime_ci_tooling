@@ -7,10 +7,12 @@ import '../../triage/utils/config.dart';
 import '../../triage/utils/run_context.dart';
 import '../manage_cicd_cli.dart';
 import '../options/update_options.dart';
+import '../utils/hook_installer.dart';
 import '../utils/logger.dart';
 import '../utils/repo_utils.dart';
 import '../utils/template_manifest.dart';
 import '../utils/template_resolver.dart';
+import '../utils/workflow_generator.dart';
 
 /// Update templates, configs, and workflows from runtime_ci_tooling.
 ///
@@ -18,6 +20,7 @@ import '../utils/template_resolver.dart';
 /// installed copies, then updates intelligently based on file category:
 ///   - overwritable: Replace if template changed (warn on local edits)
 ///   - cautious: Warn only; require --force to replace
+///   - templated: Render from Mustache skeleton + config.json ci section
 ///   - mergeable: Deep-merge new keys; preserve existing values
 ///   - regeneratable: Re-scan lib/src/ for new modules
 class UpdateCommand extends Command<void> {
@@ -108,6 +111,16 @@ class UpdateCommand extends Command<void> {
           verbose: verbose,
           backup: opts.backup,
         ),
+        'templated' => _processTemplated(
+          repoRoot,
+          entry,
+          tracker,
+          toolingVersion,
+          force: force,
+          dryRun: dryRun,
+          verbose: verbose,
+          backup: opts.backup,
+        ),
         'mergeable' => _processMergeable(
           repoRoot,
           templatesDir,
@@ -139,6 +152,14 @@ class UpdateCommand extends Command<void> {
       Logger.success('Saved template tracking to $kRuntimeCiDir/template_versions.json');
     }
 
+    // --- Step 5.5: Install/refresh pre-commit hook ---
+    // Respects consumer's configured line_length; falls back to 120.
+    final ciConfig = WorkflowGenerator.loadCiConfig(repoRoot);
+    final lineLength = (ciConfig?['line_length'] as num?)?.toInt() ?? 120;
+    if (HookInstaller.install(repoRoot, lineLength: lineLength, dryRun: dryRun)) {
+      updatedCount++;
+    }
+
     // --- Step 6: Summary ---
     Logger.info('');
     Logger.header('Update Summary');
@@ -161,6 +182,7 @@ class UpdateCommand extends Command<void> {
     return switch (entry.category) {
       'overwritable' => opts.templates,
       'cautious' => opts.workflows,
+      'templated' => opts.workflows,
       'mergeable' => opts.config,
       'regeneratable' => opts.autodoc,
       _ => false,
@@ -411,6 +433,86 @@ class UpdateCommand extends Command<void> {
 
     Logger.success('  ${entry.id}: added $newModuleCount new module(s)');
     return _UpdateResult(entry.id, 'updated', reason: '$newModuleCount module(s) added');
+  }
+
+  _UpdateResult _processTemplated(
+    String repoRoot,
+    TemplateEntry entry,
+    TemplateVersionTracker tracker,
+    String toolingVersion, {
+    required bool force,
+    required bool dryRun,
+    required bool verbose,
+    required bool backup,
+  }) {
+    // Templated entries require a source skeleton
+    if (entry.source == null) {
+      Logger.error('  ${entry.id}: templated entry requires a "source" field in manifest.json');
+      return _UpdateResult(entry.id, 'error', reason: 'missing source in manifest');
+    }
+
+    // Load CI config from the consumer repo
+    final ciConfig = WorkflowGenerator.loadCiConfig(repoRoot);
+    if (ciConfig == null) {
+      Logger.warn('  ${entry.id}: no "ci" section in config.json. '
+          'Add a "ci" section to enable config-driven workflow generation.');
+      return _UpdateResult(entry.id, 'warning', reason: 'no ci config -- add "ci" section to config.json');
+    }
+
+    // Validate config
+    final errors = WorkflowGenerator.validate(ciConfig);
+    if (errors.isNotEmpty) {
+      for (final error in errors) {
+        Logger.error('  ${entry.id}: $error');
+      }
+      return _UpdateResult(entry.id, 'warning', reason: 'invalid ci config');
+    }
+
+    final destPath = '$repoRoot/${entry.destination}';
+    final destFile = File(destPath);
+
+    // Read existing content for user-section preservation
+    final existingContent = destFile.existsSync() ? destFile.readAsStringSync() : null;
+
+    // Generate the workflow
+    final generator = WorkflowGenerator(
+      ciConfig: ciConfig,
+      toolingVersion: toolingVersion,
+    );
+
+    if (verbose) {
+      Logger.info('  ${entry.id}: rendering from config:');
+      generator.logConfig();
+    }
+
+    final rendered = generator.render(existingContent: existingContent);
+
+    // Check if content actually changed
+    if (existingContent != null && rendered == existingContent && !force) {
+      if (verbose) Logger.info('  ${entry.id}: output unchanged');
+      return _UpdateResult(entry.id, 'skipped', reason: 'output unchanged');
+    }
+
+    if (!dryRun) {
+      if (backup && destFile.existsSync()) {
+        destFile.copySync('$destPath.bak');
+        Logger.info('  ${entry.id}: backed up to ${entry.destination}.bak');
+      }
+      Directory(destFile.parent.path).createSync(recursive: true);
+      destFile.writeAsStringSync(rendered);
+      // Track with hash of the skeleton template source
+      final skeletonPath = TemplateResolver.resolveTemplatePath(entry.source!);
+      tracker.recordUpdate(
+        entry.id,
+        templateHash: computeFileHash(skeletonPath),
+        consumerFileHash: computeFileHash(destPath),
+        toolingVersion: toolingVersion,
+      );
+    }
+
+    final action = existingContent == null ? 'generated' : 'regenerated';
+    Logger.success('  ${entry.id}: $action ${entry.destination}');
+    return _UpdateResult(entry.id, 'updated', reason: '$action from config');
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

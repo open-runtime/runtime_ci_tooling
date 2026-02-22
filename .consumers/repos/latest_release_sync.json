@@ -1,0 +1,97 @@
+{
+  "generated_at_local": "2026-02-22T12:47:59.572910",
+  "generated_at_utc": "2026-02-22T17:47:59.572910Z",
+  "source_snapshot": "/Users/tsavoknott/Development/GitHub/open-runtime/aot_monorepo/packages/libraries/dart/runtime_ci_tooling/.consumers/repos/discovery_run_1_local_time_22_02_26.json",
+  "package": "runtime_ci_tooling",
+  "criteria": {
+    "package": "runtime_ci_tooling",
+    "exact_tag": null,
+    "tag_regex": null,
+    "include_prerelease": false
+  },
+  "repo_count": 11,
+  "processed_count": 11,
+  "success_count": 9,
+  "no_release_count": 2,
+  "failure_count": 0,
+  "run_status": "completed",
+  "repos": [
+    {
+      "repository": "open-runtime/encrypt",
+      "status": "ok",
+      "tag": "v5.1.10",
+      "output_path": "/Users/tsavoknott/Development/GitHub/open-runtime/aot_monorepo/packages/libraries/dart/runtime_ci_tooling/.consumers/encrypt/v5.1.10",
+      "error": null
+    },
+    {
+      "repository": "open-runtime/grpc-dart",
+      "status": "ok",
+      "tag": "v5.3.6",
+      "output_path": "/Users/tsavoknott/Development/GitHub/open-runtime/aot_monorepo/packages/libraries/dart/runtime_ci_tooling/.consumers/grpc-dart/v5.3.6",
+      "error": null
+    },
+    {
+      "repository": "open-runtime/mindfck",
+      "status": "ok",
+      "tag": "v0.0.15",
+      "output_path": "/Users/tsavoknott/Development/GitHub/open-runtime/aot_monorepo/packages/libraries/dart/runtime_ci_tooling/.consumers/mindfck/v0.0.15",
+      "error": null
+    },
+    {
+      "repository": "open-runtime/named_locks",
+      "status": "no_release",
+      "tag": null,
+      "output_path": "/Users/tsavoknott/Development/GitHub/open-runtime/aot_monorepo/packages/libraries/dart/runtime_ci_tooling/.consumers/named_locks/NO_RELEASE.md",
+      "error": null
+    },
+    {
+      "repository": "open-runtime/native_semaphores",
+      "status": "no_release",
+      "tag": null,
+      "output_path": "/Users/tsavoknott/Development/GitHub/open-runtime/aot_monorepo/packages/libraries/dart/runtime_ci_tooling/.consumers/native_semaphores/NO_RELEASE.md",
+      "error": null
+    },
+    {
+      "repository": "open-runtime/runtime_aot_client_examples",
+      "status": "ok",
+      "tag": "v0.0.3",
+      "output_path": "/Users/tsavoknott/Development/GitHub/open-runtime/aot_monorepo/packages/libraries/dart/runtime_ci_tooling/.consumers/runtime_aot_client_examples/v0.0.3",
+      "error": null
+    },
+    {
+      "repository": "open-runtime/runtime_aot_tooling",
+      "status": "ok",
+      "tag": "v1.0.2",
+      "output_path": "/Users/tsavoknott/Development/GitHub/open-runtime/aot_monorepo/packages/libraries/dart/runtime_ci_tooling/.consumers/runtime_aot_tooling/v1.0.2",
+      "error": null
+    },
+    {
+      "repository": "open-runtime/runtime_common_codestyle",
+      "status": "ok",
+      "tag": "v0.1.10",
+      "output_path": "/Users/tsavoknott/Development/GitHub/open-runtime/aot_monorepo/packages/libraries/dart/runtime_ci_tooling/.consumers/runtime_common_codestyle/v0.1.10",
+      "error": null
+    },
+    {
+      "repository": "open-runtime/runtime_isomorphic_ipc",
+      "status": "ok",
+      "tag": "v0.1.2",
+      "output_path": "/Users/tsavoknott/Development/GitHub/open-runtime/aot_monorepo/packages/libraries/dart/runtime_ci_tooling/.consumers/runtime_isomorphic_ipc/v0.1.2",
+      "error": null
+    },
+    {
+      "repository": "open-runtime/runtime_isomorphic_library",
+      "status": "ok",
+      "tag": "v1.2.5",
+      "output_path": "/Users/tsavoknott/Development/GitHub/open-runtime/aot_monorepo/packages/libraries/dart/runtime_ci_tooling/.consumers/runtime_isomorphic_library/v1.2.5",
+      "error": null
+    },
+    {
+      "repository": "open-runtime/runtime_telemetric_library",
+      "status": "ok",
+      "tag": "v0.0.5",
+      "output_path": "/Users/tsavoknott/Development/GitHub/open-runtime/aot_monorepo/packages/libraries/dart/runtime_ci_tooling/.consumers/runtime_telemetric_library/v0.0.5",
+      "error": null
+    }
+  ]
+}

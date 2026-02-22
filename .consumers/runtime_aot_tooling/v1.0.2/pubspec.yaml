@@ -1,0 +1,41 @@
+name: runtime_aot_tooling
+description: Cross-platform tooling for managing AOT module builds
+version: 1.0.2
+publish_to: none
+repository: https://github.com/open-runtime/runtime_aot_tooling
+
+environment:
+  sdk: ^3.9.0
+
+resolution: workspace
+
+# NOTE: When used inside the aot_monorepo workspace, add
+# `resolution: workspace` here. It is intentionally omitted so this
+# package can also resolve standalone (e.g., in its own CI pipeline).
+
+dependencies:
+  args: ^2.7.0
+  async: any
+  build_cli_annotations: ^2.1.1
+  chalkdart: ^3.1.0
+  crypto: ^3.0.6
+  glob: ^2.1.3
+  meta: ^1.16.0
+  path: ^1.9.1
+  safe_int_id: ^1.1.1
+  settings_yaml: ^8.3.1
+  string_similarity: ^2.1.1
+  system_info2: any
+  yaml: ^3.1.3
+
+  # GitHub releases versioned dependencies
+  runtime_isomorphic_library: ^1.2.1
+  grpc: ^5.3.0
+  encrypt: ^5.1.6
+
+dev_dependencies:
+  runtime_ci_tooling: ^0.7.0
+  build_cli: ^2.2.10
+  build_runner: ^2.4.14
+  lints: ^6.0.0
+  test: ^1.25.0

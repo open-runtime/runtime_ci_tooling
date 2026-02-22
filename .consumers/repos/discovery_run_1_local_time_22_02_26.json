@@ -1,0 +1,125 @@
+{
+  "index": 1,
+  "generated_at_local": "2026-02-22T12:31:59.093773",
+  "generated_at_utc": "2026-02-22T17:31:59.093773Z",
+  "package": "runtime_ci_tooling",
+  "orgs": [
+    "open-runtime",
+    "pieces-app"
+  ],
+  "scanned_repo_count": 586,
+  "consumer_count": 11,
+  "failures": [],
+  "consumers": [
+    {
+      "owner": "open-runtime",
+      "repo": "encrypt",
+      "full_name": "open-runtime/encrypt",
+      "dependency_constraint": null,
+      "dev_dependency_constraint": "{\n  \"git\": {\n    \"url\": \"git@github.com:open-runtime/runtime_ci_tooling.git\",\n    \"tag_pattern\": \"v{{version}}\"\n  },\n  \"version\": \"^0.6.0\"\n}",
+      "matched_path": "pubspec.yaml",
+      "pubspec_path": "pubspec.yaml",
+      "pubspec_sha": "5b5f51a6f28336693108a67bc43d22d844523053"
+    },
+    {
+      "owner": "open-runtime",
+      "repo": "grpc-dart",
+      "full_name": "open-runtime/grpc-dart",
+      "dependency_constraint": null,
+      "dev_dependency_constraint": "{\n  \"git\": {\n    \"url\": \"git@github.com:open-runtime/runtime_ci_tooling.git\",\n    \"tag_pattern\": \"v{{version}}\"\n  },\n  \"version\": \"^0.6.0\"\n}",
+      "matched_path": "pubspec.yaml",
+      "pubspec_path": "pubspec.yaml",
+      "pubspec_sha": "39057f97117ca082b73bc94806be932dde81cfac"
+    },
+    {
+      "owner": "open-runtime",
+      "repo": "mindfck",
+      "full_name": "open-runtime/mindfck",
+      "dependency_constraint": null,
+      "dev_dependency_constraint": "{\n  \"git\": {\n    \"url\": \"git@github.com:open-runtime/runtime_ci_tooling.git\",\n    \"tag_pattern\": \"v{{version}}\"\n  },\n  \"version\": \"^0.6.0\"\n}",
+      "matched_path": "pubspec.yaml",
+      "pubspec_path": "pubspec.yaml",
+      "pubspec_sha": "7d81520be46625ad5e1d23174d546191d69cbdb1"
+    },
+    {
+      "owner": "open-runtime",
+      "repo": "named_locks",
+      "full_name": "open-runtime/named_locks",
+      "dependency_constraint": null,
+      "dev_dependency_constraint": "{\n  \"git\": {\n    \"url\": \"git@github.com:open-runtime/runtime_ci_tooling.git\",\n    \"tag_pattern\": \"v{{version}}\"\n  },\n  \"version\": \"^0.6.0\"\n}",
+      "matched_path": "pubspec.yaml",
+      "pubspec_path": "pubspec.yaml",
+      "pubspec_sha": "9557b71b92cdc0db7602d4994814120066295ae7"
+    },
+    {
+      "owner": "open-runtime",
+      "repo": "native_semaphores",
+      "full_name": "open-runtime/native_semaphores",
+      "dependency_constraint": null,
+      "dev_dependency_constraint": "{\n  \"git\": {\n    \"url\": \"git@github.com:open-runtime/runtime_ci_tooling.git\",\n    \"tag_pattern\": \"v{{version}}\"\n  },\n  \"version\": \"^0.6.0\"\n}",
+      "matched_path": "pubspec.yaml",
+      "pubspec_path": "pubspec.yaml",
+      "pubspec_sha": "69a512d8074224d382cd9c6041781f93b06d4ade"
+    },
+    {
+      "owner": "open-runtime",
+      "repo": "runtime_aot_client_examples",
+      "full_name": "open-runtime/runtime_aot_client_examples",
+      "dependency_constraint": null,
+      "dev_dependency_constraint": "{\n  \"git\": {\n    \"url\": \"git@github.com:open-runtime/runtime_ci_tooling.git\",\n    \"tag_pattern\": \"v{{version}}\"\n  },\n  \"version\": \"^0.6.0\"\n}",
+      "matched_path": "pubspec.yaml",
+      "pubspec_path": "pubspec.yaml",
+      "pubspec_sha": "a2bcde2839b9f64ade4b22fd20e29ef1e5271cba"
+    },
+    {
+      "owner": "open-runtime",
+      "repo": "runtime_aot_tooling",
+      "full_name": "open-runtime/runtime_aot_tooling",
+      "dependency_constraint": null,
+      "dev_dependency_constraint": "^0.7.0",
+      "matched_path": "pubspec.yaml",
+      "pubspec_path": "pubspec.yaml",
+      "pubspec_sha": "8756506dd82b8f73040355f16307be1cf4ebb31b"
+    },
+    {
+      "owner": "open-runtime",
+      "repo": "runtime_common_codestyle",
+      "full_name": "open-runtime/runtime_common_codestyle",
+      "dependency_constraint": null,
+      "dev_dependency_constraint": "{\n  \"git\": {\n    \"url\": \"git@github.com:open-runtime/runtime_ci_tooling.git\",\n    \"tag_pattern\": \"v{{version}}\"\n  },\n  \"version\": \"^0.6.3\"\n}",
+      "matched_path": "pubspec.yaml",
+      "pubspec_path": "pubspec.yaml",
+      "pubspec_sha": "f189909e4a824f7031d9cfe27c0ccb58e876089e"
+    },
+    {
+      "owner": "open-runtime",
+      "repo": "runtime_isomorphic_ipc",
+      "full_name": "open-runtime/runtime_isomorphic_ipc",
+      "dependency_constraint": null,
+      "dev_dependency_constraint": "{\n  \"git\": {\n    \"url\": \"git@github.com:open-runtime/runtime_ci_tooling.git\",\n    \"tag_pattern\": \"v{{version}}\"\n  },\n  \"version\": \"^0.6.0\"\n}",
+      "matched_path": "pubspec.yaml",
+      "pubspec_path": "pubspec.yaml",
+      "pubspec_sha": "c93235409be6b6a74aaf8ee34ff40f08a46fd3ae"
+    },
+    {
+      "owner": "open-runtime",
+      "repo": "runtime_isomorphic_library",
+      "full_name": "open-runtime/runtime_isomorphic_library",
+      "dependency_constraint": null,
+      "dev_dependency_constraint": "{\n  \"git\": {\n    \"url\": \"git@github.com:open-runtime/runtime_ci_tooling.git\",\n    \"tag_pattern\": \"v{{version}}\"\n  },\n  \"version\": \"^0.6.0\"\n}",
+      "matched_path": "pubspec.yaml",
+      "pubspec_path": "pubspec.yaml",
+      "pubspec_sha": "6cdf15a36a42270d1b1214e6eefbd6785dba66e0"
+    },
+    {
+      "owner": "open-runtime",
+      "repo": "runtime_telemetric_library",
+      "full_name": "open-runtime/runtime_telemetric_library",
+      "dependency_constraint": null,
+      "dev_dependency_constraint": "{\n  \"git\": {\n    \"url\": \"git@github.com:open-runtime/runtime_ci_tooling.git\",\n    \"tag_pattern\": \"v{{version}}\"\n  },\n  \"version\": \"^0.6.4\"\n}",
+      "matched_path": "pubspec.yaml",
+      "pubspec_path": "pubspec.yaml",
+      "pubspec_sha": "43567ae1bb6aaa1401490c079c023814f8d48e50"
+    }
+  ]
+}

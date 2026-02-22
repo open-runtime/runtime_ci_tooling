@@ -5,6 +5,7 @@ import 'package:args/command_runner.dart';
 
 import '../../triage/utils/config.dart';
 import '../../triage/utils/run_context.dart';
+import '../utils/hook_installer.dart';
 import '../utils/logger.dart';
 
 /// Scan the current repo and generate `.runtime_ci/config.json`,
@@ -123,6 +124,21 @@ class InitCommand extends Command<void> {
           'triaged_label': 'triaged',
           'changelog_path': 'CHANGELOG.md',
           'release_notes_path': '$kReleaseNotesDir',
+        },
+        'ci': {
+          'dart_sdk': '3.9.2',
+          'personal_access_token_secret': 'GITHUB_TOKEN',
+          'line_length': 120,
+          'features': {
+            'proto': false,
+            'lfs': false,
+            'format_check': true,
+            'analysis_cache': true,
+            'managed_analyze': true,
+            'managed_test': true,
+          },
+          'secrets': {},
+          'sub_packages': [],
         },
         'gcp': {'project': ''},
         'sentry': {
@@ -270,7 +286,11 @@ class InitCommand extends Command<void> {
       repaired++;
     }
 
-    // -- 8. Ensure .runtime_ci/runs/ is in .gitignore --
+    // -- 8. Install git pre-commit hook --
+    final hookInstalled = HookInstaller.install(repoRoot);
+    if (hookInstalled) repaired++;
+
+    // -- 9. Ensure .runtime_ci/runs/ is in .gitignore --
     final gitignoreFile = File('$repoRoot/.gitignore');
     if (gitignoreFile.existsSync()) {
       final content = gitignoreFile.readAsStringSync();
@@ -299,6 +319,7 @@ class InitCommand extends Command<void> {
     Logger.info('  Owner:     $repoOwner');
     Logger.info('  Areas:     ${areaLabels.join(", ")}');
     Logger.info('  Changelog: ${hadChangelog ? "found" : "created"}');
+    Logger.info('  Hook:      ${hookInstalled ? "installed .git/hooks/pre-commit" : "skipped (no .git/hooks)"}');
     Logger.info('  .github/:  ${hasGithub ? "exists (not overwritten)" : "not found"}');
     Logger.info('  .gemini/:  ${hasGemini ? "exists (not overwritten)" : "not found"}');
     print('');

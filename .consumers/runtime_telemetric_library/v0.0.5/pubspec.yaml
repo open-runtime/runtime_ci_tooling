@@ -1,0 +1,63 @@
+name: runtime_telemetric_library
+description: |
+  Fire-and-forget telemetry for ML inference services.
+  Writes events to BigQuery with dynamic schema management.
+  Supports pluggable writers (BigQuery now, GCS future).
+  Includes proper timeout handling, error capture to Sentry, and batched writes.
+version: 0.0.5
+publish_to: none
+homepage: https://github.com/open-runtime/runtime_telemetric_library
+repository: https://github.com/open-runtime/runtime_telemetric_library
+
+environment:
+  sdk: ^3.9.0
+
+# NOTE: When used inside the aot_monorepo workspace, add
+# `resolution: workspace` here. It is intentionally omitted so this
+# package can also resolve standalone (e.g., in its own CI pipeline).
+
+dependencies:
+  # ==========================================================================
+  # Direct pub.dev dependencies
+  # ==========================================================================
+  crypto: ^3.0.3
+  meta: ^1.16.0
+  protobuf: ^6.0.0
+  retry: ^3.1.2
+  sentry: ^9.4.1
+  synchronized: ^3.4.0
+
+  # ==========================================================================
+  # GitHub releases versioned dependencies
+  # ==========================================================================
+  grpc:
+    git:
+      url: git@github.com:open-runtime/grpc-dart.git
+      tag_pattern: v{{version}}
+    version: ^5.3.0
+  runtime_isomorphic_library:
+    git:
+      url: git@github.com:open-runtime/runtime_isomorphic_library.git
+      tag_pattern: v{{version}}
+    version: ^1.2.1
+
+dev_dependencies:
+  # ==========================================================================
+  # GitHub releases versioned dependencies
+  # ==========================================================================
+  runtime_common_codestyle:
+    git:
+      url: git@github.com:open-runtime/runtime_common_codestyle.git
+      tag_pattern: v{{version}}
+    version: ^0.1.6
+  runtime_ci_tooling:
+    git:
+      url: git@github.com:open-runtime/runtime_ci_tooling.git
+      tag_pattern: v{{version}}
+    version: ^0.6.4
+
+  # ==========================================================================
+  # Direct pub.dev dev dependencies
+  # ==========================================================================
+  test: ^1.28.0
+  mocktail: ^1.0.4

@@ -6,8 +6,10 @@ part of 'global_options.dart';
 // CliGenerator
 // **************************************************************************
 
-GlobalOptions _$parseGlobalOptionsResult(ArgResults result) =>
-    GlobalOptions(dryRun: result['dry-run'] as bool, verbose: result['verbose'] as bool);
+GlobalOptions _$parseGlobalOptionsResult(ArgResults result) => GlobalOptions(
+  dryRun: result['dry-run'] as bool,
+  verbose: result['verbose'] as bool,
+);
 
 ArgParser _$populateGlobalOptionsParser(ArgParser parser) => parser
   ..addFlag('dry-run', help: 'Show what would be done without executing')

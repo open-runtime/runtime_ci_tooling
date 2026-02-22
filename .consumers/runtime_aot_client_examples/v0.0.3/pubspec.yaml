@@ -1,0 +1,85 @@
+name: runtime_aot_client_examples
+description: |
+  A fully self-contained Dart package for authenticating with AOT services.
+  Handles browser-based OAuth authentication and provides a secure gRPC interceptor
+  for making authenticated requests to AOT Cloud Run services.
+
+  This package can be used outside the monorepo by colleagues who have:
+  - Dart SDK 3.9+
+  - GitHub CLI (gh) for private repo access
+  - Google Cloud CLI (gcloud) for GCP authentication
+  - VPN connection for user-team-service access
+  - A Pieces account for Descope authentication
+
+version: 0.0.4
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+
+# NOTE: When used inside the aot_monorepo workspace, add
+# `resolution: workspace` here. It is intentionally omitted so this
+# package can also resolve standalone (e.g., in its own CI pipeline).
+
+dependencies:
+  # ==========================================================================
+  #
+  # Direct pub.dev dependencies
+  #
+  # ==========================================================================
+  crypto: ^3.0.6
+  dart_jsonwebtoken: ^3.2.0
+  googleapis: ^15.0.0
+  googleapis_auth: ^2.0.0
+  http: ^1.4.0
+  uuid: ^4.5.1
+
+  # ==========================================================================
+  #
+  # GitHub releases versioned dependencies
+  #
+  # ==========================================================================
+  encrypt:
+    git:
+      url: git@github.com:pieces-app/encrypt.git
+      tag_pattern: v{{version}}
+    version: ^5.1.6
+  grpc:
+    git:
+      url: git@github.com:open-runtime/grpc-dart.git
+      tag_pattern: v{{version}}
+    version: ^5.3.0
+  runtime_isomorphic_library:
+    git:
+      url: git@github.com:open-runtime/runtime_isomorphic_library.git
+      tag_pattern: v{{version}}
+    version: ^1.2.1
+  runtime_mindfck:
+    git:
+      url: git@github.com:open-runtime/mindfck.git
+      tag_pattern: v{{version}}
+    version: ^0.0.9
+
+dev_dependencies:
+  # ==========================================================================
+  #
+  # GitHub releases versioned dev dependencies
+  #
+  # ==========================================================================
+  runtime_common_codestyle:
+    git:
+      url: git@github.com:open-runtime/runtime_common_codestyle.git
+      tag_pattern: v{{version}}
+    version: ^0.1.5
+  runtime_ci_tooling:
+    git:
+      url: git@github.com:open-runtime/runtime_ci_tooling.git
+      tag_pattern: v{{version}}
+    version: ^0.6.0
+
+  # ==========================================================================
+  #
+  # Direct pub.dev dev dependencies
+  #
+  # ==========================================================================
+  test: ^1.28.0

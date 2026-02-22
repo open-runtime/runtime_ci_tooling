@@ -2863,9 +2863,11 @@ String _detectNextVersion(String repoRoot, String prevTag) {
       repoRoot,
     );
 
-    // Save raw Gemini response for audit trail
+    // Save Gemini response for audit trail (strip MCP/warning prefix)
     if (geminiResult.isNotEmpty) {
-      File('${versionAnalysisDir.path}/gemini_response.json').writeAsStringSync(geminiResult);
+      final jsonStart = geminiResult.indexOf('{');
+      final cleaned = jsonStart > 0 ? geminiResult.substring(jsonStart) : geminiResult;
+      File('${versionAnalysisDir.path}/gemini_response.json').writeAsStringSync(cleaned);
     }
 
     if (geminiResult.isNotEmpty && File(bumpJsonPath).existsSync()) {

@@ -1,0 +1,26 @@
+{
+  "repository": "open-runtime/runtime_telemetric_library",
+  "discovery": {
+    "owner": "open-runtime",
+    "repo": "runtime_telemetric_library",
+    "full_name": "open-runtime/runtime_telemetric_library",
+    "dependency_constraint": null,
+    "dev_dependency_constraint": "{\n  \"git\": {\n    \"url\": \"git@github.com:open-runtime/runtime_ci_tooling.git\",\n    \"tag_pattern\": \"v{{version}}\"\n  },\n  \"version\": \"^0.6.4\"\n}",
+    "matched_path": "pubspec.yaml",
+    "pubspec_path": "pubspec.yaml",
+    "pubspec_sha": "43567ae1bb6aaa1401490c079c023814f8d48e50",
+    "runtime_ci_config_path": null,
+    "usage_signals": []
+  },
+  "release": {
+    "assets": [],
+    "body": "# runtime_telemetric_library v0.0.5\n\n# Version Bump: v0.0.5\n\n**Date**: 2026-02-22T04:12:34.776835Z\n**Previous**: v0.0.4\n**Commits**: 2\n\n## Commits\n\n20cd571 fix: revert Gemini model ID back to gemini-3.1-pro-preview\neab2da3 fix: correct Gemini pro model ID to gemini-3-pro-preview\n\n\n---\n[Full Changelog](https://github.com/open-runtime/runtime_telemetric_library/compare/v0.0.4...v0.0.5)\n\n\n---\n[Full Changelog](https://github.com/open-runtime/runtime_telemetric_library/compare/v0.0.4...v0.0.5) | [CHANGELOG.md](https://github.com/open-runtime/runtime_telemetric_library/blob/v0.0.5/CHANGELOG.md)",
+    "createdAt": "2026-02-22T04:21:23Z",
+    "isDraft": false,
+    "isPrerelease": false,
+    "name": "v0.0.5",
+    "publishedAt": "2026-02-22T04:21:23Z",
+    "tagName": "v0.0.5",
+    "url": "https://github.com/open-runtime/runtime_telemetric_library/releases/tag/v0.0.5"
+  }
+}

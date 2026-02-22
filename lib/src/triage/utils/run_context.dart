@@ -105,9 +105,11 @@ class RunContext {
     File('${subdir(phase)}/prompt.txt').writeAsStringSync(prompt);
   }
 
-  /// Save the raw response from Gemini CLI (full stdout including warnings).
+  /// Save the response from Gemini CLI, stripping any MCP/warning prefix.
   void saveResponse(String phase, String rawResponse) {
-    File('${subdir(phase)}/gemini_response.json').writeAsStringSync(rawResponse);
+    final jsonStart = rawResponse.indexOf('{');
+    final cleaned = jsonStart > 0 ? rawResponse.substring(jsonStart) : rawResponse;
+    File('${subdir(phase)}/gemini_response.json').writeAsStringSync(cleaned);
   }
 
   /// Save a structured artifact (JSON, markdown, etc.).

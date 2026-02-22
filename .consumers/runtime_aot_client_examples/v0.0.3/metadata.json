@@ -1,0 +1,26 @@
+{
+  "repository": "open-runtime/runtime_aot_client_examples",
+  "discovery": {
+    "owner": "open-runtime",
+    "repo": "runtime_aot_client_examples",
+    "full_name": "open-runtime/runtime_aot_client_examples",
+    "dependency_constraint": null,
+    "dev_dependency_constraint": "{\n  \"git\": {\n    \"url\": \"git@github.com:open-runtime/runtime_ci_tooling.git\",\n    \"tag_pattern\": \"v{{version}}\"\n  },\n  \"version\": \"^0.6.0\"\n}",
+    "matched_path": "pubspec.yaml",
+    "pubspec_path": "pubspec.yaml",
+    "pubspec_sha": "a2bcde2839b9f64ade4b22fd20e29ef1e5271cba",
+    "runtime_ci_config_path": null,
+    "usage_signals": []
+  },
+  "release": {
+    "assets": [],
+    "body": "# runtime_aot_client_examples v0.0.3\n\n# Version Bump: v0.0.3\n\n**Date**: 2026-02-22T03:41:15.419164Z\n**Previous**: v0.0.2\n**Commits**: 1\n\n## Commits\n\nf6ec441 chore: add autodoc.json for documentation generation\n\n\n---\n[Full Changelog](https://github.com/open-runtime/runtime_aot_client_examples/compare/v0.0.2...v0.0.3)\n\n\n---\n[Full Changelog](https://github.com/open-runtime/runtime_aot_client_examples/compare/v0.0.2...v0.0.3) | [CHANGELOG.md](https://github.com/open-runtime/runtime_aot_client_examples/blob/v0.0.3/CHANGELOG.md)",
+    "createdAt": "2026-02-22T03:46:06Z",
+    "isDraft": false,
+    "isPrerelease": false,
+    "name": "v0.0.3",
+    "publishedAt": "2026-02-22T03:46:07Z",
+    "tagName": "v0.0.3",
+    "url": "https://github.com/open-runtime/runtime_aot_client_examples/releases/tag/v0.0.3"
+  }
+}
