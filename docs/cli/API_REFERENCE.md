@@ -1,280 +1,208 @@
 # CI/CD CLI API Reference
 
-This document provides a comprehensive API reference for the `runtime_ci_tooling` CI/CD CLI module.
-This module provides a suite of CLI commands and utilities for managing the CI/CD pipeline, interacting with Gemini AI, and handling GitHub releases.
+This module provides the core command-line interface for managing the AI-powered release pipeline, issue triage, and general CI/CD automation locally and in GitHub Actions.
 
 ## 1. Commands
 
-The CLI exposes several commands to manage the release pipeline and CI tasks.
+### AnalyzeCommand
+Run `dart analyze` (fail on errors only). 
 
-### `AnalyzeCommand`
-Runs `dart analyze` on the repository, failing only on errors (ignores warnings).
-- **Name:** `analyze`
-- **Method:** `Future<void> run()`
+This command runs `dart analyze --no-fatal-warnings`, ensuring that only actual errors fail the CI pipeline, while infos and warnings are reported but non-fatal.
 
-### `ArchiveRunCommand`
-Archives a CI/CD run from `.runtime_ci/runs/` to `.runtime_ci/audit/vX.X.X/` for permanent storage.
-- **Name:** `archive-run`
+**Example Usage:**
+```bash
+dart run runtime_ci_tooling:manage_cicd analyze
+```
 
-### `AutodocCommand`
-Generates or updates documentation for modules using Gemini Pro.
-- **Name:** `autodoc`
-- **Options:** `--init`, `--force`, `--module`, `--dry-run`
+### ArchiveRunCommand
+Archive a CI/CD run to `.runtime_ci/audit/vX.X.X/` for permanent storage.
+If the `--version` option is missing, it will skip the process. It finds the latest run automatically if `--run-dir` is not provided.
 
-### `ComposeCommand`
-Runs Stage 2 Changelog Composer using Gemini Pro, updating `CHANGELOG.md` and `README.md`.
-- **Name:** `compose`
+**Options:**
+- `runDir` (`String?`): Directory containing the CI run to archive.
 
-### `ConfigureMcpCommand`
-Sets up Model Context Protocol (MCP) servers (GitHub, Sentry) in `.gemini/settings.json`.
-- **Name:** `configure-mcp`
+### AutodocCommand
+Generate/update module documentation. Uses `autodoc.json` for configuration and hash-based change detection for incremental updates using Gemini.
 
-### `ConsumersCommand`
-Discovers repositories that consume `runtime_ci_tooling` and syncs latest release data.
-- **Name:** `consumers`
-- **Static Methods:**
-  - `int computeNextDiscoveryIndexFromNames(Iterable<String> fileNames)`
-  - `String buildDiscoverySnapshotName({required int index, required DateTime localTime})`
-  - `String resolveVersionFolderName(String tagName)`
-  - `String snapshotIdentityFromPath(String path)`
-  - `bool isSnapshotSourceCompatible({required String? sourceSnapshotPath, required String? sourceSnapshotIdentity, required String expectedSnapshotPath})`
-  - `bool isReleaseSummaryReusable({required String status, required String outputPath, required String? tag, required String? exactTag})`
-  - `String buildReleaseOutputPath({required String outputDir, required String repoName, required String tagName})`
-  - `String? selectTagFromReleaseList({required List<Map<String, dynamic>> releases, required bool includePrerelease, RegExp? tagPattern})`
+**Options:**
+- `init` (`bool`): Scan repo and create initial `autodoc.json`.
+- `force` (`bool`): Regenerate all docs regardless of hash.
+- `module` (`String?`): Only generate for a specific module.
 
-### `CreateReleaseCommand`
-Creates a git tag, GitHub Release, and commits all changes.
-- **Name:** `create-release`
+**Example Usage:**
+```bash
+# Generate all docs
+dart run runtime_ci_tooling:manage_cicd autodoc
+# Force regenerate specific module
+dart run runtime_ci_tooling:manage_cicd autodoc --force --module core
+```
 
-### `DetermineVersionCommand`
-Determines the next SemVer version via Gemini analysis or regex fallback. Outputs for GitHub Actions if `--output-github-actions` is set.
-- **Name:** `determine-version`
+### ComposeCommand
+Run Stage 2 Changelog Composer. Uses the Gemini Pro model to synthesize PR data and commit history into updates for `CHANGELOG.md` and `README.md`.
 
-### `DocumentationCommand`
-Runs documentation update using Gemini 3 Pro Preview.
-- **Name:** `documentation`
+### ConfigureMcpCommand
+Configure MCP servers (`github` and `sentry`) in `.gemini/settings.json`. 
+It detects `GH_TOKEN` or `GITHUB_TOKEN` to configure the GitHub MCP server, and sets up the Sentry MCP server.
 
-### `ExploreCommand`
-Runs Stage 1 Explorer Agent using Gemini 3 Pro Preview to analyze commits, PRs, and breaking changes.
-- **Name:** `explore`
+### ConsumersCommand
+Discover repositories that consume `runtime_ci_tooling` and sync latest release data. 
+Useful for cross-repository updates.
 
-### `InitCommand`
-Scans the repository and generates `.runtime_ci/config.json`, `autodoc.json`, and scaffolds workflows.
-- **Name:** `init`
+### CreateReleaseCommand
+Create git tag, GitHub Release, and commit all changes. Replaces shell scripts in the release job. 
 
-### `MergeAuditTrailsCommand`
-Merges CI/CD audit artifacts from multiple parallel jobs into a single run directory.
-- **Name:** `merge-audit-trails`
+**Options:**
+- `artifactsDir` (`String?`): Directory containing downloaded CI artifacts.
+- `repo` (`String?`): GitHub repository slug (`owner/repo`).
 
-### `ReleaseCommand`
-Runs the full local release pipeline (Version, Explore, and Compose).
-- **Name:** `release`
+### DetermineVersionCommand
+Determine SemVer bump via Gemini + regex heuristic. 
+Analyzes commit history and outputs JSON. With `--output-github-actions`, it writes `prev_tag`, `new_version`, and `should_release` to `$GITHUB_OUTPUT`.
 
-### `ReleaseNotesCommand`
-Runs Stage 3 Release Notes Author using Gemini 3 Pro Preview to generate rich narrative release notes.
-- **Name:** `release-notes`
+### DocumentationCommand
+Run documentation update via Gemini 3 Pro Preview. 
 
-### `SetupCommand`
-Installs all prerequisites (Node.js, Gemini CLI, gh, jq, tree) cross-platform.
-- **Name:** `setup`
+### ExploreCommand
+Run Stage 1 Explorer Agent. Analyzes commits and PRs to prepare context for changelog composition. Writes artifacts to `/tmp/`.
 
-### `StatusCommand`
-Shows the current CI/CD configuration status and validates required tools and configurations.
-- **Name:** `status`
+### InitCommand
+Scan the current repo and bootstrap `.runtime_ci/config.json`, `.runtime_ci/autodoc.json`, and optional scaffolding (e.g., `CHANGELOG.md`, `.gitignore` entries, pre-commit hooks).
 
-### `TestCommand`
-Runs `dart test`, excluding tags like `gcp` and `integration`.
-- **Name:** `test`
+### MergeAuditTrailsCommand
+Merge CI/CD audit artifacts from multiple jobs into a single run directory under `.runtime_ci/runs/`. Used in CI.
 
-### `TriageCommand`
-Root command for the issue triage pipeline. Supports subcommands: `auto`, `status`, `resume`, `pre-release`, `post-release`, `single`.
-- **Name:** `triage`
+**Options:**
+- `incomingDir` (`String?`): Directory containing incoming artifacts.
+- `outputDir` (`String?`): Output directory for merged trails.
 
-### `UpdateCommand`
-Updates templates, configs, and workflows from `runtime_ci_tooling`.
-- **Name:** `update`
+### ReleaseCommand
+Run the full local release pipeline sequentially: Version Detection, Explore, and Compose.
 
-### `UpdateAllCommand`
-Batch-updates all packages under a root directory by discovering `.runtime_ci/config.json`.
-- **Name:** `update-all`
+### ReleaseNotesCommand
+Run Stage 3 Release Notes Author. Generates rich release notes, migration guides, and linked issues using Gemini Pro. 
 
-### `ValidateCommand`
-Validates all configuration files (JSON, YAML, Dart, TOML).
-- **Name:** `validate`
+### SetupCommand
+Install all prerequisites cross-platform, including Node.js, Gemini CLI, `gh`, `jq`, and `tree`.
 
-### `VerifyProtosCommand`
-Verifies that proto source and generated Dart files exist.
-- **Name:** `verify-protos`
+### StatusCommand
+Show current CI/CD configuration status. Validates the existence of configuration files, tool versions, and API keys.
 
-### `VersionCommand`
-Shows the next SemVer version without making any side effects.
-- **Name:** `version`
+### TestCommand
+Run `dart test`. Excludes `gcp` and `integration` tags.
+
+### Triage Command Group
+Issue triage pipeline with AI-powered investigation.
+- **TriageAutoCommand**: `auto` - Auto-triage all untriaged open issues.
+- **TriagePostReleaseCommand**: `post-release` - Close loop after release (comment/close issues, link Sentry).
+- **TriagePreReleaseCommand**: `pre-release` - Scan issues for upcoming release.
+- **TriageResumeCommand**: `resume <run_id>` - Resume an interrupted triage run.
+- **TriageSingleCommand**: `single <number>` - Triage a single issue.
+- **TriageStatusCommand**: `status` - Show triage pipeline status.
+
+### UpdateCommand
+Update templates, configs, and workflows from `runtime_ci_tooling`. Detects drift between the package's templates and the consumer's installed copies.
+
+**Options:**
+- `force` (`bool`): Overwrite all files.
+- `templates` (`bool`): Only update template files.
+- `config` (`bool`): Only merge new keys into config.
+- `workflows` (`bool`): Only update workflow files.
+- `autodoc` (`bool`): Re-scan and update `autodoc.json`.
+- `backup` (`bool`): Write a backup before overwriting.
+
+### UpdateAllCommand
+Discover and update all `runtime_ci_tooling` packages under a root directory.
+
+### ValidateCommand
+Validate all configuration files (JSON, YAML, TOML, and Dart prompt scripts).
+
+### VerifyProtosCommand
+Verify proto source and generated files exist.
+
+### VersionCommand
+Show the next SemVer version without applying any side effects.
+
+---
 
 ## 2. Options Classes
 
-The CLI uses the `build_cli` pattern.
+Options classes use `build_cli` to parse command-line arguments.
 
-### `GlobalOptions`
-- `bool dryRun` - Show what would be done without executing.
-- `bool verbose` - Show detailed command output.
+### GlobalOptions
+Global CLI options available to all commands.
+- `dryRun` (`bool`): Show what would be done without executing.
+- `verbose` (`bool`): Show detailed command output.
 
-### `ManageCicdOptions`
-Combined CLI options for `manage_cicd.dart` entry point.
-- `bool dryRun`
-- `bool verbose`
-- `String? prevTag` - Override previous tag detection.
-- `String? version` - Override version (skip auto-detection).
-- `bool outputGithubActions` - Write version outputs to `$GITHUB_OUTPUT`.
-- `String? artifactsDir` - Directory containing downloaded CI artifacts.
-- `String? repo` - GitHub repository slug `owner/repo`.
-- `String? releaseTag` - Git tag for the release.
-- `String? releaseUrl` - URL of the GitHub release page.
-- `String? manifest` - Path to `issue_manifest.json`.
+### ManageCicdOptions
+Combined options for `manage_cicd.dart` entry point. Includes global, version, CI/CD, and release options.
 
-### Command-Specific Options
-- `ArchiveRunOptions` - Options for `archive-run` command (`runDir`).
-- `AutodocOptions` - Options for `autodoc` command (`init`, `force`, `module`).
-- `CreateReleaseOptions` - Options for `create-release` command (`artifactsDir`, `repo`).
-- `DetermineVersionOptions` - Options for `determine-version` command (`outputGithubActions`).
-- `MergeAuditTrailsOptions` - Options for `merge-audit-trails` command (`incomingDir`, `outputDir`).
-- `PostReleaseTriageOptions` - Options for `post-release-triage` command (`releaseTag`, `releaseUrl`, `manifest`).
-- `TriageCliOptions` - Combined CLI options for the modular `triage_cli.dart`.
-- `TriageOptions` - Options shared by triage subcommands (`force`).
-- `UpdateOptions` - Options for `update` command (`force`, `templates`, `config`, `workflows`, `autodoc`, `backup`).
-- `UpdateAllOptions` - Options for `update-all` command (`scanRoot`, `concurrency`, `force`, `workflows`, `templates`, `config`, `autodoc`, `backup`).
-- `VersionOptions` - Version-related options (`prevTag`, `version`).
+---
 
 ## 3. Utilities
 
-### `CiProcessRunner`
+### CiProcessRunner
 Utilities for running external processes.
-- `static bool commandExists(String command)`
-- `static String runSync(String command, String workingDirectory, {bool verbose = false})`
-- `static void exec(String executable, List<String> args, {String? cwd, bool fatal = false, bool verbose = false})`
+- `commandExists(String command)` (`bool`): Checks if a command exists on PATH.
+- `runSync(String command, String workingDirectory, {bool verbose = false})` (`String`): Runs a command synchronously.
+- `exec(String executable, List<String> args, {String? cwd, bool fatal = false, bool verbose = false})` (`void`): Executes a process, optionally exiting on failure.
 
-### `FileUtils`
+### FileUtils
 File system utilities for CI/CD operations.
-- `static void copyDirRecursive(Directory src, Directory dst)`
-- `static int countFiles(Directory dir)`
-- `static String readFileOr(String path, [String fallback = '(not available)'])`
+- `copyDirRecursive(Directory src, Directory dst)` (`void`)
+- `countFiles(Directory dir)` (`int`)
+- `readFileOr(String path, [String fallback])` (`String`)
 
-### `GeminiUtils`
+### GeminiUtils
 Utilities for Gemini CLI integration.
-- `static bool geminiAvailable({bool warnOnly = false})`
-- `static void requireGeminiCli()`
-- `static void requireApiKey()`
-- `static String extractJson(String rawOutput)`
+- `geminiAvailable({bool warnOnly = false})` (`bool`)
+- `requireGeminiCli()` (`void`)
+- `requireApiKey()` (`void`)
+- `extractJson(String rawOutput)` (`String`)
 
-### `HookInstaller`
-Installs and manages git pre-commit hooks for Dart repos.
-- `static bool install(String repoRoot, {int lineLength = 120, bool dryRun = false})`
-
-### `Logger`
+### Logger
 ANSI-styled console logging for CI/CD commands.
-- `static void header(String msg)`
-- `static void info(String msg)`
-- `static void success(String msg)`
-- `static void warn(String msg)`
-- `static void error(String msg)`
+- `header(String msg)`
+- `info(String msg)`
+- `success(String msg)`
+- `warn(String msg)`
+- `error(String msg)`
 
-### `PromptResolver`
-Resolves paths to prompt scripts.
-- `static String promptScript(String scriptName)`
-- `static String resolveToolingPackageRoot()`
-
-### `ReleaseUtils`
+### ReleaseUtils
 Utilities for release management.
-- `static String buildReleaseCommitMessage({required String repoRoot, required String version, required String prevTag, required Directory releaseDir, bool verbose = false})`
-- `static List<Map<String, String>> gatherVerifiedContributors(String repoRoot, String prevTag)`
-- `static String buildFallbackReleaseNotes(String repoRoot, String version, String prevTag)`
-- `static void addChangelogReferenceLinks(String repoRoot, String content)`
+- `buildReleaseCommitMessage(...)` (`String`): Builds rich commit message.
+- `gatherVerifiedContributors(String repoRoot, String prevTag)` (`List<Map<String, String>>`): Uses `gh` and `git` to collect contributors.
+- `buildFallbackReleaseNotes(...)` (`String`)
+- `addChangelogReferenceLinks(...)` (`void`)
 
-### `RepoUtils`
-Utilities for finding and working with the repository root.
-- `static String? findRepoRoot()`
+### RepoUtils
+- `findRepoRoot()` (`String?`): Finds the repository root by locating `pubspec.yaml` containing the configured package name.
 
-### `StepSummary`
-Step summary utilities for GitHub Actions.
-- `static void write(String markdown)`
-- `static String artifactLink([String label = 'View all artifacts'])`
-- `static String compareLink(String prevTag, String newTag, [String? label])`
-- `static String ghLink(String label, String path)`
-- `static String releaseLink(String tag)`
-- `static String collapsible(String title, String content, {bool open = false})`
+### StepSummary
+Utilities for writing to GitHub Actions `$GITHUB_STEP_SUMMARY`.
+- `write(String markdown)`
+- `artifactLink([String label = 'View all artifacts'])`
+- `compareLink(String prevTag, String newTag, [String? label])`
+- `ghLink(String label, String path)`
+- `releaseLink(String tag)`
+- `collapsible(String title, String content, {bool open = false})`
 
-### `TemplateResolver`
-Resolves paths within the `runtime_ci_tooling` package.
-- `static String resolvePackageRoot()`
-- `static String resolveTemplatesDir()`
-- `static String resolveTemplatePath(String relativePath)`
-- `static Map<String, dynamic> readManifest()`
-- `static String resolveToolingVersion()`
+### WorkflowGenerator
+Renders CI workflow YAML from a Mustache skeleton template and `config.json`.
+- `loadCiConfig(String repoRoot)` (`Map<String, dynamic>?`)
+- `render({String? existingContent})` (`String`): Renders template, preserving user sections.
+- `validate(Map<String, dynamic> ciConfig)` (`List<String>`)
+- `logConfig()` (`void`)
 
-### `TemplateVersionTracker` & `TemplateEntry`
-Tracks which template versions a consumer repo has installed.
-- `TemplateEntry({required String id, required String? source, required String destination, required String category, required String description})`
-- `TemplateVersionTracker.load(String repoRoot)`
-- `String? getInstalledHash(String templateId)`
-- `String? getConsumerHash(String templateId)`
-- `void recordUpdate(String templateId, {required String templateHash, required String consumerFileHash, required String toolingVersion})`
-- `void save(String repoRoot)`
+### HookInstaller
+Installs and manages git pre-commit hooks for Dart repos.
+- `install(String repoRoot, {int lineLength = 120, bool dryRun = false})` (`bool`): Installs or refreshes the pre-commit hook.
 
-### `ToolInstallers`
+### PromptResolver
+Resolves paths to prompt scripts within the `runtime_ci_tooling` package.
+- `promptScript(String scriptName)` (`String`)
+- `resolveToolingPackageRoot()` (`String`)
+
+### ToolInstallers
 Cross-platform tool installation utilities.
-- `static Future<void> installTool(String tool, {bool dryRun = false})`
-- `static Future<void> installNodeJs()`
-- `static Future<void> installGeminiCli()`
-- `static Future<void> installGitHubCli()`
-- `static Future<void> installJq()`
-- `static Future<void> installTree()`
+- `installTool(String tool, {bool dryRun = false})` (`Future<void>`)
 
-### `VersionDetection`
-Version detection and semantic versioning utilities.
-- `static String detectPrevTag(String repoRoot, {bool verbose = false})`
-- `static String detectNextVersion(String repoRoot, String prevTag, {bool verbose = false})`
-- `static int compareVersions(String a, String b)`
-
-### `WorkflowGenerator`
-Renders CI workflow YAML from a Mustache skeleton template and config.json.
-- `WorkflowGenerator({required this.ciConfig, required this.toolingVersion})`
-- `static Map<String, dynamic>? loadCiConfig(String repoRoot)`
-- `String render({String? existingContent})`
-- `static List<String> validate(Map<String, dynamic> ciConfig)`
-- `void logConfig()`
-
-## 4. Triage Top-Level Functions
-
-- `bool acquireTriageLock(bool force)`
-- `String computeFileHash(String filePath)`
-- `String createTriageRunDir(String repoRoot)`
-- `String? findLatestManifest(String repoRoot)`
-- `List<TriageDecision> loadCachedDecisions(String runDir)`
-- `Map<int, List<InvestigationResult>> loadCachedResults(String runDir, GamePlan plan)`
-- `void releaseTriageLock()`
-- `void saveCheckpoint(String runDir, GamePlan plan, String lastPhase)`
-
-## Examples
-
-**Running a command programmatically:**
-
-```dart
-import 'package:runtime_ci_tooling/src/cli/manage_cicd_cli.dart';
-
-void main() async {
-  final runner = ManageCicdCli();
-  await runner.run(['status', '--verbose']);
-}
-```
-
-**Executing process utilities:**
-
-```dart
-import 'package:runtime_ci_tooling/src/cli/utils/process_runner.dart';
-
-// Check if git is installed
-if (CiProcessRunner.commandExists('git')) {
-  // Run git status synchronously
-  final output = CiProcessRunner.runSync('git status', '/path/to/repo', verbose: true);
-  print(output);
-}
-```
