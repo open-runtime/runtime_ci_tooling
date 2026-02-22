@@ -1,0 +1,76 @@
+{
+  "version": "0.10.0",
+  "previous_version": "v0.9.2",
+  "total_commits": 1,
+  "categories": {
+    "added": [
+      {
+        "description": "Added investigationResults to TriageDecision serialization to prevent data loss",
+        "pr": "#4",
+        "commits": ["a82e9cc62da7d563b21afba18f85d13f58b9068b"]
+      },
+      {
+        "description": "Added balanced bracket-counting JSON extraction replacing indexOf(\"{\")",
+        "pr": "#4",
+        "commits": ["a82e9cc62da7d563b21afba18f85d13f58b9068b"]
+      },
+      {
+        "description": "Added logging/comments to 22 empty catch blocks across 13 files",
+        "pr": "#4",
+        "commits": ["a82e9cc62da7d563b21afba18f85d13f58b9068b"]
+      }
+    ],
+    "changed": [
+      {
+        "description": "Aligned agent output paths with investigate.dart read paths via resultsDir",
+        "pr": "#4",
+        "commits": ["a82e9cc62da7d563b21afba18f85d13f58b9068b"]
+      },
+      {
+        "description": "Deduplicated kCiConfigFiles and kStage1Artifacts into ci_constants.dart",
+        "pr": "#4",
+        "commits": ["a82e9cc62da7d563b21afba18f85d13f58b9068b"]
+      },
+      {
+        "description": "Centralized temporary paths via kStagingDir constant (env-overridable)",
+        "pr": "#4",
+        "commits": ["a82e9cc62da7d563b21afba18f85d13f58b9068b"]
+      },
+      {
+        "description": "Used config.triagedLabel and config.releaseNotesPath instead of hardcoded values in verify.dart and link.dart",
+        "pr": "#4",
+        "commits": ["a82e9cc62da7d563b21afba18f85d13f58b9068b"]
+      },
+      {
+        "description": "Replaced Ruby YAML validation with package:yaml in validate_command",
+        "pr": "#4",
+        "commits": ["a82e9cc62da7d563b21afba18f85d13f58b9068b"]
+      },
+      {
+        "description": "Replaced exit(1) with GeminiPrerequisiteError exceptions in gemini_utils",
+        "pr": "#4",
+        "commits": ["a82e9cc62da7d563b21afba18f85d13f58b9068b"]
+      },
+      {
+        "description": "Threw FormatException on unknown agent type instead of silent fallback",
+        "pr": "#4",
+        "commits": ["a82e9cc62da7d563b21afba18f85d13f58b9068b"]
+      }
+    ],
+    "deprecated": [],
+    "removed": [],
+    "fixed": [
+      {
+        "description": "Replaced firstWhere+.first fallback with firstOrNull+skip to prevent wrong-issue processing in investigate.dart and cross_repo_link.dart",
+        "pr": "#4",
+        "commits": ["a82e9cc62da7d563b21afba18f85d13f58b9068b"]
+      },
+      {
+        "description": "Replaced greedy regex with bracket-counting JSON extraction",
+        "pr": "#4",
+        "commits": ["a82e9cc62da7d563b21afba18f85d13f58b9068b"]
+      }
+    ],
+    "security": []
+  }
+}

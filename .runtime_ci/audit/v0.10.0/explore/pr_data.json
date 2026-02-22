@@ -1,0 +1,14 @@
+{
+  "pull_requests": [
+    {
+      "number": 4,
+      "title": "fix: resolve 15+ audit findings from comprehensive code review",
+      "author": "Tsavo Knott",
+      "labels": [],
+      "summary": "Resolves over 15 audit findings from a comprehensive code review. Includes critical fixes for data loss and wrong-issue processing, high-priority fixes for agent paths and JSON extraction, and centralizes temporary paths into an environment-overridable constant.",
+      "commits": [
+        "a82e9cc62da7d563b21afba18f85d13f58b9068b"
+      ]
+    }
+  ]
+}
