@@ -1,0 +1,78 @@
+{
+  "version": "1.0.0",
+  "gemini_model": "gemini-3-1-pro-preview",
+  "max_concurrent": 4,
+  "modules": [
+    {
+      "id": "cli",
+      "name": "CI/CD CLI",
+      "source_paths": [
+        "lib/src/cli/"
+      ],
+      "lib_paths": [
+        "lib/src/cli/"
+      ],
+      "output_path": "docs/cli/",
+      "generate": [
+        "quickstart",
+        "api_reference"
+      ],
+      "hash": "",
+      "last_updated": null
+    },
+    {
+      "id": "prompts",
+      "name": "Gemini Prompt Templates",
+      "source_paths": [
+        "lib/src/prompts/"
+      ],
+      "lib_paths": [
+        "lib/src/prompts/"
+      ],
+      "output_path": "docs/prompts/",
+      "generate": [
+        "api_reference"
+      ],
+      "hash": "",
+      "last_updated": null
+    },
+    {
+      "id": "triage",
+      "name": "Issue Triage Engine",
+      "source_paths": [
+        "lib/src/triage/"
+      ],
+      "lib_paths": [
+        "lib/src/triage/"
+      ],
+      "output_path": "docs/triage/",
+      "generate": [
+        "quickstart",
+        "api_reference"
+      ],
+      "hash": "",
+      "last_updated": null
+    },
+    {
+      "id": "utils",
+      "name": "Shared Utilities",
+      "source_paths": [
+        "lib/src/utils/"
+      ],
+      "lib_paths": [
+        "lib/src/utils/"
+      ],
+      "output_path": "docs/utils/",
+      "generate": [
+        "api_reference"
+      ],
+      "hash": "",
+      "last_updated": null
+    }
+  ],
+  "templates": {
+    "quickstart": "scripts/prompts/autodoc_quickstart_prompt.dart",
+    "api_reference": "scripts/prompts/autodoc_api_reference_prompt.dart",
+    "examples": "scripts/prompts/autodoc_examples_prompt.dart"
+  }
+}
