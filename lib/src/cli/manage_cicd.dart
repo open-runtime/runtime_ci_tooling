@@ -149,6 +149,11 @@ bool _verbose = false;
 bool _outputGithubActions = false;
 String? _prevTagOverride;
 String? _versionOverride;
+String? _artifactsDir;
+String? _repo;
+String? _releaseTag;
+String? _releaseUrl;
+String? _manifest;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Main
@@ -167,6 +172,11 @@ void main(List<String> args) async {
   _outputGithubActions = opts.outputGithubActions;
   _prevTagOverride = opts.prevTag;
   _versionOverride = opts.version;
+  _artifactsDir = opts.artifactsDir;
+  _repo = opts.repo;
+  _releaseTag = opts.releaseTag;
+  _releaseUrl = opts.releaseUrl;
+  _manifest = opts.manifest;
 
   final command = args.first;
 
@@ -1884,13 +1894,9 @@ ${_artifactLink()}
 Future<void> _runCreateRelease(String repoRoot, List<String> args) async {
   _header('Create Release');
 
-  // Parse args
-  String? artifactsDir;
-  String? repo;
-  final adIdx = args.indexOf('--artifacts-dir');
-  if (adIdx != -1 && adIdx + 1 < args.length) artifactsDir = args[adIdx + 1];
-  final repoIdx = args.indexOf('--repo');
-  if (repoIdx != -1 && repoIdx + 1 < args.length) repo = args[repoIdx + 1];
+  // Parse args from typed options
+  final artifactsDir = _artifactsDir;
+  final repo = _repo;
 
   final newVersion = _versionOverride;
   if (newVersion == null) {
@@ -2418,17 +2424,10 @@ Future<void> _runPostReleaseTriage(String repoRoot, List<String> args) async {
     exit(1);
   }
 
-  // Parse release tag and URL from args
-  String? releaseTag;
-  String? releaseUrl;
-  String? manifest;
-  for (var i = 0; i < args.length - 1; i++) {
-    if (args[i] == '--release-tag') releaseTag = args[i + 1];
-    if (args[i] == '--release-url') releaseUrl = args[i + 1];
-    if (args[i] == '--manifest') manifest = args[i + 1];
-  }
-
-  releaseTag ??= 'v$newVersion';
+  // Parse release tag and URL from typed options
+  final releaseTag = _releaseTag ?? 'v$newVersion';
+  final releaseUrl = _releaseUrl;
+  final manifest = _manifest;
 
   final triageArgs = [
     '--post-release',

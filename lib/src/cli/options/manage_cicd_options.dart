@@ -40,11 +40,44 @@ class ManageCicdOptions {
   @CliOption(help: 'Write version outputs to \$GITHUB_OUTPUT for GitHub Actions')
   final bool outputGithubActions;
 
+  // =========================================================================
+  // Release Options
+  // =========================================================================
+
+  /// Directory containing downloaded CI artifacts.
+  @CliOption(help: 'Directory containing downloaded CI artifacts (create-release)')
+  final String? artifactsDir;
+
+  /// GitHub repository slug (owner/repo) for release creation.
+  @CliOption(help: 'GitHub repository slug owner/repo (create-release)')
+  final String? repo;
+
+  // =========================================================================
+  // Post-Release Options
+  // =========================================================================
+
+  /// Git tag for the release (e.g. v0.6.0).
+  @CliOption(help: 'Git tag for the release (post-release-triage)')
+  final String? releaseTag;
+
+  /// URL of the GitHub release page.
+  @CliOption(help: 'URL of the GitHub release page (post-release-triage)')
+  final String? releaseUrl;
+
+  /// Path to issue_manifest.json for post-release triage.
+  @CliOption(help: 'Path to issue_manifest.json (post-release-triage)')
+  final String? manifest;
+
   const ManageCicdOptions({
     this.dryRun = false,
     this.verbose = false,
     this.prevTag,
     this.version,
     this.outputGithubActions = false,
+    this.artifactsDir,
+    this.repo,
+    this.releaseTag,
+    this.releaseUrl,
+    this.manifest,
   });
 }
