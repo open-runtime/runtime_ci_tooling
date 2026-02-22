@@ -5,6 +5,7 @@ import '../../utils/logger.dart';
 import '../../../triage/models/game_plan.dart';
 import '../../../triage/models/investigation_result.dart';
 import '../../../triage/models/triage_decision.dart';
+import '../../../triage/utils/run_context.dart';
 
 /// Lock file remains in /tmp (not repo-scoped -- prevents concurrent triage globally).
 const String kLockFilePath = '/tmp/triage.lock';
@@ -56,7 +57,7 @@ void releaseTriageLock() {
 String createTriageRunDir(String repoRoot) {
   final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').replaceAll('.', '-').substring(0, 19);
   final runId = 'triage_${timestamp}_$pid';
-  final runDir = Directory('$repoRoot/.cicd_runs/$runId');
+  final runDir = Directory('$repoRoot/$kCicdRunsDir/$runId');
   runDir.createSync(recursive: true);
   Directory('${runDir.path}/results').createSync();
   Directory('${runDir.path}/triage').createSync();
@@ -105,7 +106,7 @@ List<TriageDecision> loadCachedDecisions(String runDir) {
 
 /// Search recent triage runs for the latest issue_manifest.json.
 String? findLatestManifest(String repoRoot) {
-  final runsDir = Directory('$repoRoot/.cicd_runs');
+  final runsDir = Directory('$repoRoot/$kCicdRunsDir');
   if (!runsDir.existsSync()) return null;
 
   final runs = runsDir.listSync().whereType<Directory>().toList()..sort((a, b) => b.path.compareTo(a.path));

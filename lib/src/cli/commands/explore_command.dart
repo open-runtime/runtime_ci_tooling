@@ -92,7 +92,7 @@ class ExploreCommand extends Command<void> {
         'cat $promptPath | gemini '
             '-o json --yolo '
             '-m $_kGeminiProModel '
-            "--allowed-tools 'run_shell_command(git),run_shell_command(gh),write_file'",
+            "--allowed-tools 'run_shell_command(git),run_shell_command(gh),run_shell_command(mkdir),run_shell_command(tee),run_shell_command(cat)'",
       ],
       workingDirectory: repoRoot,
       environment: {...Platform.environment},

@@ -197,8 +197,8 @@ class ReleaseNotesCommand extends Command<void> {
       Logger.success('Stage 3 completed.');
       if (stats != null) {
         Logger.info('  Tool calls: ${stats['tools']?['totalCalls']}');
-        Logger.info('  Duration: ${stopwatch.elapsed.inSeconds}s');
       }
+      Logger.info('  Duration: ${stopwatch.elapsed.inSeconds}s');
     } catch (e) {
       Logger.warn('Could not parse Gemini response stats: $e');
     }
