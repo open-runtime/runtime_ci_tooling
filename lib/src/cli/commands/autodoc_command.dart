@@ -407,7 +407,10 @@ Write the corrected file to the same path: $absOutputFile
 
   static const _maxRetries = 3;
   static const _retryDelays = [Duration(seconds: 5), Duration(seconds: 15), Duration(seconds: 45)];
-  static final _rateLimitPattern = RegExp(r'(429|RESOURCE_EXHAUSTED|rate.?limit|quota)', caseSensitive: false);
+  static final _retryablePattern = RegExp(
+    r'(429|RESOURCE_EXHAUSTED|rate.?limit|quota|fetch.?failed|ECONNRESET|ETIMEDOUT|ENOTFOUND)',
+    caseSensitive: false,
+  );
 
   /// Runs a Gemini CLI shell command, retrying on rate-limit errors with exponential backoff.
   ///
@@ -430,7 +433,7 @@ Write the corrected file to the same path: $absOutputFile
       final stderr = result.stderr as String;
       final attemptsLeft = _maxRetries - attempt;
 
-      if (_rateLimitPattern.hasMatch(stderr) && attemptsLeft > 0) {
+      if (_retryablePattern.hasMatch(stderr) && attemptsLeft > 0) {
         final delay = _retryDelays[attempt.clamp(0, _retryDelays.length - 1)];
         Logger.warn('  [$taskLabel] Rate limited — retrying in ${delay.inSeconds}s ($attemptsLeft left)');
         await Future.delayed(delay);
