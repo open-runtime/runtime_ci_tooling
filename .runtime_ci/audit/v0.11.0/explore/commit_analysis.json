@@ -1,0 +1,21 @@
+{
+  "version": "0.11.0",
+  "previous_version": "v0.10.0",
+  "total_commits": 1,
+  "categories": {
+    "added": [
+      {
+        "description": "Multi-platform CI workflow generation supporting configurable platform matrices via config.json's ci.platforms array",
+        "pr": null,
+        "commits": [
+          "a2afc8b6d2a7c1dec31e4ac50fab6be3eba9c9e4"
+        ]
+      }
+    ],
+    "changed": [],
+    "deprecated": [],
+    "removed": [],
+    "fixed": [],
+    "security": []
+  }
+}

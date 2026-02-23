@@ -9,6 +9,7 @@ Shared CI/CD automation tooling for open-runtime or pieces-app packages. Provide
 - **Documentation Generation**: Automated documentation maintenance using Gemini (with parallel execution and automatic retries), including API references, migration guides, quickstarts, and examples. Writes directly to module-scoped paths.
 - **Audit Trails**: Comprehensive logging of CI/CD actions and decisions.
 - **MCP Integration**: Configuration for Model Context Protocol servers (GitHub, Sentry).
+- **Multi-Platform CI**: Multi-platform CI workflow generation supporting configurable platform matrices via `config.json`'s `ci.platforms` array.
 - **Cross-Platform**: Utilities for tool installation and environment setup.
 - **Template Updating**: Keep local configurations and CI workflows in sync with upstream changes.
 - **Typed CLI Options**: Uses `build_cli` to generate typed and structured command-line options.
@@ -19,7 +20,7 @@ Add `runtime_ci_tooling` to your `dev_dependencies`:
 
 ```yaml
 dev_dependencies:
-  runtime_ci_tooling: ^0.10.0
+  runtime_ci_tooling: ^0.11.0
 ```
 
 Or run:
@@ -44,7 +45,7 @@ This will create:
 
 ## Usage
 
-As of version **v0.10.0**, tools are available as executables in `bin/`, and CLI options are strictly typed.
+As of version **v0.11.0**, tools are available as executables in `bin/`, and CLI options are strictly typed.
 
 ### Manage CI/CD
 
@@ -82,8 +83,8 @@ dart run bin/triage_cli.dart <command> [options]
 **Usage Examples:**
 - **Single Issue**: `dart run bin/triage_cli.dart <issue_number>`
 - **Auto Triage**: `dart run bin/triage_cli.dart --auto`
-- **Pre-Release Scan**: `dart run bin/triage_cli.dart --pre-release --prev-tag v0.9.2 --version 0.10.0`
-- **Post-Release Loop**: `dart run bin/triage_cli.dart --post-release --version 0.10.0 --release-tag v0.10.0`
+- **Pre-Release Scan**: `dart run bin/triage_cli.dart --pre-release --prev-tag v0.10.0 --version 0.11.0`
+- **Post-Release Loop**: `dart run bin/triage_cli.dart --post-release --version 0.11.0 --release-tag v0.11.0`
 
 Run `dart run bin/triage_cli.dart --help` for full usage details.
 

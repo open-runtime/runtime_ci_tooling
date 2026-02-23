@@ -1,0 +1,3 @@
+- Added multi-platform CI support via the `ci.platforms` configuration array.
+- Automatically generates GitHub Actions matrix strategies for `ubuntu`, `macos`, and `windows`.
+- Maintains backward compatibility with a streamlined job structure for single-platform projects.
