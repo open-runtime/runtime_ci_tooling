@@ -1,0 +1,21 @@
+{
+  "version": "0.11.2",
+  "previous_version": "v0.11.1",
+  "total_commits": 1,
+  "categories": {
+    "added": [],
+    "changed": [],
+    "deprecated": [],
+    "removed": [],
+    "fixed": [
+      {
+        "description": "Fixed triage CLI failing with UsageException when given a bare issue number instead of routing to the single subcommand.",
+        "pr": "",
+        "commits": [
+          "0d931b33b96c92704456203445941a39b600e52f"
+        ]
+      }
+    ],
+    "security": []
+  }
+}

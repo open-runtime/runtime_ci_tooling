@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.2] - 2026-02-23
+
+### Fixed
+- Fixed triage CLI failing with UsageException when given a bare issue number instead of routing to the single subcommand
+
 ## [0.11.1] - 2026-02-23
 
 ### Changed
@@ -159,6 +164,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed `git add` failure in release process by adding files individually (commit 1d45361)
 
+[0.11.2]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.9.2...v0.10.0
