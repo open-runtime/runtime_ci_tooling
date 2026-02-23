@@ -32,17 +32,17 @@ dependencies:
     git:
       url: git@github.com:open-runtime/runtime_isomorphic_library.git
       tag_pattern: v{{version}}
-    version: ^1.2.1
+    version: ^1.2.6
   grpc:
     git:
       url: git@github.com:open-runtime/grpc-dart.git
       tag_pattern: v{{version}}
-    version: ^5.3.0
+    version: ^5.3.7
   encrypt:
     git:
       url: git@github.com:open-runtime/encrypt.git
       tag_pattern: v{{version}}
-    version: ^5.1.6
+    version: ^5.1.11
 
 dev_dependencies:
   # Resolves from workspace (packages/libraries/dart/runtime_ci_tooling) in monorepo.
@@ -51,7 +51,7 @@ dev_dependencies:
     git:
       url: git@github.com:open-runtime/runtime_ci_tooling.git
       tag_pattern: v{{version}}
-    version: ^0.8.0
+    version: ^0.9.1
   build_cli: ^2.2.10
   build_runner: ^2.4.14
   lints: ^6.0.0

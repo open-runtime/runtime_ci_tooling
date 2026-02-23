@@ -19,14 +19,14 @@ dependencies:
     git:
       url: git@github.com:open-runtime/grpc-dart.git
       tag_pattern: v{{version}}
-    version: ^5.3.0
+    version: ^5.3.7
 
 dev_dependencies:
   runtime_ci_tooling:
     git:
       url: git@github.com:open-runtime/runtime_ci_tooling.git
       tag_pattern: v{{version}}
-    version: ^0.8.0
+    version: ^0.9.1
   build_runner: ^2.11.0
   test: ^1.24.0
   leak_tracker: ^11.0.1
@@ -35,12 +35,12 @@ dev_dependencies:
     git:
       url: git@github.com:open-runtime/encrypt.git
       tag_pattern: v{{version}}
-    version: ^5.1.6
+    version: ^5.1.11
   cli_script:
     git:
       url: git@github.com:open-runtime/dart_cli_script.git
       tag_pattern: v{{version}}
-    version: ^1.0.0
+    version: ^1.0.1
   meta: ^1.9.1
   safe_int_id: ^1.0.0
   http2: ^2.3.0
