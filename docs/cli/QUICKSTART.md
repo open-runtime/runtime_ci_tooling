@@ -1,150 +1,180 @@
 # CI/CD CLI Quickstart
 
 ## 1. Overview
-The **CI/CD CLI** module provides a cross-platform command-line interface for managing the AI-powered release pipeline, document generation, repository discovery, and issue triage. It includes a comprehensive suite of commands that leverage the Gemini CLI to explore commit histories, compose changelogs, author release notes, generate module documentation, and automatically triage GitHub issues.
+The **CI/CD CLI** module provides a cross-platform command-line interface for managing AI-powered release pipelines, issue triage, and documentation generation. It orchestrates GitHub Actions workflows, local repository configuration (`.runtime_ci`), and integrates with Gemini CLI to automate tasks like changelog composition, release notes authoring, and repository scanning.
 
-## 2. Setup and Usage
-The CLI relies on the `ManageCicdCli` command runner. You can interact with the tool via the pre-compiled executable in any repository where this package is installed:
+## 2. Usage as a Command-Line Tool
+The primary way to use the CLI is via the `dart run` command from your terminal:
 
 ```bash
-dart run runtime_ci_tooling:manage_cicd <command>
+dart run runtime_ci_tooling:manage_cicd <command> [arguments]
 ```
 
-To use the CLI programmatically or extend its functionality, import the main CLI runner and the corresponding options classes:
+## 3. Programmatic Setup
+The CLI can also be embedded programmatically. The entry point is the `ManageCicdCli` class, which extends `CommandRunner`. It registers all available commands automatically.
 
 ```dart
+import 'dart:io';
 import 'package:runtime_ci_tooling/src/cli/manage_cicd_cli.dart';
-import 'package:runtime_ci_tooling/src/cli/options/global_options.dart';
 
-void main(List<String> args) async {
+Future<void> main(List<String> args) async {
   final cli = ManageCicdCli();
   
   try {
     await cli.run(args);
-  } catch (e) {
-    print('CLI Error: $e');
+  } on UsageException catch (e) {
+    stderr.writeln(e);
+    exit(64);
   }
 }
 ```
 
-## 3. Available Commands
+## 4. Global Options
+The CLI provides global options that apply to all commands:
+- `--dry-run`: Show what would be done without executing.
+- `-v, --verbose`: Show detailed command output.
 
-The CLI supports a robust set of commands for managing the full CI/CD lifecycle:
+Example:
+```dart
+import 'package:runtime_ci_tooling/src/cli/manage_cicd_cli.dart';
 
-### Project Initialization & Setup
-- `init`: Scan the repo and generate `.runtime_ci/config.json`, `autodoc.json`, and scaffold workflows.
-- `setup`: Install all prerequisites (Node.js, Gemini CLI, `gh`, `jq`, `tree`).
-- `configure-mcp`: Set up Model Context Protocol (MCP) servers (GitHub, Sentry) in `.gemini/settings.json`.
-- `validate`: Validate all configuration files (YAML, JSON, TOML, Dart prompts).
-- `status`: Show current CI/CD configuration status.
-- `update`: Update templates, configs, and workflows from `runtime_ci_tooling`.
-- `update-all`: Discover and update all `runtime_ci_tooling` packages under a root directory.
+Future<void> main() async {
+  final cli = ManageCicdCli();
+  await cli.run(['--verbose', 'status']);
+}
+```
 
-### Code Quality & Testing
-- `analyze`: Run `dart analyze` (fail on errors only).
-- `test`: Run `dart test`.
-- `verify-protos`: Verify proto source and generated Dart files exist.
+## 5. Command Reference & Common Operations
 
-### AI-Powered Release Pipeline
-- `release`: Run the full local release pipeline (`version` + `explore` + `compose`).
-- `version`: Determine the next SemVer version from commit history without side effects.
-- `determine-version`: Determine SemVer bump via Gemini + regex (outputs JSON and to `$GITHUB_OUTPUT`).
-- `explore`: Run Stage 1 Explorer Agent (Gemini 3 Pro Preview) to analyze commits, PRs, and breaking changes.
-- `compose`: Run Stage 2 Changelog Composer to update `CHANGELOG.md`.
-- `release-notes`: Run Stage 3 Release Notes Author to generate rich release notes, migration guides, and highlights.
-- `documentation`: Run documentation update via Gemini.
-- `create-release`: Create git tag, GitHub Release, and commit all changes.
+### Initialization & Setup
+- **`init`**: Scaffolds `.runtime_ci/config.json`, `autodoc.json`, and sets up git pre-commit hooks.
+- **`setup`**: Installs all prerequisites (Node.js, Gemini CLI, `gh`, `jq`, `tree`).
+- **`status`**: Shows current CI/CD configuration status, tool versions, and MCP server configuration.
+- **`validate`**: Validates all configuration files (YAML, JSON, TOML, Dart prompts).
+- **`configure-mcp`**: Sets up MCP servers (GitHub, Sentry) in `.gemini/settings.json`.
 
-### Issue Triage
-The `triage` command group provides an AI-powered pipeline:
-- `triage auto`: Auto-triage all untriaged open issues.
-- `triage single <number>`: Triage a single specific issue.
-- `triage status`: Show triage pipeline status.
-- `triage resume <run_id>`: Resume a previously interrupted triage run.
-- `triage pre-release`: Scan issues for upcoming release (requires `--prev-tag` and `--version`).
-- `triage post-release`: Close loop after release (requires `--version` and `--release-tag`).
+```dart
+import 'package:runtime_ci_tooling/src/cli/manage_cicd_cli.dart';
+
+Future<void> main() async {
+  final cli = ManageCicdCli();
+  await cli.run(['init']);
+  await cli.run(['setup']);
+  await cli.run(['status', '--verbose']);
+  await cli.run(['configure-mcp']);
+}
+```
+
+### Template Updates
+- **`update`**: Updates templates, configs, and workflows from `runtime_ci_tooling`. Options include `--force`, `--templates`, `--config`, `--workflows`, `--autodoc`, and `--backup`.
+- **`update-all`**: Discovers and updates all `runtime_ci_tooling` packages under a root directory. Accepts options like `--scan-root`, `--concurrency`, and passthrough flags.
+
+```dart
+import 'package:runtime_ci_tooling/src/cli/manage_cicd_cli.dart';
+
+Future<void> main() async {
+  final cli = ManageCicdCli();
+  // Update workflows and make backups
+  await cli.run(['update', '--workflows', '--backup']);
+  // Update all packages in a directory concurrently
+  await cli.run(['update-all', '--scan-root', '../projects', '--concurrency', '4']);
+}
+```
+
+### Release Pipeline
+The release commands use Gemini to automate versioning and changelogs:
+- **`version`**: Shows the next SemVer version without side effects. Options: `--prev-tag`, `--version`.
+- **`determine-version`**: Determines SemVer bump (useful in CI with `--output-github-actions`).
+- **`explore`**: Runs Stage 1 Explorer Agent (Gemini 3 Pro Preview) to analyze commits and PRs.
+- **`compose`**: Runs Stage 2 Changelog Composer to update `CHANGELOG.md`.
+- **`release-notes`**: Runs Stage 3 Release Notes Author to generate rich release notes, migration guides, and highlights.
+- **`documentation`**: Runs documentation updates via Gemini.
+- **`release`**: Runs the full local release pipeline (`version` + `explore` + `compose`).
+- **`create-release`**: Creates git tag, GitHub Release, and commits all changes. Options: `--artifacts-dir`, `--repo`.
+
+```dart
+import 'package:runtime_ci_tooling/src/cli/manage_cicd_cli.dart';
+
+Future<void> main() async {
+  final cli = ManageCicdCli();
+  // Automatically determine next version and generate changelog
+  await cli.run(['release']);
+
+  // Specify specific version and tag manually
+  await cli.run(['explore', '--prev-tag', 'v0.0.1', '--version', '0.0.2']);
+  await cli.run(['compose', '--prev-tag', 'v0.0.1', '--version', '0.0.2']);
+}
+```
+
+### AI-Powered Triage
+The `triage` command is a modular pipeline for issue management. It supports global options like `--force`.
+- **`triage single <number>`** (or `triage <number>`): Triage a specific issue.
+- **`triage auto`**: Auto-triage all untriaged open issues.
+- **`triage status`**: Show triage pipeline status.
+- **`triage resume <run_id>`**: Resume an interrupted triage run.
+- **`triage pre-release`**: Scan issues/Sentry and produce an issue manifest before a release. Requires `--prev-tag` and `--version`.
+- **`triage post-release`**: Add comments and close issues post-release. Requires `--version` and `--release-tag`, optionally `--manifest` and `--release-url`.
+
+```dart
+import 'package:runtime_ci_tooling/src/cli/manage_cicd_cli.dart';
+
+Future<void> main() async {
+  final cli = ManageCicdCli();
+  // Triage a single issue by number
+  await cli.run(['triage', 'single', '42']);
+
+  // Auto-triage all open untriaged issues
+  await cli.run(['triage', 'auto']);
+
+  // Run pre-release triage
+  await cli.run(['triage', 'pre-release', '--prev-tag', 'v1.0.0', '--version', '1.1.0']);
+}
+```
 
 ### Documentation Generation
-- `autodoc`: Generate/update module docs using Gemini based on `autodoc.json`.
+- **`autodoc`**: Generates or updates module docs using Gemini Pro based on `autodoc.json`. Options: `--init`, `--force`, `--module`, `--dry-run`.
 
-### CI/CD Artifacts & Consumers
-- `archive-run`: Archive `.runtime_ci/runs/` to `.runtime_ci/audit/vX.X.X/` for permanent storage.
-- `merge-audit-trails`: Merge CI/CD audit artifacts from multiple jobs (for CI use).
-- `consumers`: Discover `runtime_ci_tooling` consumers and sync latest release data.
+```dart
+import 'package:runtime_ci_tooling/src/cli/manage_cicd_cli.dart';
 
-## 4. Common Workflows
-
-### Initializing a Project
-Scaffold `.runtime_ci/config.json`, `CHANGELOG.md`, `.gitignore` entries, and configure GitHub/Sentry MCPs:
-
-```bash
-dart run runtime_ci_tooling:manage_cicd init
-dart run runtime_ci_tooling:manage_cicd setup
-dart run runtime_ci_tooling:manage_cicd configure-mcp
+Future<void> main() async {
+  final cli = ManageCicdCli();
+  // Force regenerate all configured documentation modules
+  await cli.run(['autodoc', '--force']);
+}
 ```
 
-### Auto-Generating Documentation
-Generate or update API references and quickstarts via `autodoc`.
+### Code Quality & Utilities
+- **`analyze`**: Runs `dart analyze` and fails on errors.
+- **`test`**: Runs `dart test` excluding integration tags.
+- **`verify-protos`**: Verifies proto source and generated files exist.
+- **`consumers`**: Discovers `runtime_ci_tooling` consumers and syncs latest release data. Options: `--org`, `--package`, `--discover-only`, `--releases-only`, `--tag`, `--tag-regex`, `--include-prerelease`, `--resume`, `--search-first`, `--discovery-workers`, `--release-workers`, `--repo-limit`, `--output-dir`.
+- **`archive-run`**: Archives a CI run to `.runtime_ci/audit/` for permanent storage. Options: `--run-dir`.
+- **`merge-audit-trails`**: Merges CI/CD audit artifacts from multiple jobs into a single run directory. Options: `--incoming-dir`, `--output-dir`.
 
-```bash
-# 1. Scaffold autodoc.json based on the lib/src/ layout
-dart run runtime_ci_tooling:manage_cicd autodoc --init
+```dart
+import 'package:runtime_ci_tooling/src/cli/manage_cicd_cli.dart';
 
-# 2. Generate documentation using Gemini (reads from autodoc.json)
-dart run runtime_ci_tooling:manage_cicd autodoc
-
-# 3. Force regeneration of a specific module
-dart run runtime_ci_tooling:manage_cicd autodoc --force --module commands
+Future<void> main() async {
+  final cli = ManageCicdCli();
+  await cli.run(['analyze']);
+  await cli.run(['consumers', '--org', 'my-org', '--discover-only']);
+}
 ```
 
-### Issue Triage
-Automate issue management with `triage`.
+## 6. Configuration
+The CLI relies heavily on the following configuration files and environment variables:
 
-```bash
-# Auto-triage all open untriaged issues
-dart run runtime_ci_tooling:manage_cicd triage auto
+**Files**:
+- `.runtime_ci/config.json`: Core repository config, CI features, and agent thresholds.
+- `.runtime_ci/autodoc.json`: Source paths and output rules for documentation generation.
+- `.gemini/settings.json`: Configuration for GitHub and Sentry MCP servers.
 
-# Triage a single specific issue (can also use 'triage 42' as shorthand)
-dart run runtime_ci_tooling:manage_cicd triage single 42
+**Environment Variables**:
+- `GEMINI_API_KEY`: Required for all AI-powered commands (`explore`, `compose`, `release-notes`, `triage`, `autodoc`, etc.).
+- `GH_TOKEN` or `GITHUB_TOKEN` or `GITHUB_PAT`: Required for GitHub CLI (`gh`) operations and GitHub MCP server.
+- `CI_STAGING_DIR`: Optional override for the staging directory used in CI pipelines (defaults to system temp directory).
 
-# View current triage lock status and run history
-dart run runtime_ci_tooling:manage_cicd triage status
-```
-
-### Release Pipeline Execution
-Execute the full pipeline locally:
-
-```bash
-dart run runtime_ci_tooling:manage_cicd release --prev-tag v0.1.0 --version 0.2.0
-```
-
-Or run specific stages individually:
-```bash
-dart run runtime_ci_tooling:manage_cicd explore --prev-tag v0.1.0 --version 0.2.0
-dart run runtime_ci_tooling:manage_cicd compose --prev-tag v0.1.0 --version 0.2.0
-dart run runtime_ci_tooling:manage_cicd release-notes --prev-tag v0.1.0 --version 0.2.0
-```
-
-### Package Management & Discovery
-Discover dependent projects and update shared pipeline workflows:
-
-```bash
-# Batch update runtime_ci_tooling configurations across local repositories
-dart run runtime_ci_tooling:manage_cicd update-all --force --workflows
-
-# Discover consumer repositories across GitHub orgs and sync release artifacts
-dart run runtime_ci_tooling:manage_cicd consumers --org open-runtime --package runtime_ci_tooling
-```
-
-## 5. Configuration
-
-### Files
-- **`.runtime_ci/config.json`**: The core repository config. Stores CI workflow parameters, area labels, MCP settings, and feature flags.
-- **`.runtime_ci/autodoc.json`**: Tracks the generation state for docs, containing source paths, hashes, and prompt templates for each target module.
-- **`.gemini/settings.json`**: Configures the MCP servers utilized by the Gemini CLI agents for operations like `explore` and `triage`.
-
-### Environment Variables
-- `GEMINI_API_KEY`: Required for executing AI tasks (`explore`, `compose`, `release-notes`, `autodoc`, `triage`).
-- `GH_TOKEN`, `GITHUB_TOKEN`, or `GITHUB_PAT`: Required to communicate with the GitHub API (used by `gh` and the GitHub MCP server).
-- `SENTRY_ACCESS_TOKEN`: Required if Sentry MCP is enabled and requires authorization.
-- `CI_STAGING_DIR`: Optional override for the path where intermediate JSON artifacts (like `commit_analysis.json`) are buffered during multi-stage CI runs.
+## 7. Related Modules
+- `Triage` (`lib/src/triage/`): The core business logic, phase execution, and models (e.g., `GamePlan`, `TriageDecision`) utilized by the `triage` commands.
+- `Prompts` (`lib/src/prompts/`): Executable Dart scripts that generate context-aware prompts for the Gemini CLI.
