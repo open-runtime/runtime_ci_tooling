@@ -23,7 +23,7 @@ Future<void> main(List<String> args) async {
   //   --pre-release  → triage pre-release
   //   --post-release → triage post-release
   //   --resume <id>  → triage resume <id>
-  //   <number>       → triage single <number> (handled by TriageCommand.run)
+  //   <number>       → triage single <number> (handled below in _translateArgs)
   final translated = _translateArgs(args);
 
   final cli = ManageCicdCli();
@@ -70,6 +70,12 @@ List<String> _translateArgs(List<String> args) {
 
   if (subcommand != null) {
     result.add(subcommand);
+  } else if (remaining.isNotEmpty && int.tryParse(remaining.first) != null) {
+    // Bare number → route to `single` subcommand.
+    // (TriageCommand.run() has this shorthand too, but CommandRunner
+    // throws UsageException for unrecognised subcommands before run()
+    // is ever called, so we must handle it here.)
+    result.add('single');
   }
   result.addAll(remaining);
 

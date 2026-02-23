@@ -9,9 +9,9 @@ import 'triage_status_command.dart';
 
 /// Triage command group with subcommands.
 ///
-/// Supports both explicit subcommands and shorthand:
+/// Supports both explicit subcommands and shorthand (rewritten upstream):
 ///   manage_cicd triage single 42
-///   manage_cicd triage 42          (auto-detects positional number)
+///   manage_cicd triage 42          (rewritten to `single 42` by ManageCicdCli.run)
 ///   manage_cicd triage auto
 ///   manage_cicd triage status
 ///   manage_cicd triage resume <run_id>
@@ -33,20 +33,8 @@ class TriageCommand extends Command<void> {
     addSubcommand(TriagePostReleaseCommand());
   }
 
-  @override
-  Future<void> run() async {
-    // Support shorthand: `triage 42` → delegates to `triage single 42`
-    final rest = argResults!.rest;
-    if (rest.isNotEmpty) {
-      final issueNumber = int.tryParse(rest.first);
-      if (issueNumber != null) {
-        // Delegate to TriageSingleCommand logic
-        await TriageSingleCommand.runSingle(issueNumber, globalResults);
-        return;
-      }
-    }
-
-    // No subcommand matched, no positional number → print usage
-    printUsage();
-  }
+  // NOTE: `run()` is never called on branch commands (commands with
+  // subcommands) — the `args` package throws UsageException for unrecognised
+  // subcommand names before reaching run(). The `triage <number>` shorthand
+  // is handled by ManageCicdCli.run() and triage_cli.dart's _translateArgs().
 }

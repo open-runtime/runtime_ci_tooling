@@ -74,6 +74,26 @@ class ManageCicdCli extends CommandRunner<void> {
     addCommand(VersionCommand());
   }
 
+  /// Intercept `triage <number>` and rewrite to `triage single <number>`.
+  ///
+  /// The `args` package throws [UsageException] for unrecognised subcommand
+  /// names before [TriageCommand.run] is ever called, so the shorthand
+  /// `triage 42` must be rewritten here rather than in the command's `run()`.
+  @override
+  Future<void> run(Iterable<String> args) {
+    final argList = args.toList();
+
+    // Find the index of 'triage' (may not be at 0 if global flags precede it,
+    // e.g. `manage_cicd --verbose triage 42`).
+    final triageIdx = argList.indexOf('triage');
+    final nextIdx = triageIdx + 1;
+    if (triageIdx >= 0 && nextIdx < argList.length && int.tryParse(argList[nextIdx]) != null) {
+      argList.insert(nextIdx, 'single');
+    }
+
+    return super.run(argList);
+  }
+
   /// Parse global options from ArgResults using build_cli generated code.
   static GlobalOptions parseGlobalOptions(ArgResults? results) {
     if (results == null) {
