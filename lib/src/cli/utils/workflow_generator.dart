@@ -6,6 +6,20 @@ import 'package:mustache_template/mustache_template.dart';
 import 'logger.dart';
 import 'template_resolver.dart';
 
+/// Maps platform config identifiers to GitHub Actions runner labels.
+///
+/// Architecture-specific variants:
+///   - `macos-arm64`: Apple Silicon (default for `macos-latest`)
+///   - `macos-x64`:   Intel macOS (`macos-13`, last x64 runner)
+///   - `macos`:        Alias for `macos-arm64`
+const _platformRunners = <String, String>{
+  'ubuntu': 'ubuntu-latest',
+  'macos': 'macos-latest',
+  'macos-arm64': 'macos-latest',
+  'macos-x64': 'macos-13',
+  'windows': 'windows-latest',
+};
+
 /// Renders CI workflow YAML from a Mustache skeleton template and config.json.
 ///
 /// The skeleton uses `<% %>` delimiters (set via `{{=<% %>=}}` at the top)
@@ -82,6 +96,12 @@ class WorkflowGenerator {
       }
     }
 
+    // Platform support
+    final platformsRaw = ciConfig['platforms'] as List? ?? ['ubuntu'];
+    final platforms = platformsRaw.cast<String>().where((p) => _platformRunners.containsKey(p)).toList();
+    if (platforms.isEmpty) platforms.add('ubuntu');
+    final isMultiPlatform = platforms.length > 1;
+
     return {
       'tooling_version': toolingVersion,
       'dart_sdk': ciConfig['dart_sdk'] ?? '3.9.2',
@@ -106,6 +126,12 @@ class WorkflowGenerator {
           .where((sp) => sp['name'] != null && sp['path'] != null)
           .map((sp) => {'name': sp['name'], 'path': sp['path']})
           .toList(),
+
+      // Platform support
+      'multi_platform': isMultiPlatform,
+      'single_platform': !isMultiPlatform,
+      'runner': isMultiPlatform ? '' : _platformRunners[platforms.first]!,
+      'platform_matrix_json': json.encode(platforms.map((p) => _platformRunners[p]!).toList()),
     };
   }
 
@@ -169,6 +195,21 @@ class WorkflowGenerator {
     if (lineLength != null && lineLength is! int && lineLength is! String) {
       errors.add('ci.line_length must be a number or string, got ${lineLength.runtimeType}');
     }
+    final platforms = ciConfig['platforms'];
+    if (platforms != null) {
+      if (platforms is! List) {
+        errors.add('ci.platforms must be an array, got ${platforms.runtimeType}');
+      } else {
+        for (final p in platforms) {
+          if (p is! String || !_platformRunners.containsKey(p)) {
+            errors.add(
+              'ci.platforms contains invalid platform "$p". '
+              'Valid: ${_platformRunners.keys.join(', ')}',
+            );
+          }
+        }
+      }
+    }
     return errors;
   }
 
@@ -178,8 +219,11 @@ class WorkflowGenerator {
     final secrets = ciConfig['secrets'] as Map<String, dynamic>? ?? {};
     final subPackages = ciConfig['sub_packages'] as List? ?? [];
 
+    final platforms = ciConfig['platforms'] as List? ?? ['ubuntu'];
+
     Logger.info('  Dart SDK: ${ciConfig['dart_sdk']}');
     Logger.info('  PAT secret: ${ciConfig['personal_access_token_secret']}');
+    Logger.info('  Platforms: ${platforms.join(', ')}');
 
     final enabledFeatures = features.entries.where((e) => e.value == true).map((e) => e.key).toList();
     if (enabledFeatures.isNotEmpty) {
