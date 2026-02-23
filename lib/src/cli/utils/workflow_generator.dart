@@ -10,13 +10,13 @@ import 'template_resolver.dart';
 ///
 /// Architecture-specific variants:
 ///   - `macos-arm64`: Apple Silicon (default for `macos-latest`)
-///   - `macos-x64`:   Intel macOS (`macos-13`, last x64 runner)
+///   - `macos-x64`:   Intel macOS (`macos-15-intel`)
 ///   - `macos`:        Alias for `macos-arm64`
 const _platformRunners = <String, String>{
   'ubuntu': 'ubuntu-latest',
   'macos': 'macos-latest',
   'macos-arm64': 'macos-latest',
-  'macos-x64': 'macos-13',
+  'macos-x64': 'macos-15-intel',
   'windows': 'windows-latest',
 };
 
