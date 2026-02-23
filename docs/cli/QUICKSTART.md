@@ -1,32 +1,28 @@
 # CI/CD CLI Quickstart
 
 ## 1. Overview
-The **CI/CD CLI** module (`manage_cicd`) provides an autonomous, package-agnostic management tool for AI-powered release pipelines, cross-repository operations, codebase triage, and automated documentation. It supplies a centralized `CommandRunner` (`ManageCicdCli`) capable of executing operations across the full software lifecycle—from scaffolding configurations to interacting with Gemini-based agents for changelog composition and issue analysis.
+The CI/CD CLI module provides a comprehensive command-line interface and programmatic entry point for managing the continuous integration, continuous delivery, and issue triage lifecycle. It orchestrates AI-powered agents (via Gemini) to automate changelog generation, release notes authoring, issue triaging, and documentation creation, while also supplying utilities for standard CI tasks like code analysis and test execution.
 
 ## 2. Import
-To use the CLI programmatically or access its internal utilities in your own Dart code, import the necessary paths:
-
 ```dart
 import 'package:runtime_ci_tooling/src/cli/manage_cicd_cli.dart';
 import 'package:runtime_ci_tooling/src/cli/options/global_options.dart';
-import 'package:runtime_ci_tooling/src/cli/utils/logger.dart';
-import 'package:runtime_ci_tooling/src/cli/utils/repo_utils.dart';
 ```
 
-## 3. Setup and Programmatic Invocation
-To instantiate the CLI runner and execute commands programmatically, use the `ManageCicdCli` class. This class automatically registers all available command instances during initialization.
+## 3. Setup
+To use the CLI programmatically in your Dart scripts, instantiate the `ManageCicdCli` runner. This runner registers all the available commands (like `release`, `triage`, `autodoc`, `status`, etc.).
 
 ```dart
 import 'dart:io';
 import 'package:runtime_ci_tooling/src/cli/manage_cicd_cli.dart';
 
-void main(List<String> args) async {
-  final cli = ManageCicdCli();
+Future<void> main(List<String> args) async {
+  final runner = ManageCicdCli();
   
   try {
-    await cli.run(args);
+    await runner.run(args);
   } catch (e) {
-    print('Command failed: $e');
+    stderr.writeln(e);
     exit(1);
   }
 }
@@ -34,173 +30,138 @@ void main(List<String> args) async {
 
 ## 4. Common Operations
 
+### Checking CLI Status
+You can programmatically invoke the status command to check configuration files, required tools (like `gh`, `git`, `gemini`), and MCP server configurations.
+
+```dart
+final runner = ManageCicdCli();
+// Equivalent to running `dart run runtime_ci_tooling:manage_cicd status`
+await runner.run(['status']);
+```
+
+### Initializing the Project
+Scan the repository and generate the initial `.runtime_ci/config.json`, `.runtime_ci/autodoc.json`, and scaffold workflows.
+
+```dart
+final runner = ManageCicdCli();
+await runner.run(['init']);
+```
+
+### Triaging Issues
+Run the AI-powered issue triage pipeline using the `triage` command. It supports auto-triaging all open issues or targeting a single issue.
+
+```dart
+final runner = ManageCicdCli();
+
+// Auto-triage all untriaged open issues with verbose logging
+await runner.run(['triage', 'auto', '--verbose']);
+
+// Triage a single issue by its number
+await runner.run(['triage', 'single', '42']);
+
+// Pre-release triage
+await runner.run(['triage', 'pre-release', '--prev-tag', 'v1.0.0', '--version', '1.1.0']);
+```
+
+### Running the Release Pipeline
+Execute the full local release pipeline, which includes version detection, exploring commits for changelog data, and composing the `CHANGELOG.md`.
+
+```dart
+final runner = ManageCicdCli();
+
+// Run the release pipeline in dry-run mode
+await runner.run(['release', '--dry-run']);
+
+// Determine the next version
+await runner.run(['version']);
+```
+
+### Managing Consumers
+Discover repositories that consume the package and synchronize release artifacts across repositories.
+
+```dart
+final runner = ManageCicdCli();
+
+// Discover consumers and run release syncing
+await runner.run(['consumers', '--org', 'my-org', '--package', 'my_package']);
+```
+
+### Updating Workflows and Templates
+Detects drift between the tooling package's templates and the consumer's installed copies, then updates intelligently.
+
+```dart
+final runner = ManageCicdCli();
+
+// Update workflows, config, and templates
+await runner.run(['update']);
+
+// Batch-update all packages under a root directory
+await runner.run(['update-all']);
+```
+
+### Generating Documentation
+Initialize and generate documentation for the repository modules using the `autodoc` command.
+
+```dart
+final runner = ManageCicdCli();
+
+// Scaffold the initial .runtime_ci/autodoc.json configuration
+await runner.run(['autodoc', '--init']);
+
+// Force regenerate documentation for a specific module without cache
+await runner.run(['autodoc', '--force', '--module', 'cli']);
+```
+
+### Code Quality and Validation
+Perform basic checks.
+
+```dart
+final runner = ManageCicdCli();
+
+// Run `dart test`
+await runner.run(['test']);
+
+// Run `dart analyze`
+await runner.run(['analyze']);
+
+// Validate all configuration files
+await runner.run(['validate']);
+```
+
 ### Parsing Global Options
-The CLI provides `GlobalOptions` (e.g., `--dry-run`, `--verbose`) that apply across all commands. You can parse them easily via static helpers:
+The module provides helpers to easily extract global options (like `--verbose` or `--dry-run`) from parsed `ArgResults`.
 
 ```dart
 import 'package:runtime_ci_tooling/src/cli/manage_cicd_cli.dart';
-import 'package:runtime_ci_tooling/src/cli/utils/logger.dart';
 
-void runWithGlobalContext(List<String> args) {
-  final cli = ManageCicdCli();
-  final results = cli.parse(args);
+void handleArgs(List<String> args) {
+  final runner = ManageCicdCli();
+  final results = runner.parse(args);
   
-  final isVerbose = ManageCicdCli.isVerbose(results);
   final isDryRun = ManageCicdCli.isDryRun(results);
+  final isVerbose = ManageCicdCli.isVerbose(results);
   
   if (isVerbose) {
-    Logger.info('Verbose mode is enabled!');
+    print('Verbose mode is enabled.');
   }
-}
-```
-
-### Utilizing CLI Utilities
-The module exposes robust utilities for repository interaction, logging, and running subprocesses.
-
-```dart
-import 'package:runtime_ci_tooling/src/cli/utils/repo_utils.dart';
-import 'package:runtime_ci_tooling/src/cli/utils/logger.dart';
-import 'package:runtime_ci_tooling/src/cli/utils/process_runner.dart';
-
-void executeRepoTask() {
-  final repoRoot = RepoUtils.findRepoRoot();
-  if (repoRoot == null) {
-    Logger.error('Could not locate the repository root.');
-    return;
-  }
-  
-  Logger.header('Found Repo Root');
-  
-  // Check if a tool exists
-  if (CiProcessRunner.commandExists('gh')) {
-    Logger.success('GitHub CLI is available.');
-    
-    // Execute a synchronous shell command
-    final currentBranch = CiProcessRunner.runSync(
-      'git branch --show-current', 
-      repoRoot, 
-      verbose: true,
-    );
-    Logger.info('On branch: $currentBranch');
-  }
-}
-```
-
-### Composing Commands Directly
-If you need to invoke an underlying command's logic without using the CLI arguments parser, you can instantiate individual commands directly:
-
-```dart
-import 'package:runtime_ci_tooling/src/cli/commands/validate_command.dart';
-
-void validateConfiguration() async {
-  final validateCmd = ValidateCommand();
-  print('Running: ${validateCmd.description}');
-  
-  // Note: Directly running commands bypasses ArgParser population,
-  // so this is only recommended for commands not requiring complex arguments.
-  await validateCmd.run(); 
 }
 ```
 
 ## 5. Configuration
-The CLI relies heavily on repository configuration files and environment variables.
+
+The CLI's behavior is driven by environment variables and local repository configuration files.
 
 ### Environment Variables
-*   `GEMINI_API_KEY`: Required for AI-powered generation (Changelog, Release Notes, Triage, Autodoc).
-*   `GITHUB_TOKEN` or `GH_TOKEN`: Required for interacting with the GitHub API (creating releases, syncing repos, issue triage).
-*   `CI_STAGING_DIR`: Optional. Defines the path for staging artifacts (defaults to `/tmp/` or system temp).
+- `GEMINI_API_KEY`: Required for all AI-powered features (exploration, changelog, triage, release-notes, autodoc).
+- `GH_TOKEN` or `GITHUB_TOKEN`: Required for GitHub CLI (`gh`) operations and GitHub MCP server configuration.
+- `CI_STAGING_DIR`: Optional. Specifies where CI artifacts are temporarily stored (defaults to `/tmp/` in CI or system temp locally).
 
-### Key Files
-*   `.runtime_ci/config.json`: The central configuration generated by `InitCommand`. Stores repo rules, MCP config, and thresholds.
-*   `.runtime_ci/autodoc.json`: Configuration for `AutodocCommand` specifying which source files translate to which markdown outputs.
-*   `.gemini/settings.json`: Stores Gemini MCP context configuration generated by `ConfigureMcpCommand`.
+### Configuration Files
+- `.runtime_ci/config.json`: The central configuration defining CI behaviors, repository ownership, active agents, and triage thresholds. Generated via `manage_cicd init`.
+- `.runtime_ci/autodoc.json`: Configuration for the autodoc generation pipeline. Generated via `manage_cicd autodoc --init`.
+- `.gemini/settings.json`: Configuration for the Gemini MCP servers (can be bootstrapped via `manage_cicd configure-mcp`).
+- `pubspec.yaml`: Read by the CLI to determine the current package name and base version for releases.
 
-## 6. Detailed API Reference
-
-### Registered Commands
-The `ManageCicdCli` automatically registers the following commands, mapping to specific lifecycle phases. Each command can be run using `dart run runtime_ci_tooling:manage_cicd <command>`.
-
-*   **Initialization & Validation**
-    *   `InitCommand` (`init`): Scans repo and generates `.runtime_ci/config.json` + `autodoc.json` and scaffolds workflows.
-    *   `SetupCommand` (`setup`): Installs cross-platform prerequisites (`Node.js`, `Gemini CLI`, `gh`, `jq`, `tree`).
-    *   `ValidateCommand` (`validate`): Validates all JSON/YAML/TOML/Dart configurations in the repository.
-    *   `StatusCommand` (`status`): Shows current CI/CD configuration status and required tools.
-*   **Release Pipeline (AI-Powered)**
-    *   `VersionCommand` (`version`): Detects the next semantic version without side effects.
-    *   `ExploreCommand` (`explore`): Stage 1. Runs the Explorer Agent (`gemini-3.1-pro-preview`) locally to analyze code changes.
-    *   `ComposeCommand` (`compose`): Stage 2. Runs the Changelog Composer to update `CHANGELOG.md` and `README.md`.
-    *   `ReleaseNotesCommand` (`release-notes`): Stage 3. Authors rich release notes and migration guides.
-    *   `ReleaseCommand` (`release`): Runs the full release pipeline locally (version + explore + compose).
-*   **CI/CD Pipeline Execution**
-    *   `DetermineVersionCommand` (`determine-version`): Determines SemVer bump via Gemini and exports output to `$GITHUB_OUTPUT`.
-    *   `CreateReleaseCommand` (`create-release`): Copies artifacts, applies version bump, commits, tags, and creates the GitHub release.
-    *   `ArchiveRunCommand` (`archive-run`): Archives `.runtime_ci/runs/` artifacts for permanent storage.
-    *   `MergeAuditTrailsCommand` (`merge-audit-trails`): Merges distributed artifact trails in parallel CI jobs.
-*   **Issue Triage (`TriageCommand`)**
-    *   *Subcommands*: `TriageAutoCommand` (`auto`), `TriageSingleCommand` (`single <number>`), `TriagePreReleaseCommand` (`pre-release`), `TriagePostReleaseCommand` (`post-release`), `TriageResumeCommand` (`resume`), `TriageStatusCommand` (`status`).
-*   **Cross-Repository Operations**
-    *   `ConsumersCommand` (`consumers`): Discovers downstream repositories consuming the tooling and syncs latest release data.
-    *   `UpdateCommand` (`update`): Updates `.gemini/` templates, `.github/` workflows, and `.runtime_ci/config.json` from the base tooling package.
-    *   `UpdateAllCommand` (`update-all`): Batch-discovers and updates all opted-in packages under a specified root directory.
-*   **Code Quality & Documentation**
-    *   `TestCommand` (`test`): Wrapper for `dart test`.
-    *   `AnalyzeCommand` (`analyze`): Wrapper for `dart analyze`.
-    *   `VerifyProtosCommand` (`verify-protos`): Verifies proto source and generated files exist.
-    *   `DocumentationCommand` (`documentation`): Standalone Gemini-powered documentation update.
-    *   `AutodocCommand` (`autodoc`): Generates/updates structured modular documentation utilizing `.runtime_ci/autodoc.json`.
-    *   `ConfigureMcpCommand` (`configure-mcp`): Sets up standard GitHub/Sentry MCP tools.
-
-### Option Classes
-Arguments parsed from `argResults` are strongly typed via `build_cli`-generated options. Here is a comprehensive list:
-
-*   **`GlobalOptions`**: Shared flags across all commands.
-    *   `dryRun` (`--dry-run`): Show what would be done without executing.
-    *   `verbose` (`-v`, `--verbose`): Show detailed command output.
-*   **`ManageCicdOptions`**: Composite options encompassing all standard configurations.
-*   **`ArchiveRunOptions`**: Options for archiving CI runs.
-    *   `runDir` (`--run-dir`): Directory containing the CI run to archive.
-*   **`AutodocOptions`**: Options for autodoc generation.
-    *   `init` (`--init`): Scan repo and create initial autodoc.json.
-    *   `force` (`--force`): Regenerate all docs regardless of hash.
-    *   `module` (`--module`): Only generate for a specific module.
-*   **`CreateReleaseOptions`**: Options for creating a GitHub release.
-    *   `artifactsDir` (`--artifacts-dir`): Directory containing downloaded CI artifacts.
-    *   `repo` (`--repo`): GitHub repository slug owner/repo.
-*   **`DetermineVersionOptions`**: 
-    *   `outputGithubActions` (`--output-github-actions`): Write version outputs to `$GITHUB_OUTPUT`.
-*   **`MergeAuditTrailsOptions`**: 
-    *   `incomingDir` (`--incoming-dir`): Directory containing incoming audit trail artifacts.
-    *   `outputDir` (`--output-dir`): Output directory for merged audit trails.
-*   **`PostReleaseTriageOptions`**: 
-    *   `releaseTag` (`--release-tag`): Git tag for the release.
-    *   `releaseUrl` (`--release-url`): URL of the GitHub release page.
-    *   `manifest` (`--manifest`): Path to issue_manifest.json.
-*   **`TriageOptions` & `TriageCliOptions`**: Triage execution control and locking (e.g., `--force`, `--auto`, `--status`).
-*   **`UpdateOptions` & `UpdateAllOptions`**: Configuration for updating package files.
-    *   `force` (`--force`), `workflows` (`--workflows`), `templates` (`--templates`), `config` (`--config`), `autodoc` (`--autodoc`), `backup` (`--backup`).
-    *   `UpdateAllOptions` adds `scanRoot` (`--scan-root`) and `concurrency` (`--concurrency`).
-*   **`VersionOptions`**: Standard version overrides.
-    *   `prevTag` (`--prev-tag`): Override previous tag detection.
-    *   `version` (`--version`): Override version (skip auto-detection).
-
-### Internal Utilities
-The `lib/src/cli/utils/` directory provides essential helper classes:
-
-*   **`AutodocScaffold`**: Contains `scaffoldAutodocJson()` for generating base docs configurations.
-*   **`CiProcessRunner`**: Safe shell executor featuring `commandExists()`, `runSync()`, and `exec()`.
-*   **`FileUtils`**: Recursive copying, file counting, and safe text loading (`copyDirRecursive`, `readFileOr`).
-*   **`GeminiUtils`**: Rate-limit aware Gemini execution and JSON extractor (`geminiAvailable`, `extractJson`).
-*   **`HookInstaller`**: Automates installation of Dart pre-commit hooks (`install()`).
-*   **`Logger`**: ANSI-styled terminal output (`header`, `info`, `success`, `warn`, `error`).
-*   **`PromptResolver`**: Determines prompt script paths within the cached dependency (`promptScript()`).
-*   **`ReleaseUtils`**: Builds markdown commit messages, fallback release notes, and contributor verification (`buildReleaseCommitMessage()`, `gatherVerifiedContributors()`).
-*   **`RepoUtils`**: Standardizes repo root boundary checks (`findRepoRoot()`).
-*   **`StepSummary`**: Integrates rich Markdown output directly into `$GITHUB_STEP_SUMMARY` (`write()`, `collapsible()`).
-*   **`TemplateResolver`** & **`TemplateVersionTracker`**: Computes hashes and detects local template drift.
-*   **`ToolInstallers`**: Cross-platform prerequisite installers (`installNodeJs()`, `installGitHubCli()`, etc).
-*   **`VersionDetection`**: Commit history evaluation and Gemini-assisted Semantic Version computation (`detectPrevTag()`, `detectNextVersion()`).
-*   **`WorkflowGenerator`**: Renders dynamic GitHub Actions `.yaml` workflows from configurations while preserving user injections (`render()`, `loadCiConfig()`).
-
-## 7. Related Modules
-*   **Triage Module (`lib/src/triage/`)**: Executes the complex state machine for issue investigation.
-*   **Prompts Module (`lib/src/prompts/`)**: Contains the raw, generated dart scripts invoking Gemini context configurations.
+## 6. Related Modules
+- `triage`: Contains the core logic, models (`GamePlan`, `TriageDecision`), and phases for the AI triage pipeline invoked by the `triage` commands.
+- `utils`: Contains shared file, process, and GitHub utilities used by the CLI commands (e.g., `CiProcessRunner`, `RepoUtils`, `GeminiUtils`, `Logger`, `ReleaseUtils`).
