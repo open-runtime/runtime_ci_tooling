@@ -1,0 +1,2 @@
+- Replaced the deprecated `macos-13` CI runner with `macos-15-intel` for Intel x64 macOS testing.
+- Refreshed consumer manifest snapshots to track the latest workspace dependency versions.
