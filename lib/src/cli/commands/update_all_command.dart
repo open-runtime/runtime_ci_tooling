@@ -60,17 +60,26 @@ class UpdateAllCommand extends Command<void> {
     }
 
     if (dryRun) {
+      final useGlobal = _isGloballyActivated();
       Logger.header('[DRY-RUN] Would update ${packages.length} package(s)');
       for (var i = 0; i < packages.length; i++) {
         final pkg = packages[i];
         final args = _buildSubprocessArgs(global: global, opts: opts);
-        Logger.info('  [${i + 1}/${packages.length}] dart run runtime_ci_tooling:manage_cicd ${args.join(" ")}');
+        final cmd = useGlobal ? 'manage_cicd' : 'dart run runtime_ci_tooling:manage_cicd';
+        Logger.info('  [${i + 1}/${packages.length}] $cmd ${args.join(" ")}');
         Logger.info('    in: ${pkg.path}');
       }
       return;
     }
 
     // Execute updates with worker pool concurrency.
+    // Prefer the globally activated `manage_cicd` binary over `dart run`
+    // to avoid `resolution: workspace` issues in monorepo environments.
+    final useGlobalBinary = _isGloballyActivated();
+    if (useGlobalBinary) {
+      Logger.info('Using globally activated manage_cicd binary');
+    }
+
     Logger.header('Updating ${packages.length} package(s)');
 
     final results = <_UpdateResult>[];
@@ -91,6 +100,7 @@ class UpdateAllCommand extends Command<void> {
           global: global,
           opts: opts,
           verbose: verbose,
+          useGlobalBinary: useGlobalBinary,
         );
         results.add(result);
       }
@@ -185,6 +195,16 @@ class UpdateAllCommand extends Command<void> {
     return args;
   }
 
+  /// Check if manage_cicd is available as a globally activated binary.
+  bool _isGloballyActivated() {
+    try {
+      final result = Process.runSync('manage_cicd', ['--help']);
+      return result.exitCode == 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<_UpdateResult> _updatePackage({
     required Directory pkg,
     required int index,
@@ -193,6 +213,7 @@ class UpdateAllCommand extends Command<void> {
     required dynamic global,
     required UpdateAllOptions opts,
     required bool verbose,
+    required bool useGlobalBinary,
   }) async {
     final relative = p.relative(pkg.path, from: rootDir.path);
     final label = '[${index + 1}/$total]';
@@ -202,9 +223,21 @@ class UpdateAllCommand extends Command<void> {
     final sw = Stopwatch()..start();
 
     try {
+      // Prefer globally activated binary to avoid `resolution: workspace`
+      // issues in monorepo environments where packages aren't standalone.
+      final String executable;
+      final List<String> execArgs;
+      if (useGlobalBinary) {
+        executable = 'manage_cicd';
+        execArgs = args;
+      } else {
+        executable = 'dart';
+        execArgs = ['run', 'runtime_ci_tooling:manage_cicd', ...args];
+      }
+
       final result = await Process.run(
-        'dart',
-        ['run', 'runtime_ci_tooling:manage_cicd', ...args],
+        executable,
+        execArgs,
         workingDirectory: pkg.path,
       ).timeout(const Duration(minutes: 5), onTimeout: () => ProcessResult(0, 124, '', 'Timed out after 5 minutes'));
 

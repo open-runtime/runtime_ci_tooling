@@ -8,14 +8,20 @@ import 'logger.dart';
 /// When runtime_ci_tooling is consumed as a dependency, its templates
 /// and other assets are in the pub cache. This class finds the package
 /// root by parsing .dart_tool/package_config.json.
+///
+/// Resolution order:
+///   1. package_config.json walking up from CWD (works as a dependency)
+///   2. CWD contains templates/ directly (running from package repo)
+///   3. Platform.script / Platform.resolvedExecutable ancestor (global activation)
 abstract final class TemplateResolver {
   static String? _cachedPackageRoot;
 
   /// Find the runtime_ci_tooling package root directory.
   ///
   /// Resolution order:
-  ///   1. .dart_tool/package_config.json (works as a dependency)
+  ///   1. .dart_tool/package_config.json walking up from CWD
   ///   2. CWD contains templates/ directly (running from package repo)
+  ///   3. Platform.script ancestor directories (global activation)
   static String resolvePackageRoot() {
     if (_cachedPackageRoot != null) return _cachedPackageRoot!;
     _cachedPackageRoot = _resolve();
@@ -85,6 +91,28 @@ abstract final class TemplateResolver {
     // Try 2: Running from the package's own repo
     if (Directory('templates').existsSync() && File('templates/manifest.json').existsSync()) {
       return Directory.current.path;
+    }
+
+    // Try 3: Globally activated — walk up from Platform.script location.
+    // When globally activated via `dart pub global activate --source path`,
+    // the snapshot lives under the package's .dart_tool/pub/bin/ directory.
+    // Walk up from the script URI to find the package root with templates/.
+    try {
+      final scriptUri = Platform.script;
+      if (scriptUri.scheme == 'file' || scriptUri.scheme.isEmpty) {
+        var scriptDir = Directory(File.fromUri(scriptUri).parent.path);
+        for (var i = 0; i < 10; i++) {
+          final candidate = Directory('${scriptDir.path}/templates');
+          if (candidate.existsSync() && File('${candidate.path}/manifest.json').existsSync()) {
+            return scriptDir.path;
+          }
+          final parent = scriptDir.parent;
+          if (parent.path == scriptDir.path) break;
+          scriptDir = parent;
+        }
+      }
+    } catch (_) {
+      // Platform.script may throw in some environments; ignore.
     }
 
     Logger.warn('Could not resolve runtime_ci_tooling package root. Template files may not be found.');
