@@ -1,0 +1,3 @@
+- **Auto-Formatting CI Job** — Replaced the strict formatting check with a new CI job that automatically formats code and pushes the changes back to your branch.
+- **Global Activation Support** — Enhanced `TemplateResolver` to correctly locate internal template directories when executing as a globally activated binary.
+- **Monorepo Update Resilience** — The `update-all` command now preferentially uses the globally activated binary to bypass `resolution: workspace` errors.

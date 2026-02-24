@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-02-24
+
+### Added
+- Added an auto-format CI job that automatically commits dart formatting before analyze and test jobs
+
+### Changed
+- Replaced the old format_check validation step with the new auto-format job in CI workflow and skeleton
+- Updated update-all command to prefer globally activated manage_cicd binary over dart run to prevent resolution workspace issues
+
+### Fixed
+- Fixed template resolution to walk Platform.script ancestors to find templates when running as a globally activated binary
+
 ## [0.11.3] - 2026-02-24
 
 ### Fixed
@@ -169,6 +181,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed `git add` failure in release process by adding files individually (commit 1d45361)
 
+[0.12.0]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.11.3...v0.12.0
 [0.11.3]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.11.2...v0.11.3
 [0.11.2]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.11.0...v0.11.1

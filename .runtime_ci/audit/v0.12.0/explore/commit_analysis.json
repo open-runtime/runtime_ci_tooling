@@ -1,0 +1,36 @@
+{
+  "version": "0.12.0",
+  "previous_version": "v0.11.3",
+  "total_commits": 2,
+  "categories": {
+    "added": [
+      {
+        "description": "Added an auto-format CI job that automatically commits dart formatting before analyze and test jobs",
+        "pr": "",
+        "commits": ["4c6a968"]
+      }
+    ],
+    "changed": [
+      {
+        "description": "Replaced the old format_check validation step with the new auto-format job in CI workflow and skeleton",
+        "pr": "",
+        "commits": ["4c6a968"]
+      },
+      {
+        "description": "Updated update-all command to prefer globally activated manage_cicd binary over dart run to prevent resolution workspace issues",
+        "pr": "",
+        "commits": ["ee0ee52"]
+      }
+    ],
+    "deprecated": [],
+    "removed": [],
+    "fixed": [
+      {
+        "description": "Fixed template resolution to walk Platform.script ancestors to find templates when running as a globally activated binary",
+        "pr": "",
+        "commits": ["ee0ee52"]
+      }
+    ],
+    "security": []
+  }
+}

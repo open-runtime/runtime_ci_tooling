@@ -11,7 +11,9 @@ Shared CI/CD automation tooling for open-runtime or pieces-app packages. Provide
 - **MCP Integration**: Configuration for Model Context Protocol servers (GitHub, Sentry).
 - **Multi-Platform CI**: Multi-platform CI workflow generation supporting configurable platform matrices via `config.json`'s `ci.platforms` array.
 - **Cross-Platform**: Utilities for tool installation and environment setup.
+- **Auto-Formatting CI**: CI workflow templates include an auto-format job that automatically commits dart formatting changes before analysis and testing.
 - **Template Updating**: Keep local configurations and CI workflows in sync with upstream changes.
+- **Global Activation Support**: Can be globally activated (`dart pub global activate runtime_ci_tooling`) to bypass workspace resolution issues, fully supported with path-agnostic template resolution.
 - **Typed CLI Options**: Uses `build_cli` to generate typed and structured command-line options.
 
 ## Installation
@@ -20,13 +22,19 @@ Add `runtime_ci_tooling` to your `dev_dependencies`:
 
 ```yaml
 dev_dependencies:
-  runtime_ci_tooling: ^0.11.3
+  runtime_ci_tooling: ^0.12.0
 ```
 
 Or run:
 
 ```bash
 dart pub add dev:runtime_ci_tooling
+```
+
+You can also install this globally:
+
+```bash
+dart pub global activate runtime_ci_tooling
 ```
 
 ## Configuration
@@ -45,7 +53,7 @@ This will create:
 
 ## Usage
 
-As of version **v0.11.0**, tools are available as executables in `bin/`, and CLI options are strictly typed.
+As of version **v0.12.0**, tools are available as executables in `bin/` (and globally), and CLI options are strictly typed.
 
 ### Manage CI/CD
 
@@ -83,8 +91,8 @@ dart run bin/triage_cli.dart <command> [options]
 **Usage Examples:**
 - **Single Issue**: `dart run bin/triage_cli.dart <issue_number>`
 - **Auto Triage**: `dart run bin/triage_cli.dart --auto`
-- **Pre-Release Scan**: `dart run bin/triage_cli.dart --pre-release --prev-tag v0.11.2 --version 0.11.3`
-- **Post-Release Loop**: `dart run bin/triage_cli.dart --post-release --version 0.11.3 --release-tag v0.11.3`
+- **Pre-Release Scan**: `dart run bin/triage_cli.dart --pre-release --prev-tag v0.11.3 --version 0.12.0`
+- **Post-Release Loop**: `dart run bin/triage_cli.dart --post-release --version 0.12.0 --release-tag v0.12.0`
 
 Run `dart run bin/triage_cli.dart --help` for full usage details.
 
