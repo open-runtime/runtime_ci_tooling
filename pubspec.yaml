@@ -12,9 +12,9 @@ executables:
 environment:
   sdk: ^3.9.0
 
-# NOTE: `resolution: workspace` is intentionally absent here so this package
-# resolves correctly in its own standalone CI pipeline. Add it only in your
-# local monorepo workspace (never commit it to this repo).
+# NOTE: `resolution: workspace` is intentionally absent in this repo so this package
+# resolves correctly in its own standalone CI pipeline. In your local monorepo
+# workspace you may add it, but never commit it back here.
 
 dependencies:
   args: ^2.7.0
