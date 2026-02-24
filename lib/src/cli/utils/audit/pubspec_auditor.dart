@@ -445,8 +445,35 @@ class PubspecAuditor {
     final updated = editor.toString();
     if (updated == original) return false;
 
+    // Guard against producing an invalid pubspec.yaml.
+    try {
+      loadYaml(updated);
+    } on YamlException catch (e) {
+      Logger.error('Refusing to write invalid YAML for $pubspecPath: $e');
+      return false;
+    }
+
+    _writeBackup(pubspecPath, original);
     file.writeAsStringSync(updated);
     return true;
+  }
+
+  void _writeBackup(String pubspecPath, String originalContent) {
+    // Keep the backup next to the file so developers can revert quickly.
+    // Use a stable name, but avoid overwriting an existing backup.
+    final base = '$pubspecPath.runtime_ci_tooling.bak';
+    var backupPath = base;
+    if (File(base).existsSync()) {
+      final ts = DateTime.now().toUtc().toIso8601String().replaceAll(':', '-').replaceAll('.', '-');
+      backupPath = '$pubspecPath.runtime_ci_tooling.$ts.bak';
+    }
+
+    try {
+      File(backupPath).writeAsStringSync(originalContent);
+      Logger.info('  Backup written: $backupPath');
+    } catch (e) {
+      Logger.warn('  Could not write backup for $pubspecPath: $e');
+    }
   }
 
   /// Rewrite a dependency to the full git format using registry values.
