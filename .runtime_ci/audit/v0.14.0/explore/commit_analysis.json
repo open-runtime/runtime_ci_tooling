@@ -1,0 +1,122 @@
+{
+  "version": "0.14.0",
+  "previous_version": "v0.13.0",
+  "total_commits": 15,
+  "categories": {
+    "added": [
+      {
+        "description": "Add build_runner feature flag for CI codegen to generate .g.dart files in CI instead of relying on local developer builds.",
+        "pr": null,
+        "commits": [
+          "1851a3d"
+        ]
+      },
+      {
+        "description": "Add manage_cicd audit and audit-all commands for pubspec.yaml dependency validation against external_workspace_packages.yaml registry (refs open-runtime/aot_monorepo#411).",
+        "pr": "#22",
+        "commits": [
+          "b3e5e68"
+        ]
+      },
+      {
+        "description": "Add sibling dependency conversion and per-package tag creation for multi-package releases, automatically converting bare sibling dependencies during release.",
+        "pr": "#22",
+        "commits": [
+          "6a95213"
+        ]
+      },
+      {
+        "description": "Use org-managed runners as default platform definitions for Linux (ubuntu-x64/arm64) and Windows (windows-x64/arm64).",
+        "pr": null,
+        "commits": [
+          "5253af9"
+        ]
+      }
+    ],
+    "changed": [
+      {
+        "description": "Update CI workflow templates and generator with latest patterns and remove deprecated config entries from templates.",
+        "pr": "#22",
+        "commits": [
+          "cce18be"
+        ]
+      }
+    ],
+    "deprecated": [],
+    "removed": [],
+    "fixed": [
+      {
+        "description": "Fix cross-platform hashing in template_manifest.dart using pure-Dart crypto and normalize CRLF to LF to prevent data loss on Windows (fixes #8, #10, #11, #13, partially #12, #5).",
+        "pr": "#23",
+        "commits": [
+          "d3f9c58"
+        ]
+      },
+      {
+        "description": "Add strict input validation for dart_sdk, feature keys, sub_packages, and harden triage config require_file to prevent path traversal.",
+        "pr": null,
+        "commits": [
+          "c832711"
+        ]
+      },
+      {
+        "description": "Replace shell-based hashing with pure-Dart crypto in autodoc to ensure caching works on macOS, Windows, and minimal CI images.",
+        "pr": null,
+        "commits": [
+          "bbf14c4"
+        ]
+      },
+      {
+        "description": "Normalize version input by stripping the leading 'v' prefix and validate SemVer in create-release.",
+        "pr": null,
+        "commits": [
+          "fc62dd1"
+        ]
+      },
+      {
+        "description": "Fix passing allFindings to fixPubspec and add pub_semver dependency.",
+        "pr": null,
+        "commits": [
+          "1f29621"
+        ]
+      },
+      {
+        "description": "Validate YAML before writing and create backups in pubspec auditor to prevent corruption.",
+        "pr": "#22",
+        "commits": [
+          "f8c7e09"
+        ]
+      },
+      {
+        "description": "Fix tag existence checks by using refs/tags/ prefix and handle errors for per-package tags.",
+        "pr": "#22",
+        "commits": [
+          "ad9e6dc"
+        ]
+      },
+      {
+        "description": "Increase test process timeout from 30 to 45 minutes to fix Windows named pipe tests on CI runners.",
+        "pr": "#22",
+        "commits": [
+          "bd1becd"
+        ]
+      },
+      {
+        "description": "Add yaml_edit dependency required for pubspec auditor.",
+        "pr": null,
+        "commits": [
+          "c86d1b4"
+        ]
+      }
+    ],
+    "security": [
+      {
+        "description": "Add ::add-mask:: token masking before git config in all CI workflow locations to prevent Personal Access Token (PAT) leaks in logs. Add fetch-depth: 1 to checkout steps and fix analysis cache key drift.",
+        "pr": "#23",
+        "commits": [
+          "d3f9c58"
+        ]
+      }
+    ]
+  }
+}

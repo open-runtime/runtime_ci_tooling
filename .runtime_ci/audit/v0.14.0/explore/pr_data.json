@@ -1,0 +1,30 @@
+{
+  "pull_requests": [
+    {
+      "number": 22,
+      "title": "feat: pubspec auditing, sibling dep conversion, and CI template updates",
+      "author": "tsavo-knott",
+      "labels": [],
+      "summary": "Introduces pubspec dependency auditing commands, adds sibling dependency conversion for multi-package releases, and updates CI workflow templates.",
+      "commits": [
+        "b3e5e68",
+        "bd1becd",
+        "6a95213",
+        "cce18be",
+        "ad9e6dc",
+        "f8c7e09",
+        "cdaf48c"
+      ]
+    },
+    {
+      "number": 23,
+      "title": "fix: comprehensive audit fixes - cross-platform hashing, CI hardening, test suite",
+      "author": "tsavo-knott",
+      "labels": [],
+      "summary": "Fixes cross-platform hashing using pure-Dart crypto, improves CI template security by masking PATs, normalizes CRLF, and adds extensive test coverage for WorkflowGenerator.",
+      "commits": [
+        "d3f9c58"
+      ]
+    }
+  ]
+}

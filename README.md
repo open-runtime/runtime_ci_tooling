@@ -5,12 +5,14 @@ Shared CI/CD automation tooling for open-runtime or pieces-app packages. Provide
 ## Features
 
 - **Gemini-Powered Triage**: Automated issue analysis, labeling, and response generation.
-- **Release Automation**: Automated versioning, changelog generation, and release notes authoring.
+- **Release Automation**: Automated versioning, changelog generation, and release notes authoring. Support for sibling dependency conversion and per-package tag creation for multi-package releases.
 - **Documentation Generation**: Automated documentation maintenance using Gemini (with parallel execution and automatic retries), including API references, migration guides, quickstarts, and examples. Writes directly to module-scoped paths.
+- **Dependency Auditing**: Audit tools (`audit` and `audit-all`) for `pubspec.yaml` dependency validation against a central workspace registry.
 - **Audit Trails**: Comprehensive logging of CI/CD actions and decisions.
 - **MCP Integration**: Configuration for Model Context Protocol servers (GitHub, Sentry).
 - **Multi-Package Support**: Support for `analyze`, `test`, `autodoc`, `changelog`, and `release` commands across multiple packages in a single repository.
 - **Multi-Platform CI**: Multi-platform CI workflow generation supporting configurable platform matrices via `config.json`'s `ci.platforms` array and `ci.runner_overrides` config.
+- **CI Codegen**: Support for `build_runner` feature flag to generate `.g.dart` files directly in CI, eliminating environment drift.
 - **Cross-Platform**: Utilities for tool installation and environment setup.
 - **Auto-Formatting CI**: CI workflow templates include an auto-format job that automatically commits dart formatting changes before analysis and testing.
 - **Template Updating**: Keep local configurations and CI workflows in sync with upstream changes.
@@ -23,7 +25,7 @@ Add `runtime_ci_tooling` to your `dev_dependencies`:
 
 ```yaml
 dev_dependencies:
-  runtime_ci_tooling: ^0.13.0
+  runtime_ci_tooling: ^0.14.0
 ```
 
 Or run:
@@ -54,7 +56,7 @@ This will create:
 
 ## Usage
 
-As of version **v0.13.0**, tools are available as executables in `bin/` (and globally), and CLI options are strictly typed.
+As of version **v0.14.0**, tools are available as executables in `bin/` (and globally), and CLI options are strictly typed.
 
 ### Manage CI/CD
 
@@ -72,6 +74,8 @@ dart run bin/manage_cicd.dart <command> [options]
 - `update-all`: Discover and update all runtime_ci_tooling packages under a root directory.
 - `consumers`: Discover runtime_ci_tooling consumers and sync latest release data.
 - `release`: Run the full local release pipeline.
+- `audit`: Validate `pubspec.yaml` dependencies against a workspace registry.
+- `audit-all`: Discover and run the audit process across all packages.
 - `triage <N>`: Run issue triage for a single issue.
 - `explore`: Run Stage 1 Explorer Agent.
 - `compose`: Run Stage 2 Changelog Composer.
@@ -92,8 +96,8 @@ dart run bin/triage_cli.dart <command> [options]
 **Usage Examples:**
 - **Single Issue**: `dart run bin/triage_cli.dart <issue_number>`
 - **Auto Triage**: `dart run bin/triage_cli.dart --auto`
-- **Pre-Release Scan**: `dart run bin/triage_cli.dart --pre-release --prev-tag v0.12.0 --version 0.13.0`
-- **Post-Release Loop**: `dart run bin/triage_cli.dart --post-release --version 0.13.0 --release-tag v0.13.0`
+- **Pre-Release Scan**: `dart run bin/triage_cli.dart --pre-release --prev-tag v0.13.0 --version 0.14.0`
+- **Post-Release Loop**: `dart run bin/triage_cli.dart --post-release --version 0.14.0 --release-tag v0.14.0`
 
 Run `dart run bin/triage_cli.dart --help` for full usage details.
 
