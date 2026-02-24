@@ -3,18 +3,17 @@ description: |
   Shared CI/CD automation tooling for open-runtime or pieces-app packages. Provides a reusable
   triage pipeline, Gemini CLI integration, audit trail management, release
   automation, and GitHub Actions workflow utilities that any package can depend on.
-version: 0.11.3
+version: 0.11.4
 publish_to: none
 executables:
   manage_cicd: manage_cicd
   triage_cli: triage_cli
-
 environment:
   sdk: ^3.9.0
 
 # NOTE: `resolution: workspace` is intentionally absent here so this package
-# resolves correctly in its own standalone CI pipeline. Add it only in your
-# local monorepo workspace (never commit it to this repo).
+# resolves correctly in its own standalone CI pipeline AND can be globally
+# activated. This package is NOT in the monorepo root workspace list.
 
 dependencies:
   args: ^2.7.0
