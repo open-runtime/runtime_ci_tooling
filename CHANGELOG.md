@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.1] - 2026-02-24
+
+### Added
+- Added operation logging for git config, git add, and pubspec writes (#28, fixes #26)
+
+### Changed
+- Converted shell-interpolated git commands to safe Process.runSync array args (#28)
+- Replaced silent catch blocks with Logger.warn() to ensure errors are visible in CI logs (#28)
+- Scoped CI auto-format `git add -A` to `git add lib/` in skeleton template to prevent staging unrelated files (#28)
+- Regenerated CI workflow to use correct self-hosted runner names and bumped generated version stamp
+
+### Fixed
+- Fixed token and secrets leak in verbose logging by redacting matching patterns (#28)
+- Fixed shell injection vulnerabilities by eliminating shell interpolation via config-controlled path and tag values (#28)
+- Fixed template bug using `matrix.os` instead of `matrix.platform_id` for artifact naming
+- Fixed staging issue related to unrelated files being added during format (#28, fixes #25, #26, #27)
+
+### Security
+- Redact GitHub PATs, generic auth tokens, and embedded credentials in URLs from verbose logging output (#28)
+- Eliminate shell injection vulnerabilities by migrating git execution to safe Process.runSync with array arguments (#28)
+
 ## [0.14.0] - 2026-02-24
 
 ### Added
@@ -239,6 +260,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed `git add` failure in release process by adding files individually (commit 1d45361)
 
+[0.14.1]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.12.2...v0.13.0
 [0.12.2]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.12.0...v0.12.2

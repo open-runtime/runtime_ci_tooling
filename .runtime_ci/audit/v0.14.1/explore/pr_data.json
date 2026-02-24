@@ -1,0 +1,12 @@
+{
+  "pull_requests": [
+    {
+      "number": 28,
+      "title": "sec: fix token leak, shell injection, and add operation logging",
+      "author": "tsavo-at-pieces",
+      "labels": [],
+      "summary": "Fixes token leaks in verbose logging, prevents shell injection by using array arguments in Process.runSync, unhides silent exceptions, scopes git add in templates, and adds operation logging.",
+      "commits": ["5ad3279d5847a1eddc8e158b2500dab1314911fc"]
+    }
+  ]
+}

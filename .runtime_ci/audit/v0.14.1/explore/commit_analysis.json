@@ -1,0 +1,72 @@
+{
+  "version": "0.14.1",
+  "previous_version": "v0.14.0",
+  "total_commits": 2,
+  "categories": {
+    "added": [
+      {
+        "description": "Added operation logging for git config, git add, and pubspec writes",
+        "pr": "#28",
+        "commits": ["5ad3279d5847a1eddc8e158b2500dab1314911fc"]
+      }
+    ],
+    "changed": [
+      {
+        "description": "Converted shell-interpolated git commands to safe Process.runSync array args",
+        "pr": "#28",
+        "commits": ["5ad3279d5847a1eddc8e158b2500dab1314911fc"]
+      },
+      {
+        "description": "Replaced silent catch blocks with Logger.warn() to ensure errors are visible in CI logs",
+        "pr": "#28",
+        "commits": ["5ad3279d5847a1eddc8e158b2500dab1314911fc"]
+      },
+      {
+        "description": "Scoped CI auto-format git add -A to git add lib/ in skeleton template to prevent staging unrelated files",
+        "pr": "#28",
+        "commits": ["5ad3279d5847a1eddc8e158b2500dab1314911fc", "e28e8664bbae577aa4fc70e85110492f2f24eb1f"]
+      },
+      {
+        "description": "Regenerated CI workflow to use correct self-hosted runner names and bumped generated version stamp",
+        "pr": "",
+        "commits": ["e28e8664bbae577aa4fc70e85110492f2f24eb1f"]
+      }
+    ],
+    "deprecated": [],
+    "removed": [],
+    "fixed": [
+      {
+        "description": "Fixed token and secrets leak in verbose logging by redacting matching patterns",
+        "pr": "#28",
+        "commits": ["5ad3279d5847a1eddc8e158b2500dab1314911fc"]
+      },
+      {
+        "description": "Fixed shell injection vulnerabilities by eliminating shell interpolation via config-controlled path and tag values",
+        "pr": "#28",
+        "commits": ["5ad3279d5847a1eddc8e158b2500dab1314911fc"]
+      },
+      {
+        "description": "Fixed template bug using matrix.os instead of matrix.platform_id for artifact naming",
+        "pr": "",
+        "commits": ["e28e8664bbae577aa4fc70e85110492f2f24eb1f"]
+      },
+      {
+        "description": "Fixed staging issue #25, #26, #27 related to unrelated files being added during format",
+        "pr": "#28",
+        "commits": ["5ad3279d5847a1eddc8e158b2500dab1314911fc"]
+      }
+    ],
+    "security": [
+      {
+        "description": "Redact GitHub PATs, generic auth tokens, and embedded credentials in URLs from verbose logging output",
+        "pr": "#28",
+        "commits": ["5ad3279d5847a1eddc8e158b2500dab1314911fc"]
+      },
+      {
+        "description": "Eliminate shell injection vulnerabilities by migrating git execution to safe Process.runSync with array arguments",
+        "pr": "#28",
+        "commits": ["5ad3279d5847a1eddc8e158b2500dab1314911fc"]
+      }
+    ]
+  }
+}

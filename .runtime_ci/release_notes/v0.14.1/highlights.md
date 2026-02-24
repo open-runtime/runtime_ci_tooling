@@ -1,0 +1,4 @@
+- **Security Hardened:** Eliminated shell injection vulnerabilities by using isolated execution arrays and redacted sensitive tokens from all verbose command logging.
+- **Workflow Reliability:** Fixed broken CI matrix artifact uploads and correctly mapped Linux and Windows runs to self-hosted machines.
+- **Cleaner Formats:** Scoped automated formatting commits to only include `lib/` files, preventing unrelated workspace artifacts from accidentally leaking into PRs.
+- **Better Observability:** Swapped silent catch blocks for explicit warnings and added lifecycle logs to track all mutating operations like `git config` and `pubspec` edits.

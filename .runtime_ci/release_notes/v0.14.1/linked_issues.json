@@ -1,0 +1,27 @@
+{
+  "version": "0.14.1",
+  "github_issues": [
+    {
+      "number": 26,
+      "title": "fix: add before/after logging for all state-mutating operations",
+      "status": "fixed",
+      "confidence": 0.9,
+      "referenced_in": ["release_notes", "changelog"]
+    },
+    {
+      "number": 28,
+      "title": "sec: fix token leak, shell injection, and add operation logging",
+      "status": "fixed",
+      "confidence": 1.0,
+      "referenced_in": ["release_notes", "changelog"]
+    }
+  ],
+  "sentry_issues": [],
+  "prs_referenced": [
+    {
+      "number": 28,
+      "title": "sec: fix token leak, shell injection, and add operation logging",
+      "author": "tsavo-at-pieces"
+    }
+  ]
+}
