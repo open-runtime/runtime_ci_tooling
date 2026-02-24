@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.2] - 2026-02-24
+
+### Added
+- Multi-package support for analyze, test, autodoc, changelog, and release commands
+- Extended platform matrix with explicit arch-qualified IDs: `ubuntu-x64`, `ubuntu-arm64`, `windows-x64`, `windows-arm64`
+- `runner_overrides` config field to map platform IDs to custom org-managed runner labels
+
+### Fixed
+- Add `--repo` to all `gh` commands and org allowlist to prevent upstream leakage in triage
+- Remove `|| true` debug leftover and redundant path normalization
+- Avoid queued self-hosted x64 runners by preferring GitHub-hosted defaults
+- Increase test process timeout from 20 to 30 minutes
+
 ## [0.12.0] - 2026-02-24
 
 ### Added
