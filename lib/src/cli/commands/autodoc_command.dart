@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
+import 'package:crypto/crypto.dart';
+import 'package:path/path.dart' as p;
 
 import '../../triage/utils/config.dart';
 import '../../triage/utils/run_context.dart';
@@ -455,23 +457,51 @@ Write the corrected file to the same path: $absOutputFile
 
   /// Compute SHA256 hash of all source files in the given paths.
   String _computeModuleHash(String repoRoot, List<String> sourcePaths) {
-    final quotedPaths = sourcePaths.map((p) => '"$repoRoot/$p"').join(' ');
-    // Try sha256sum first (Linux), fall back to shasum (macOS)
-    final hashCmd =
-        'command -v sha256sum >/dev/null 2>&1 '
-        '&& SHA_CMD="sha256sum" '
-        '|| SHA_CMD="shasum -a 256"';
-    final result = Process.runSync('sh', [
-      '-c',
-      '$hashCmd; find $quotedPaths -type f \\( -name "*.proto" -o -name "*.dart" \\) 2>/dev/null '
-          '| sort | xargs cat 2>/dev/null | \$SHA_CMD | cut -d" " -f1',
-    ], workingDirectory: repoRoot);
-    final hash = (result.stdout as String).trim();
-    if (hash.isEmpty || result.exitCode != 0) {
-      // Fallback: timestamp-based (disables caching)
-      Logger.warn('Could not compute module hash (sha256sum/shasum not available) -- caching disabled');
-      return DateTime.now().millisecondsSinceEpoch.toString();
+    // Pure-Dart hashing so caching works on macOS/Windows and minimal CI images
+    // (no dependency on sha256sum/shasum/xargs/find).
+    final filePaths = <String>[];
+
+    for (final relPath in sourcePaths) {
+      final absPath = p.normalize(p.join(repoRoot, relPath));
+      final dir = Directory(absPath);
+      if (!dir.existsSync()) {
+        // Still include the missing directory marker so a later appearance
+        // changes the hash and triggers regeneration.
+        filePaths.add('missing_dir:$absPath');
+        continue;
+      }
+
+      for (final entity in dir.listSync(recursive: true, followLinks: false)) {
+        if (entity is! File) continue;
+        final path = entity.path;
+        if (path.endsWith('.dart') || path.endsWith('.proto')) {
+          filePaths.add(path);
+        }
+      }
     }
-    return hash;
+
+    filePaths.sort();
+
+    final sink = AccumulatorSink<Digest>();
+    final input = sha256.startChunkedConversion(sink);
+
+    for (final path in filePaths) {
+      // Include the path name in the digest so renames affect the hash.
+      input.add(utf8.encode(path));
+      input.add(const [0]);
+
+      if (!path.startsWith('missing_dir:')) {
+        try {
+          input.add(File(path).readAsBytesSync());
+        } catch (e) {
+          Logger.warn('Could not read $path for module hash: $e');
+        }
+      }
+
+      input.add(const [0]);
+    }
+
+    input.close();
+    return sink.events.single.toString();
   }
 }
