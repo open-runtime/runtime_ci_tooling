@@ -24,23 +24,65 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Check for release bot commit
+      - name: Check for bot commit
         id: bot_check
         run: |
           AUTHOR=$(git log -1 --format='%an')
           MSG=$(git log -1 --format='%s')
           echo "Commit author: $AUTHOR"
           echo "Commit subject: $MSG"
-          if [[ "$AUTHOR" == "github-actions[bot]" ]] || [[ "$MSG" == *"[skip ci]"* ]]; then
+          if [[ "$AUTHOR" == "github-actions[bot]" ]] || [[ "$MSG" == *"[skip ci]"* ]] || [[ "$MSG" == "bot(format)"* ]]; then
             echo "should_run=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Release bot commit detected — skipping CI."
+            echo "::notice::Bot commit detected — skipping CI."
           else
             echo "should_run=true" >> "$GITHUB_OUTPUT"
           fi
 
+<%#format_check%>
+  auto-format:
+    needs: pre-check
+    if: needs.pre-check.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.format-push.outputs.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          ref: ${{ github.head_ref || github.ref }}
+          token: ${{ secrets.<%pat_secret%> || github.token }}
+          persist-credentials: true
+
+      - uses: dart-lang/setup-dart@v1.7.1
+        with:
+          sdk: "<%dart_sdk%>"
+
+      - name: Format code
+        run: dart format --line-length <%line_length%> lib/
+
+      - name: Commit and push formatting
+        id: format-push
+        run: |
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "bot(format): apply dart format --line-length <%line_length%> [skip ci]"
+            if git push; then
+              echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+              echo "::notice::Formatting changes committed and pushed."
+            else
+              echo "::warning::Could not push formatting changes (branch may be protected or this is a fork PR)."
+            fi
+          else
+            echo "::notice::Code is already formatted."
+          fi
+
+<%/format_check%>
 <%#single_platform%>
   analyze-and-test:
-    needs: pre-check
+    needs: [pre-check<%#format_check%>, auto-format<%/format_check%>]
     if: needs.pre-check.outputs.should_run == 'true'
     runs-on: <%runner%>
 <%#has_secrets%>
@@ -52,6 +94,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.2
         with:
+<%#format_check%>
+          ref: ${{ needs.auto-format.outputs.sha }}
+<%/format_check%>
           persist-credentials: false
 <%#lfs%>
           lfs: true
@@ -128,11 +173,6 @@ jobs:
           fi
 
 <%/sub_packages%>
-<%#format_check%>
-      - name: Format check
-        run: dart format --line-length <%line_length%> --output=none --set-exit-if-changed lib/
-
-<%/format_check%>
 # --- BEGIN USER: pre-test ---
 # --- END USER: pre-test ---
 
@@ -150,7 +190,7 @@ jobs:
 <%/single_platform%>
 <%#multi_platform%>
   analyze:
-    needs: pre-check
+    needs: [pre-check<%#format_check%>, auto-format<%/format_check%>]
     if: needs.pre-check.outputs.should_run == 'true'
     runs-on: ubuntu-latest
 <%#has_secrets%>
@@ -162,6 +202,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.2
         with:
+<%#format_check%>
+          ref: ${{ needs.auto-format.outputs.sha }}
+<%/format_check%>
           persist-credentials: false
 <%#lfs%>
           lfs: true
@@ -238,13 +281,8 @@ jobs:
           fi
 
 <%/sub_packages%>
-<%#format_check%>
-      - name: Format check
-        run: dart format --line-length <%line_length%> --output=none --set-exit-if-changed lib/
-
-<%/format_check%>
   test:
-    needs: [pre-check, analyze]
+    needs: [pre-check, analyze<%#format_check%>, auto-format<%/format_check%>]
     if: needs.pre-check.outputs.should_run == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
@@ -260,6 +298,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.2
         with:
+<%#format_check%>
+          ref: ${{ needs.auto-format.outputs.sha }}
+<%/format_check%>
           persist-credentials: false
 <%#lfs%>
           lfs: true
