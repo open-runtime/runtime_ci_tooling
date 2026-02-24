@@ -1,121 +1,105 @@
 # Shared Utilities API Reference
 
-## 1. Classes
-*(No public classes defined in this module)*
+This module provides generic repository discovery, file detection, and cross-platform automatic installation of CLI tools (e.g., Smithy CLI).
 
-## 2. Enums
-*(No public enums defined in this module)*
+**Importing:**
+```dart
+import 'package:runtime_ci_tooling/runtime_ci_tooling.dart';
+```
 
-## 3. Extensions
-*(No public extensions defined in this module)*
+### 1. Classes
+*No public classes are defined in this module.*
 
-## 4. Constants
+### 2. Enums
+*No public enums are defined in this module.*
 
-- **kGeneratedExtensions** -- `List<String>`
-  All generated file extensions produced by `protoc-gen-dart` and `protoc-gen-enhance`.
-  
-  **Example:**
-  ```dart
-  import 'package:runtime_ci_tooling/src/utils/repo_utils.dart';
+### 3. Extensions
+*No public extensions are defined in this module.*
 
-  void main() {
-    print('Known generated extensions: $kGeneratedExtensions');
-  }
-  ```
-
-- **kSmithyCliVersion** -- `String`
-  The latest Smithy CLI release version used for auto-installation.
-  
-  **Example:**
-  ```dart
-  import 'package:runtime_ci_tooling/src/utils/tool_installers.dart';
-
-  void main() {
-    print('Required Smithy CLI version: $kSmithyCliVersion');
-  }
-  ```
-
-- **kMinJavaVersion** -- `int`
-  Minimum required Java major version for the Smithy CLI.
-  
-  **Example:**
-  ```dart
-  import 'package:runtime_ci_tooling/src/utils/tool_installers.dart';
-
-  void main() {
-    print('Minimum Java version: $kMinJavaVersion');
-  }
-  ```
-
-## 5. Top-Level Functions
+### 4. Top-Level Functions
 
 - **isGeneratedFile** -- `bool isGeneratedFile(String filePath)`
-  Check if a file path ends with a known generated extension.
-  - Parameters: 
-    - `filePath` (`String`): The path of the file to check.
-  - Return Type: `bool`
-  
+  Check if a file path ends with a known generated extension produced by `protoc-gen-dart` and `protoc-gen-enhance`.
+  - **Parameters:** 
+    - `filePath` (`String`): The file path to verify.
+  - **Returns:** `bool`
+
   **Example:**
   ```dart
-  import 'package:runtime_ci_tooling/src/utils/repo_utils.dart';
+  import 'package:runtime_ci_tooling/runtime_ci_tooling.dart';
 
   void main() {
-    final isGen = isGeneratedFile('lib/src/generated/api.pb.dart');
-    print('Is generated file: $isGen'); // true
+    final isGen = isGeneratedFile('lib/src/messages.pb.dart');
+    print('Is generated: $isGen'); // Prints: Is generated: true
   }
   ```
 
 - **findRepoRoot** -- `String? findRepoRoot(String packageName)`
-  Finds a Dart package repo root by walking up from the current directory, looking for a `pubspec.yaml` with `name: <packageName>`. Returns `null` if not found.
-  - Parameters:
+  Finds a Dart package repo root by walking up from the current directory, looking for a `pubspec.yaml` with `name: <packageName>`.
+  - **Parameters:** 
     - `packageName` (`String`): The name of the package to locate.
-  - Return Type: `String?`
-  
+  - **Returns:** `String?` - The absolute path to the repository root, or `null` if not found (e.g., running from outside the repo).
+
   **Example:**
   ```dart
-  import 'package:runtime_ci_tooling/src/utils/repo_utils.dart';
+  import 'package:runtime_ci_tooling/runtime_ci_tooling.dart';
 
   void main() {
-    final rootDir = findRepoRoot('runtime_ci_tooling');
-    if (rootDir != null) {
-      print('Found repo root at: $rootDir');
+    final repoRoot = findRepoRoot('runtime_ci_tooling');
+    if (repoRoot != null) {
+      print('Found repository root at: $repoRoot');
     } else {
-      print('Repo root not found.');
+      print('Could not locate repository root.');
     }
   }
   ```
 
 - **ensureSmithyCli** -- `Future<bool> ensureSmithyCli()`
-  Ensures the Smithy CLI and a compatible JDK are installed. If the Smithy CLI is missing, automatically installs it based on the platform. Returns `true` if both Java and the Smithy CLI are available.
-  - Parameters: None
-  - Return Type: `Future<bool>`
-  
+  Ensures the Smithy CLI and a compatible JDK (Java 17+) are installed. 
+  If the Smithy CLI is missing, it automatically installs it without user prompts:
+  - **macOS**: Uses Homebrew (`brew tap smithy-lang/tap && brew install smithy-cli`), with a fallback to binary download.
+  - **Linux / Windows**: Downloads the appropriate binary from GitHub releases.
+  - **Parameters:** None
+  - **Returns:** `Future<bool>` - Returns `true` if both Java 17+ and the Smithy CLI are available after any installation attempts.
+
   **Example:**
   ```dart
-  import 'package:runtime_ci_tooling/src/utils/tool_installers.dart';
+  import 'package:runtime_ci_tooling/runtime_ci_tooling.dart';
 
   void main() async {
-    final isReady = await ensureSmithyCli();
-    if (isReady) {
-      print('Smithy CLI is ready to use!');
+    final isAvailable = await ensureSmithyCli();
+    if (isAvailable) {
+      print('Smithy CLI is installed and ready to use.');
     } else {
-      print('Failed to locate or install Smithy CLI.');
+      print('Failed to install or locate Smithy CLI.');
     }
   }
   ```
 
 - **commandExists** -- `Future<bool> commandExists(String command)`
-  Checks if a command is available on the system PATH.
-  - Parameters:
-    - `command` (`String`): The name of the command (e.g., 'git', 'java').
-  - Return Type: `Future<bool>`
-  
+  Checks if a given CLI command is available on the system's `PATH`. This uses `where` on Windows and `which` on Unix-based systems.
+  - **Parameters:** 
+    - `command` (`String`): The CLI command name to look up.
+  - **Returns:** `Future<bool>`
+
   **Example:**
   ```dart
-  import 'package:runtime_ci_tooling/src/utils/tool_installers.dart';
+  import 'package:runtime_ci_tooling/runtime_ci_tooling.dart';
 
   void main() async {
     final hasGit = await commandExists('git');
-    print('Git installed: $hasGit');
+    print('Git is installed: $hasGit');
   }
   ```
+
+### 5. Constants
+
+- **kGeneratedExtensions** -- `const List<String> kGeneratedExtensions`
+  All generated file extensions produced by `protoc-gen-dart` and `protoc-gen-enhance`.
+  *Values include:* `'.pb.dart'`, `'.pbenum.dart'`, `'.pbjson.dart'`, `'.pbgrpc.dart'`, `'.enhance.oneof.dart'`, `'.enhance.builder.dart'`, `'.enhance.fixture.dart'`, `'.enhance.timestamps.dart'`, `'.enhance.collection.dart'`, `'.enhance.map.dart'`, `'.enhance.enum.dart'`, `'.enhance.dx.dart'`, `'.enhance.http.dart'`
+
+- **kSmithyCliVersion** -- `const String kSmithyCliVersion = '1.67.0'`
+  The latest Smithy CLI release version used for auto-installation. When a new Smithy CLI release is available, this constant should be updated.
+
+- **kMinJavaVersion** -- `const int kMinJavaVersion = 17`
+  Minimum required Java major version for the Smithy CLI.
