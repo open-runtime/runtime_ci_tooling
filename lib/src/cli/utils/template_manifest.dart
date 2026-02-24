@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
+
 import '../../triage/utils/run_context.dart';
 
 /// Represents one template entry from manifest.json.
@@ -96,18 +98,12 @@ class TemplateVersionTracker {
 }
 
 /// Compute SHA256 hash of a file's contents.
+///
+/// Uses pure Dart [sha256] from `package:crypto` so it works on all platforms
+/// (macOS, Linux, Windows) without shelling out to external tools.
 String computeFileHash(String filePath) {
   final file = File(filePath);
   if (!file.existsSync()) return '';
-  // Try shasum (macOS) first, then sha256sum (Linux)
-  final macResult = Process.runSync('sh', ['-c', 'shasum -a 256 "$filePath" | cut -d" " -f1']);
-  if (macResult.exitCode == 0) {
-    final hash = (macResult.stdout as String).trim();
-    if (hash.isNotEmpty) return hash;
-  }
-  final linuxResult = Process.runSync('sh', ['-c', 'sha256sum "$filePath" | cut -d" " -f1']);
-  if (linuxResult.exitCode == 0) {
-    return (linuxResult.stdout as String).trim();
-  }
-  return '';
+  final bytes = file.readAsBytesSync();
+  return sha256.convert(bytes).toString();
 }
