@@ -56,14 +56,18 @@ ValidationResult validateInvestigationResult(String path) {
 
 /// Writes a JSON object to a file with pretty formatting.
 void writeJson(String path, Map<String, dynamic> data) {
-  File(path).writeAsStringSync('${const JsonEncoder.withIndent('  ').convert(data)}\n');
+  final file = File(path);
+  final label = file.uri.pathSegments.last;
+  print('[triage] Writing $label (${data.length} keys)');
+  file.writeAsStringSync('${const JsonEncoder.withIndent('  ').convert(data)}\n');
 }
 
 /// Reads and parses a JSON file, returning null on error.
 Map<String, dynamic>? readJson(String path) {
   try {
     return jsonDecode(File(path).readAsStringSync()) as Map<String, dynamic>;
-  } catch (_) {
+  } catch (e) {
+    print('[triage] Could not read JSON from $path: $e');
     return null;
   }
 }

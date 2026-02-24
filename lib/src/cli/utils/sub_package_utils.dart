@@ -4,7 +4,6 @@ import 'package:yaml/yaml.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 
 import 'logger.dart';
-import 'process_runner.dart';
 import 'workflow_generator.dart';
 
 /// Utilities for loading and working with sub-packages defined in
@@ -87,12 +86,19 @@ abstract final class SubPackageUtils {
       buffer.writeln('### Changes in `$name` (`$path/`)');
       buffer.writeln();
 
-      // Per-package commit log
-      final commitLog = CiProcessRunner.runSync(
-        'git log $logRange --oneline --no-merges -- $path',
-        repoRoot,
-        verbose: verbose,
-      );
+      // Per-package commit log — use Process.runSync with array args to
+      // avoid shell injection via path or tag values from config.json.
+      final logArgs = <String>[
+        'log',
+        ...logRange == 'HEAD' ? ['HEAD'] : [logRange],
+        '--oneline',
+        '--no-merges',
+        '--',
+        path,
+      ];
+      if (verbose) Logger.info('[CMD] git ${logArgs.join(' ')}');
+      final commitLogResult = Process.runSync('git', logArgs, workingDirectory: repoRoot);
+      final commitLog = (commitLogResult.stdout as String).trim();
       if (commitLog.isNotEmpty) {
         buffer.writeln('Commits:');
         buffer.writeln('```');
@@ -105,8 +111,11 @@ abstract final class SubPackageUtils {
       }
       buffer.writeln();
 
-      // Per-package diff stat
-      final diffStat = CiProcessRunner.runSync('git diff --stat $diffRange -- $path', repoRoot, verbose: verbose);
+      // Per-package diff stat — safe array-based args, no shell interpolation.
+      final diffArgs = ['diff', '--stat', diffRange, '--', path];
+      if (verbose) Logger.info('[CMD] git ${diffArgs.join(' ')}');
+      final diffStatResult = Process.runSync('git', diffArgs, workingDirectory: repoRoot);
+      final diffStat = (diffStatResult.stdout as String).trim();
       if (diffStat.isNotEmpty) {
         buffer.writeln('Diff stat:');
         buffer.writeln('```');
@@ -358,19 +367,17 @@ Rules:
       if (doc.containsKey('resolution')) {
         try {
           editor.remove(['resolution']);
-          if (verbose) {
-            Logger.info('Stripped resolution: workspace from ${pkg['name']}');
-          }
-        } on Exception catch (_) {}
+          Logger.info('Stripped resolution: workspace from ${pkg['name']}');
+        } on Exception catch (e) {
+          Logger.warn('Could not strip resolution from ${pkg['name']}: $e');
+        }
       }
 
       final updated = editor.toString();
       if (updated != original) {
+        Logger.info('Updating ${pkg['path']}/pubspec.yaml ($conversions sibling dep conversion(s))');
         pubspecFile.writeAsStringSync(updated);
         totalConversions += conversions;
-        if (verbose) {
-          Logger.info('Converted $conversions sibling dep(s) in ${pkg['name']}');
-        }
       }
     }
 
