@@ -2016,6 +2016,7 @@ Future<void> _runCreateRelease(String repoRoot, List<String> args) async {
   }
 
   // Step 4: Commit all changes
+  _info('Configuring git identity for release commit');
   _exec('git', ['config', 'user.name', 'github-actions[bot]'], cwd: repoRoot);
   _exec('git', ['config', 'user.email', 'github-actions[bot]@users.noreply.github.com'], cwd: repoRoot);
 
@@ -2033,6 +2034,7 @@ Future<void> _runCreateRelease(String repoRoot, List<String> args) async {
   ];
   if (Directory('$repoRoot/docs').existsSync()) filesToAdd.add('docs/');
   if (Directory('$repoRoot/$kCicdAuditDir').existsSync()) filesToAdd.add('$kCicdAuditDir/');
+  _info('Staging ${filesToAdd.length} release artifacts for commit');
   for (final path in filesToAdd) {
     final fullPath = '$repoRoot/$path';
     if (File(fullPath).existsSync() || Directory(fullPath).existsSync()) {

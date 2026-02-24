@@ -4,7 +4,6 @@ import 'dart:io';
 import '../../triage/utils/config.dart';
 import '../../triage/utils/run_context.dart';
 import 'logger.dart';
-import 'process_runner.dart';
 
 /// Utilities for release management.
 abstract final class ReleaseUtils {
@@ -75,17 +74,18 @@ abstract final class ReleaseUtils {
           }
           buf.writeln();
         }
-      } catch (_) {
-        // Skip if parse fails
+      } catch (e) {
+        Logger.warn('Could not parse contributors.json: $e');
       }
     }
 
-    // Commit range
-    final commitCount = CiProcessRunner.runSync(
-      'git rev-list --count "$prevTag"..HEAD 2>/dev/null',
-      repoRoot,
-      verbose: verbose,
-    );
+    // Commit range — use array args to avoid shell injection via prevTag.
+    final commitCountResult = Process.runSync('git', [
+      'rev-list',
+      '--count',
+      '$prevTag..HEAD',
+    ], workingDirectory: repoRoot);
+    final commitCount = commitCountResult.exitCode == 0 ? (commitCountResult.stdout as String).trim() : '?';
     buf.writeln('---');
     buf.writeln('Automated release by CI/CD pipeline (Gemini CLI + GitHub Actions)');
     buf.writeln('Commits since $prevTag: $commitCount');
@@ -98,10 +98,14 @@ abstract final class ReleaseUtils {
   static List<Map<String, String>> gatherVerifiedContributors(String repoRoot, String prevTag) {
     final repo = Platform.environment['GITHUB_REPOSITORY'] ?? '${config.repoOwner}/${config.repoName}';
 
-    // Step 1: Get one commit SHA per unique author email
-    final gitResult = Process.runSync('sh', [
-      '-c',
-      'git log "$prevTag"..HEAD --format="%H %ae" --no-merges | sort -u -k2,2',
+    // Step 1: Get one commit SHA per unique author email.
+    // Use array args to avoid shell injection via prevTag, then deduplicate
+    // in Dart instead of piping through `sort -u`.
+    final gitResult = Process.runSync('git', [
+      'log',
+      '$prevTag..HEAD',
+      '--format=%H %ae',
+      '--no-merges',
     ], workingDirectory: repoRoot);
 
     if (gitResult.exitCode != 0) {
@@ -109,7 +113,13 @@ abstract final class ReleaseUtils {
       return [];
     }
 
-    final lines = (gitResult.stdout as String).trim().split('\n').where((l) => l.isNotEmpty);
+    // Deduplicate by email (replaces the shell `sort -u -k2,2` pipe).
+    final seenEmails = <String>{};
+    final lines = (gitResult.stdout as String).trim().split('\n').where((l) => l.isNotEmpty).where((l) {
+      final parts = l.split(' ');
+      if (parts.length < 2) return false;
+      return seenEmails.add(parts[1]); // returns false if already seen
+    });
     final contributors = <Map<String, String>>[];
     final seenLogins = <String>{};
 
@@ -140,8 +150,8 @@ abstract final class ReleaseUtils {
             contributors.add({'username': login});
           }
         }
-      } catch (_) {
-        // API call failed for this SHA, skip
+      } catch (e) {
+        Logger.warn('GitHub API call failed for commit $sha: $e');
       }
     }
 

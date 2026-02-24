@@ -235,6 +235,7 @@ class CreateReleaseCommand extends Command<void> {
     }
 
     // Step 4: Commit all changes
+    Logger.info('Configuring git identity for release commit');
     CiProcessRunner.exec('git', ['config', 'user.name', 'github-actions[bot]'], cwd: repoRoot, verbose: global.verbose);
     CiProcessRunner.exec(
       'git',
@@ -259,6 +260,7 @@ class CreateReleaseCommand extends Command<void> {
     if (Directory('$repoRoot/$kCicdAuditDir').existsSync()) {
       filesToAdd.add('$kCicdAuditDir/');
     }
+    Logger.info('Staging ${filesToAdd.length} release artifacts for commit');
     for (final path in filesToAdd) {
       final fullPath = '$repoRoot/$path';
       if (File(fullPath).existsSync() || Directory(fullPath).existsSync()) {
@@ -292,6 +294,7 @@ class CreateReleaseCommand extends Command<void> {
       final ghToken = Platform.environment['GH_TOKEN'] ?? Platform.environment['GITHUB_TOKEN'];
       final remoteRepo = Platform.environment['GITHUB_REPOSITORY'] ?? effectiveRepo;
       if (ghToken != null && remoteRepo.isNotEmpty) {
+        Logger.info('Setting authenticated remote URL for push');
         CiProcessRunner.exec(
           'git',
           ['remote', 'set-url', 'origin', 'https://x-access-token:$ghToken@github.com/$remoteRepo.git'],
