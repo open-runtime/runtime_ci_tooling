@@ -1,0 +1,21 @@
+{
+  "version": "0.11.3",
+  "previous_version": "v0.11.2",
+  "total_commits": 1,
+  "categories": {
+    "added": [],
+    "changed": [],
+    "deprecated": [],
+    "removed": [],
+    "fixed": [
+      {
+        "description": "Stream test output in real-time by using Process.start with inheritStdio, and add a 20-minute process-level timeout to catch test hangs",
+        "pr": null,
+        "commits": [
+          "6851b10"
+        ]
+      }
+    ],
+    "security": []
+  }
+}

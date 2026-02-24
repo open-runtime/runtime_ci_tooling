@@ -1,0 +1,2 @@
+- **Real-time Test Streaming:** Test output is now streamed in real-time instead of buffering until completion, providing immediate diagnostic feedback.
+- **Test Hang Prevention:** A new 20-minute process-level timeout acts as a safety net to automatically catch and kill hanging test runs.
