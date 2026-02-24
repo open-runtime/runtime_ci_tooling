@@ -119,6 +119,9 @@ jobs:
         env:
           GIT_LFS_SKIP_SMUDGE: "1"
 
+      - name: Run build_runner
+        run: dart run build_runner build --delete-conflicting-outputs
+
       # ── shared:analysis-cache ── keep in sync with single_platform ──
       # ── shared:proto-verify ── keep in sync with single_platform ──
       # ── shared:analyze ── keep in sync with single_platform ──
@@ -176,25 +179,35 @@ jobs:
         env:
           GIT_LFS_SKIP_SMUDGE: "1"
 
+      - name: Run build_runner
+        run: dart run build_runner build --delete-conflicting-outputs
+
 # --- BEGIN USER: pre-test ---
 # --- END USER: pre-test ---
 
       # ── shared:test ── keep in sync with single_platform ──
       - name: Test
-        run: dart test
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/test-logs"
+          dart run runtime_ci_tooling:manage_cicd test 2>&1 | tee "$RUNNER_TEMP/test-logs/console.log"
+          exit ${PIPESTATUS[0]}
+        env:
+          TEST_LOG_DIR: ${{ runner.temp }}/test-logs
 
-      - name: Upload test artifacts on failure
-        if: failure()
+      - name: Upload test logs
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-artifacts-${{ matrix.platform_id }}
+          name: test-logs-${{ matrix.platform_id }}
           path: |
+            ${{ runner.temp }}/test-logs/
             test/integration/fixtures/bin/
             **/test-results/
-          retention-days: 7
+          retention-days: 14
 
 # --- BEGIN USER: post-test ---
 # --- END USER: post-test ---
-
 # --- BEGIN USER: extra-jobs ---
 # --- END USER: extra-jobs ---

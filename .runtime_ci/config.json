@@ -73,7 +73,8 @@
       "format_check": true,
       "analysis_cache": false,
       "managed_analyze": false,
-      "managed_test": false
+      "managed_test": true,
+      "build_runner": true
     },
     "secrets": {},
     "sub_packages": [],

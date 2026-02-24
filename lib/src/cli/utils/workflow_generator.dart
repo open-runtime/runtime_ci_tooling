@@ -52,6 +52,7 @@ const Set<String> _knownFeatureKeys = {
   'managed_analyze',
   'managed_test',
   'build_runner',
+  'web_test',
 };
 
 /// Renders CI workflow YAML from a Mustache skeleton template and config.json.
@@ -177,6 +178,12 @@ class WorkflowGenerator {
       'managed_analyze': features['managed_analyze'] == true,
       'managed_test': features['managed_test'] == true,
       'build_runner': features['build_runner'] == true,
+      'web_test': features['web_test'] == true,
+
+      // Web test config (only meaningful when web_test is true)
+      'web_test_concurrency': _resolveWebTestConcurrency(ciConfig),
+      'web_test_paths': _resolveWebTestPaths(ciConfig),
+      'web_test_has_paths': _resolveWebTestHasPaths(ciConfig),
 
       // Secrets / env
       'has_secrets': secretsList.isNotEmpty,
@@ -195,6 +202,39 @@ class WorkflowGenerator {
       'runner': isMultiPlatform ? '' : resolveRunner(platforms.first),
       'platform_matrix_json': json.encode(platformMatrix),
     };
+  }
+
+  static String _resolveWebTestConcurrency(Map<String, dynamic> ciConfig) {
+    final webTestConfig = ciConfig['web_test'];
+    if (webTestConfig is Map<String, dynamic>) {
+      final concurrency = webTestConfig['concurrency'];
+      if (concurrency is int && concurrency > 0) {
+        return '$concurrency';
+      }
+    }
+    return '1';
+  }
+
+  static String _resolveWebTestPaths(Map<String, dynamic> ciConfig) {
+    final webTestConfig = ciConfig['web_test'];
+    if (webTestConfig is Map<String, dynamic>) {
+      final paths = webTestConfig['paths'];
+      if (paths is List && paths.isNotEmpty) {
+        return paths.whereType<String>().where((s) => s.trim().isNotEmpty).join(' ');
+      }
+    }
+    return '';
+  }
+
+  static bool _resolveWebTestHasPaths(Map<String, dynamic> ciConfig) {
+    final webTestConfig = ciConfig['web_test'];
+    if (webTestConfig is Map<String, dynamic>) {
+      final paths = webTestConfig['paths'];
+      if (paths is List && paths.isNotEmpty) {
+        return paths.whereType<String>().where((s) => s.trim().isNotEmpty).isNotEmpty;
+      }
+    }
+    return false;
   }
 
   /// Extract user sections from the existing file and re-insert them
@@ -391,6 +431,62 @@ class WorkflowGenerator {
         }
       }
     }
+
+    final webTestConfig = ciConfig['web_test'];
+    if (webTestConfig != null) {
+      if (webTestConfig is! Map) {
+        errors.add('ci.web_test must be an object, got ${webTestConfig.runtimeType}');
+      } else {
+        final concurrency = webTestConfig['concurrency'];
+        if (concurrency != null) {
+          if (concurrency is! int) {
+            errors.add('ci.web_test.concurrency must be an integer, got ${concurrency.runtimeType}');
+          } else if (concurrency < 1) {
+            errors.add('ci.web_test.concurrency must be a positive integer, got $concurrency');
+          }
+        }
+
+        final paths = webTestConfig['paths'];
+        if (paths != null) {
+          if (paths is! List) {
+            errors.add('ci.web_test.paths must be an array, got ${paths.runtimeType}');
+          } else {
+            for (var i = 0; i < paths.length; i++) {
+              final pathValue = paths[i];
+              if (pathValue is! String || pathValue.trim().isEmpty) {
+                errors.add('ci.web_test.paths[$i] must be a non-empty string');
+                continue;
+              }
+              if (pathValue != pathValue.trim()) {
+                errors.add('ci.web_test.paths[$i] must not have leading/trailing whitespace');
+                continue;
+              }
+              if (pathValue.contains(RegExp(r'[\r\n\t]'))) {
+                errors.add('ci.web_test.paths[$i] must not contain newlines/tabs');
+                continue;
+              }
+              if (p.isAbsolute(pathValue) || pathValue.startsWith('~')) {
+                errors.add('ci.web_test.paths[$i] must be a relative repo path');
+                continue;
+              }
+              if (pathValue.contains('\\')) {
+                errors.add('ci.web_test.paths[$i] must use forward slashes (/)');
+                continue;
+              }
+              final normalized = p.posix.normalize(pathValue);
+              if (normalized.startsWith('..') || normalized.contains('/../')) {
+                errors.add('ci.web_test.paths[$i] must not traverse outside the repo');
+                continue;
+              }
+              if (RegExp(r'[^A-Za-z0-9_./-]').hasMatch(pathValue)) {
+                errors.add('ci.web_test.paths[$i] contains unsupported characters: "$pathValue"');
+              }
+            }
+          }
+        }
+      }
+    }
+
     return errors;
   }
 
@@ -411,6 +507,13 @@ class WorkflowGenerator {
       Logger.info('  Features: ${enabledFeatures.join(', ')}');
     } else {
       Logger.info('  Features: (none)');
+    }
+
+    if (features['web_test'] == true) {
+      final webTestConfig = ciConfig['web_test'] as Map<String, dynamic>? ?? {};
+      final concurrency = webTestConfig['concurrency'] ?? 1;
+      final webPaths = webTestConfig['paths'] as List? ?? [];
+      Logger.info('  Web test: concurrency=$concurrency, paths=${webPaths.isEmpty ? "(all)" : webPaths.join(", ")}');
     }
 
     if (secrets.isNotEmpty) {

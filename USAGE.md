@@ -1249,10 +1249,15 @@ final exists = await commandExists('git');
 4. **Multi-platform mode** (`ci.platforms` has 2+ entries):
    - `analyze` — Run analysis once (Ubuntu)
    - `test` — Run tests as a matrix across OS+arch (`x64` + `arm64`)
+5. Optional `web-test` — If `ci.features.web_test=true`, runs `dart test -p chrome` in a standalone Ubuntu job with deterministic Chrome provisioning via `browser-actions/setup-chrome@v2`
 
 **Platform matrix configuration:**
 - `ci.platforms`: list of platform IDs (e.g. `["ubuntu-x64","ubuntu-arm64","macos-arm64","macos-x64","windows-x64","windows-arm64"]`)
 - `ci.runner_overrides`: optional map to point platform IDs at custom `runs-on` labels (e.g. org-managed GitHub-hosted runners)
+
+**Optional features:**
+- `ci.features.build_runner`: When `true`, runs `dart run build_runner build --delete-conflicting-outputs` before analyze and test steps to regenerate `.g.dart` codegen files
+- `ci.features.web_test`: When `true`, adds a `web-test` job that provisions Chrome via `browser-actions/setup-chrome@v2` and runs `dart test -p chrome`. Configure concurrency and test paths via `ci.web_test.concurrency` (default `1`) and `ci.web_test.paths` (default `[]` = auto-discover)
 
 **Key steps:**
 ```yaml

@@ -312,6 +312,10 @@ The CI workflow (`.github/workflows/ci.yaml`) is generated from your `ci` sectio
 | `features.analysis_cache` | bool | `false` | Cache analysis results across runs |
 | `features.managed_analyze` | bool | `false` | Run `dart analyze` via tooling |
 | `features.managed_test` | bool | `false` | Run `dart test` via tooling |
+| `features.build_runner` | bool | `false` | Run `dart run build_runner build --delete-conflicting-outputs` before analyze/test |
+| `features.web_test` | bool | `false` | Add a standalone `web-test` job that runs `dart test -p chrome` on Ubuntu |
+| `web_test.concurrency` | int | `1` | Number of concurrent browser test suites |
+| `web_test.paths` | list | `[]` | Specific test paths to run (empty = auto-discover all web-compatible tests) |
 | `platforms` | list | `["ubuntu"]` | Platform matrix. If 2+ entries, CI runs `analyze` once then `test` as a matrix. Valid: `ubuntu-x64`, `ubuntu-arm64`, `macos-arm64`, `macos-x64`, `windows-x64`, `windows-arm64` (plus aliases `ubuntu`, `macos`, `windows`). |
 | `runner_overrides` | object | `{}` | Override platform IDs to custom `runs-on` labels (e.g. org-managed GitHub-hosted runners). Example: `{ "ubuntu-arm64": "runtime-ubuntu-24.04-arm64-208gb-64core" }` |
 | `secrets` | object | `{}` | Additional secrets as `{ "ENV_NAME": "SECRET_NAME" }` |

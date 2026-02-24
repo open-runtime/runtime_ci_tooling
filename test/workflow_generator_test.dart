@@ -15,6 +15,7 @@ Map<String, dynamic> _validConfig({
   dynamic lineLength,
   List<dynamic>? subPackages,
   Map<String, dynamic>? runnerOverrides,
+  Map<String, dynamic>? webTest,
 }) {
   return <String, dynamic>{
     'dart_sdk': dartSdk,
@@ -25,6 +26,7 @@ Map<String, dynamic> _validConfig({
     if (lineLength != null) 'line_length': lineLength,
     if (subPackages != null) 'sub_packages': subPackages,
     if (runnerOverrides != null) 'runner_overrides': runnerOverrides,
+    if (webTest != null) 'web_test': webTest,
   };
 }
 
@@ -176,6 +178,7 @@ void main() {
             'managed_analyze': true,
             'managed_test': false,
             'build_runner': true,
+            'web_test': true,
           },
         ));
         expect(errors.where((e) => e.contains('features')), isEmpty);
@@ -496,11 +499,166 @@ void main() {
       });
     });
 
+    // ---- web_test ----
+    group('web_test', () {
+      test('non-map web_test produces error', () {
+        final config = _validConfig();
+        config['web_test'] = 'not_a_map';
+        final errors = WorkflowGenerator.validate(config);
+        expect(errors, anyElement(contains('web_test must be an object')));
+      });
+
+      test('null web_test is fine (optional)', () {
+        final errors = WorkflowGenerator.validate(_validConfig());
+        expect(errors.where((e) => e.contains('web_test')), isEmpty);
+      });
+
+      test('web_test.concurrency non-int produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {'concurrency': 'fast'}),
+        );
+        expect(errors, anyElement(contains('concurrency must be an integer')));
+      });
+
+      test('web_test.concurrency zero produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {'concurrency': 0}),
+        );
+        expect(errors, anyElement(contains('positive integer')));
+      });
+
+      test('web_test.concurrency negative produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {'concurrency': -1}),
+        );
+        expect(errors, anyElement(contains('positive integer')));
+      });
+
+      test('web_test.concurrency valid int passes', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {'concurrency': 4}),
+        );
+        expect(errors.where((e) => e.contains('web_test')), isEmpty);
+      });
+
+      test('web_test.concurrency null is fine (defaults to 1)', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: <String, dynamic>{}),
+        );
+        expect(errors.where((e) => e.contains('concurrency')), isEmpty);
+      });
+
+      test('web_test.paths non-list produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {'paths': 'not_a_list'}),
+        );
+        expect(errors, anyElement(contains('paths must be an array')));
+      });
+
+      test('web_test.paths with empty string produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {
+            'paths': [''],
+          }),
+        );
+        expect(errors, anyElement(contains('must be a non-empty string')));
+      });
+
+      test('web_test.paths with absolute path produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {
+            'paths': ['/etc/passwd'],
+          }),
+        );
+        expect(errors, anyElement(contains('must be a relative repo path')));
+      });
+
+      test('web_test.paths with traversal produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {
+            'paths': ['../../../etc/passwd'],
+          }),
+        );
+        expect(errors, anyElement(contains('must not traverse outside the repo')));
+      });
+
+      test('web_test.paths with backslashes produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {
+            'paths': [r'test\web\foo_test.dart'],
+          }),
+        );
+        expect(errors, anyElement(contains('forward slashes')));
+      });
+
+      test('web_test.paths with unsupported characters produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {
+            'paths': ['test/web test/foo.dart'],
+          }),
+        );
+        expect(errors, anyElement(contains('unsupported characters')));
+      });
+
+      test('web_test.paths with leading whitespace produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {
+            'paths': [' test/web/foo_test.dart'],
+          }),
+        );
+        expect(errors, anyElement(contains('whitespace')));
+      });
+
+      test('web_test.paths with tilde produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {
+            'paths': ['~/test/foo.dart'],
+          }),
+        );
+        expect(errors, anyElement(contains('must be a relative repo path')));
+      });
+
+      test('web_test.paths with newline produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {
+            'paths': ['test/foo\nbar.dart'],
+          }),
+        );
+        expect(errors, anyElement(contains('newlines/tabs')));
+      });
+
+      test('valid web_test.paths passes', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {
+            'paths': ['test/web/foo_test.dart', 'test/web/bar_test.dart'],
+          }),
+        );
+        expect(errors.where((e) => e.contains('web_test')), isEmpty);
+      });
+
+      test('empty web_test.paths list is fine', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {'paths': <String>[]}),
+        );
+        expect(errors.where((e) => e.contains('web_test')), isEmpty);
+      });
+
+      test('valid full web_test config passes', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {
+            'concurrency': 2,
+            'paths': ['test/web/'],
+          }),
+        );
+        expect(errors.where((e) => e.contains('web_test')), isEmpty);
+      });
+    });
+
     // ---- fully valid config produces no errors ----
     test('fully valid config produces no errors', () {
       final errors = WorkflowGenerator.validate(_validConfig(
         dartSdk: '3.9.2',
-        features: {'proto': true, 'lfs': false},
+        features: {'proto': true, 'lfs': false, 'web_test': true},
         platforms: ['ubuntu', 'macos'],
         secrets: {'API_KEY': 'MY_SECRET'},
         pat: 'MY_PAT',
@@ -509,6 +667,7 @@ void main() {
           <String, dynamic>{'name': 'core', 'path': 'packages/core'},
         ],
         runnerOverrides: {'ubuntu': 'custom-runner'},
+        webTest: {'concurrency': 2, 'paths': ['test/web/']},
       ));
       expect(errors, isEmpty);
     });

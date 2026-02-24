@@ -196,12 +196,29 @@ jobs:
       # ── shared:test ── keep in sync with multi_platform ──
 <%#managed_test%>
       - name: Test
-        run: dart run runtime_ci_tooling:manage_cicd test
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/test-logs"
+          dart run runtime_ci_tooling:manage_cicd test 2>&1 | tee "$RUNNER_TEMP/test-logs/console.log"
+          exit ${PIPESTATUS[0]}
+        env:
+          TEST_LOG_DIR: ${{ runner.temp }}/test-logs
+
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-<%runner%>
+          path: |
+            ${{ runner.temp }}/test-logs/
+            test/integration/fixtures/bin/
+            **/test-results/
+          retention-days: 14
 <%/managed_test%>
 <%^managed_test%>
       - name: Test
         run: dart test
-<%/managed_test%>
 
       - name: Upload test artifacts on failure
         if: failure()
@@ -212,6 +229,7 @@ jobs:
             test/integration/fixtures/bin/
             **/test-results/
           retention-days: 7
+<%/managed_test%>
 
 # --- BEGIN USER: post-test ---
 # --- END USER: post-test ---
@@ -393,12 +411,29 @@ jobs:
       # ── shared:test ── keep in sync with single_platform ──
 <%#managed_test%>
       - name: Test
-        run: dart run runtime_ci_tooling:manage_cicd test
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/test-logs"
+          dart run runtime_ci_tooling:manage_cicd test 2>&1 | tee "$RUNNER_TEMP/test-logs/console.log"
+          exit ${PIPESTATUS[0]}
+        env:
+          TEST_LOG_DIR: ${{ runner.temp }}/test-logs
+
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ matrix.platform_id }}
+          path: |
+            ${{ runner.temp }}/test-logs/
+            test/integration/fixtures/bin/
+            **/test-results/
+          retention-days: 14
 <%/managed_test%>
 <%^managed_test%>
       - name: Test
         run: dart test
-<%/managed_test%>
 
       - name: Upload test artifacts on failure
         if: failure()
@@ -409,10 +444,95 @@ jobs:
             test/integration/fixtures/bin/
             **/test-results/
           retention-days: 7
+<%/managed_test%>
 
 # --- BEGIN USER: post-test ---
 # --- END USER: post-test ---
 <%/multi_platform%>
+<%#web_test%>
+  web-test:
+    needs: [pre-check<%#format_check%>, auto-format<%/format_check%>]
+    if: needs.pre-check.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+<%#has_secrets%>
+    env:
+<%#secrets_list%>
+      <%env_name%>: ${{ secrets.<%secret_name%> }}
+<%/secrets_list%>
+<%/has_secrets%>
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+<%#format_check%>
+          ref: ${{ needs.auto-format.outputs.sha }}
+<%/format_check%>
+          fetch-depth: 1
+          persist-credentials: false
+<%#lfs%>
+          lfs: true
+<%/lfs%>
 
+      - name: Configure Git for HTTPS with Token
+        shell: bash
+        run: |
+          TOKEN="${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}"
+          echo "::add-mask::${TOKEN}"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "git@github.com:"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
+
+      - uses: dart-lang/setup-dart@v1.7.1
+        with:
+          sdk: "<%dart_sdk%>"
+
+      - name: Cache Dart pub dependencies
+        uses: actions/cache@v5.0.3
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-${{ runner.arch }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-dart-pub-
+
+      - run: dart pub get
+        env:
+          GIT_LFS_SKIP_SMUDGE: "1"
+
+<%#build_runner%>
+      - name: Run build_runner
+        run: dart run build_runner build --delete-conflicting-outputs
+
+<%/build_runner%>
+      - name: Setup Chrome
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@v2
+        with:
+          install-dependencies: true
+
+      - name: Verify Chrome
+        run: ${{ steps.setup-chrome.outputs.chrome-path }} --version
+
+<%#web_test_has_paths%>
+      - name: Web Test
+        run: dart test -p chrome --concurrency=<%web_test_concurrency%> <%web_test_paths%>
+        env:
+          CHROME_EXECUTABLE: ${{ steps.setup-chrome.outputs.chrome-path }}
+<%/web_test_has_paths%>
+<%^web_test_has_paths%>
+      - name: Web Test
+        run: dart test -p chrome --concurrency=<%web_test_concurrency%>
+        env:
+          CHROME_EXECUTABLE: ${{ steps.setup-chrome.outputs.chrome-path }}
+<%/web_test_has_paths%>
+
+      - name: Upload web test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-test-artifacts
+          path: |
+            **/test-results/
+          retention-days: 7
+
+<%/web_test%>
 # --- BEGIN USER: extra-jobs ---
 # --- END USER: extra-jobs ---
