@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
+import 'package:pub_semver/pub_semver.dart';
 
 import '../../triage/utils/config.dart';
 import '../../triage/utils/run_context.dart';
@@ -50,9 +51,16 @@ class CreateReleaseCommand extends Command<void> {
     final artifactsDir = crOpts.artifactsDir;
     final repo = crOpts.repo;
 
-    final newVersion = versionOpts.version;
-    if (newVersion == null) {
+    final rawVersion = versionOpts.version;
+    if (rawVersion == null) {
       Logger.error('--version <ver> is required for create-release');
+      exit(1);
+    }
+    final newVersion = _normalizeVersion(rawVersion);
+    try {
+      Version.parse(newVersion);
+    } on FormatException {
+      Logger.error('Invalid --version "$rawVersion". Expected SemVer like 1.2.3 (optionally -prerelease/+build).');
       exit(1);
     }
 
@@ -206,7 +214,8 @@ class CreateReleaseCommand extends Command<void> {
     final changelog = File('$repoRoot/CHANGELOG.md');
     if (changelog.existsSync()) {
       final content = changelog.readAsStringSync();
-      final entryMatch = RegExp('## \\[$newVersion\\].*?(?=## \\[|\\Z)', dotAll: true).firstMatch(content);
+      final escapedVersion = RegExp.escape(newVersion);
+      final entryMatch = RegExp('## \\[$escapedVersion\\].*?(?=## \\[|\\Z)', dotAll: true).firstMatch(content);
       File(
         '${releaseDir.path}/changelog_entry.md',
       ).writeAsStringSync(entryMatch?.group(0)?.trim() ?? '## [$newVersion]\n');
@@ -436,4 +445,13 @@ ${StepSummary.artifactLink()}
       }
     }
   }
+}
+
+String _normalizeVersion(String raw) {
+  final trimmed = raw.trim();
+  // Common mistake: passing the tag text to --version.
+  if (trimmed.startsWith('v') && trimmed.length > 1) {
+    return trimmed.substring(1);
+  }
+  return trimmed;
 }
