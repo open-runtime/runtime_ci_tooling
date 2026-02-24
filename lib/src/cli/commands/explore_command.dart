@@ -67,7 +67,7 @@ class ExploreCommand extends Command<void> {
       exit(1);
     }
     final prompt = CiProcessRunner.runSync(
-      'dart run $promptScriptPath "$prevTag" "$newVersion"',
+      'dart run "$promptScriptPath" "$prevTag" "$newVersion"',
       repoRoot,
       verbose: global.verbose,
     );
@@ -90,7 +90,7 @@ class ExploreCommand extends Command<void> {
       'sh',
       [
         '-c',
-        'cat $promptPath | gemini '
+        'cat "$promptPath" | gemini '
             '-o json --yolo '
             '-m $_kGeminiProModel '
             "--allowed-tools 'run_shell_command(git),run_shell_command(gh),run_shell_command(mkdir),run_shell_command(tee),run_shell_command(cat)'",

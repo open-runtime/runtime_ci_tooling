@@ -51,11 +51,15 @@ class VersionCommand extends Command<void> {
     // Save version bump rationale if Gemini produced one
     final rationaleFile = File('$repoRoot/$kCicdRunsDir/version_analysis/version_bump_rationale.md');
     if (rationaleFile.existsSync()) {
-      final bumpDir = Directory('$repoRoot/$kVersionBumpsDir');
-      bumpDir.createSync(recursive: true);
-      final targetPath = '${bumpDir.path}/v$newVersion.md';
-      rationaleFile.copySync(targetPath);
-      Logger.success('Version bump rationale saved to $kVersionBumpsDir/v$newVersion.md');
+      if (global.dryRun) {
+        Logger.info('[DRY-RUN] Would copy rationale to $kVersionBumpsDir/v$newVersion.md');
+      } else {
+        final bumpDir = Directory('$repoRoot/$kVersionBumpsDir');
+        bumpDir.createSync(recursive: true);
+        final targetPath = '${bumpDir.path}/v$newVersion.md';
+        rationaleFile.copySync(targetPath);
+        Logger.success('Version bump rationale saved to $kVersionBumpsDir/v$newVersion.md');
+      }
     }
   }
 }

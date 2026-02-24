@@ -239,7 +239,7 @@ ${StepSummary.artifactLink()}
     }
 
     final prompt = CiProcessRunner.runSync(
-      'dart run $repoRoot/$templatePath ${promptArgs.map((a) => '"$a"').join(' ')}',
+      'dart run "$repoRoot/$templatePath" ${promptArgs.map((a) => '"$a"').join(' ')}',
       repoRoot,
       verbose: verbose,
     );
@@ -250,10 +250,10 @@ ${StepSummary.artifactLink()}
     }
 
     // Build context includes
-    final includes = <String>['@${sourceDir.replaceFirst('$repoRoot/', '')}'];
+    final includes = <String>['"@${sourceDir.replaceFirst('$repoRoot/', '')}"'];
     if (libDir.isNotEmpty) {
       final relLib = libDir.replaceFirst('$repoRoot/', '');
-      if (Directory(libDir).existsSync()) includes.add('@$relLib');
+      if (Directory(libDir).existsSync()) includes.add('"@$relLib"');
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -282,7 +282,7 @@ Do not skip any -- completeness is more important than brevity.
 ''');
 
     final pass1Result = await _runGeminiWithRetry(
-      command: 'cat ${pass1Prompt.path} | gemini --yolo -m $_kGeminiProModel ${includes.join(" ")}',
+      command: 'cat "${pass1Prompt.path}" | gemini --yolo -m $_kGeminiProModel ${includes.join(" ")}',
       workingDirectory: repoRoot,
       taskLabel: '$moduleId/pass1',
     );
@@ -370,7 +370,7 @@ Write the corrected file to the same path: $absOutputFile
 ''');
 
     final pass2Result = await _runGeminiWithRetry(
-      command: 'cat ${pass2Prompt.path} | gemini --yolo -m $_kGeminiProModel ${includes.join(" ")}',
+      command: 'cat "${pass2Prompt.path}" | gemini --yolo -m $_kGeminiProModel ${includes.join(" ")}',
       workingDirectory: repoRoot,
       taskLabel: '$moduleId/pass2',
     );
@@ -455,15 +455,23 @@ Write the corrected file to the same path: $absOutputFile
 
   /// Compute SHA256 hash of all source files in the given paths.
   String _computeModuleHash(String repoRoot, List<String> sourcePaths) {
-    final paths = sourcePaths.map((p) => '$repoRoot/$p').join(' ');
+    final quotedPaths = sourcePaths.map((p) => '"$repoRoot/$p"').join(' ');
+    // Try sha256sum first (Linux), fall back to shasum (macOS)
+    final hashCmd =
+        'command -v sha256sum >/dev/null 2>&1 '
+        '&& SHA_CMD="sha256sum" '
+        '|| SHA_CMD="shasum -a 256"';
     final result = Process.runSync('sh', [
       '-c',
-      'find $paths -type f \\( -name "*.proto" -o -name "*.dart" \\) 2>/dev/null | sort | xargs cat 2>/dev/null | sha256sum | cut -d" " -f1',
+      '$hashCmd; find $quotedPaths -type f \\( -name "*.proto" -o -name "*.dart" \\) 2>/dev/null '
+          '| sort | xargs cat 2>/dev/null | \$SHA_CMD | cut -d" " -f1',
     ], workingDirectory: repoRoot);
-    if (result.exitCode == 0) {
-      return (result.stdout as String).trim();
+    final hash = (result.stdout as String).trim();
+    if (hash.isEmpty || result.exitCode != 0) {
+      // Fallback: timestamp-based (disables caching)
+      Logger.warn('Could not compute module hash (sha256sum/shasum not available) -- caching disabled');
+      return DateTime.now().millisecondsSinceEpoch.toString();
     }
-    // Fallback: timestamp-based
-    return DateTime.now().millisecondsSinceEpoch.toString();
+    return hash;
   }
 }

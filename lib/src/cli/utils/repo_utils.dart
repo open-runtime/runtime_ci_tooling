@@ -12,7 +12,7 @@ abstract final class RepoUtils {
       final pubspec = File('${dir.path}/pubspec.yaml');
       if (pubspec.existsSync()) {
         final content = pubspec.readAsStringSync();
-        if (content.contains('name: ${config.repoName}')) {
+        if (content.contains(RegExp(r'^name:\s+' + RegExp.escape(config.repoName) + r'\s*$', multiLine: true))) {
           return dir.path;
         }
       }

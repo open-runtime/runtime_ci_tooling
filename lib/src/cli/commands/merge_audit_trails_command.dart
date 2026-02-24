@@ -37,7 +37,6 @@ class MergeAuditTrailsCommand extends Command<void> {
       Logger.error('Could not find ${config.repoName} repo root.');
       exit(1);
     }
-    // ignore: unused_local_variable -- parsed for consistency with other commands
     final global = ManageCicdCli.parseGlobalOptions(globalResults);
     final matOpts = MergeAuditTrailsOptions.fromArgResults(argResults!);
 
@@ -60,6 +59,49 @@ class MergeAuditTrailsCommand extends Command<void> {
       return;
     }
 
+    // Scan artifact contents (read-only) to report what would be merged
+    final sources = <Map<String, dynamic>>[];
+    var totalFiles = 0;
+
+    for (final artifactDir in artifactDirs) {
+      final artifactName = artifactDir.path.split('/').last;
+      Logger.info('Found artifact: $artifactName');
+
+      for (final entity in artifactDir.listSync()) {
+        if (entity is Directory) {
+          final dirName = entity.path.split('/').last;
+
+          if (dirName.startsWith('run_')) {
+            for (final child in entity.listSync()) {
+              if (child is Directory) {
+                final phaseName = child.path.split('/').last;
+                totalFiles += FileUtils.countFiles(child);
+                Logger.info('  Phase: $phaseName (from $artifactName)');
+              } else if (child is File) {
+                final fileName = child.path.split('/').last;
+                if (fileName == 'meta.json') {
+                  try {
+                    final meta = json.decode(child.readAsStringSync()) as Map<String, dynamic>;
+                    sources.add({'artifact': artifactName, ...meta});
+                  } catch (_) {
+                    sources.add({'artifact': artifactName, 'error': 'failed to parse meta.json'});
+                  }
+                }
+              }
+            }
+          } else {
+            totalFiles += FileUtils.countFiles(entity);
+            Logger.info('  Directory: $dirName (from $artifactName)');
+          }
+        }
+      }
+    }
+
+    if (global.dryRun) {
+      Logger.info('[DRY-RUN] Would merge ${artifactDirs.length} audit trail(s) ($totalFiles files) into $outputDir');
+      return;
+    }
+
     // Create the merged run directory with a unique timestamp
     final now = DateTime.now();
     final timestamp = now.toIso8601String().replaceAll(':', '-').replaceAll('.', '-').substring(0, 19);
@@ -67,12 +109,8 @@ class MergeAuditTrailsCommand extends Command<void> {
     final mergedRunDir = '$outputPath/run_${timestamp}_merged';
     Directory(mergedRunDir).createSync(recursive: true);
 
-    final sources = <Map<String, dynamic>>[];
-    var totalFiles = 0;
-
     for (final artifactDir in artifactDirs) {
       final artifactName = artifactDir.path.split('/').last;
-      Logger.info('Processing artifact: $artifactName');
 
       for (final entity in artifactDir.listSync()) {
         if (entity is Directory) {
@@ -85,25 +123,12 @@ class MergeAuditTrailsCommand extends Command<void> {
               if (child is Directory) {
                 final phaseName = child.path.split('/').last;
                 FileUtils.copyDirRecursive(child, Directory('$mergedRunDir/$phaseName'));
-                totalFiles += FileUtils.countFiles(child);
                 Logger.info('  Merged phase: $phaseName (from $artifactName)');
-              } else if (child is File) {
-                final fileName = child.path.split('/').last;
-                if (fileName == 'meta.json') {
-                  // Collect source meta for the merged meta.json
-                  try {
-                    final meta = json.decode(child.readAsStringSync()) as Map<String, dynamic>;
-                    sources.add({'artifact': artifactName, ...meta});
-                  } catch (_) {
-                    sources.add({'artifact': artifactName, 'error': 'failed to parse meta.json'});
-                  }
-                }
               }
             }
           } else {
             // Non-RunContext directory (e.g. version_analysis/) -- copy as-is
             FileUtils.copyDirRecursive(entity, Directory('$mergedRunDir/$dirName'));
-            totalFiles += FileUtils.countFiles(entity);
             Logger.info('  Merged directory: $dirName (from $artifactName)');
           }
         }

@@ -70,7 +70,7 @@ class ComposeCommand extends Command<void> {
       exit(1);
     }
     final prompt = CiProcessRunner.runSync(
-      'dart run $composerScript "$prevTag" "$newVersion"',
+      'dart run "$composerScript" "$prevTag" "$newVersion"',
       repoRoot,
       verbose: global.verbose,
     );
@@ -102,14 +102,14 @@ class ComposeCommand extends Command<void> {
     final artifactNames = ['commit_analysis.json', 'pr_data.json', 'breaking_changes.json'];
     for (final name in artifactNames) {
       if (File('$kStagingDir/$name').existsSync()) {
-        includes.add('@$kStagingDir/$name');
+        includes.add('"@$kStagingDir/$name"');
       } else if (File('$repoRoot/$kCicdRunsDir/explore/$name').existsSync()) {
-        includes.add('@$repoRoot/$kCicdRunsDir/explore/$name');
+        includes.add('"@$repoRoot/$kCicdRunsDir/explore/$name"');
       }
     }
     // Issue manifest from pre-release-triage
     if (File('$kStagingDir/issue_manifest.json').existsSync()) {
-      includes.add('@$kStagingDir/issue_manifest.json');
+      includes.add('"@$kStagingDir/issue_manifest.json"');
     }
     final changelogFile = File('$repoRoot/CHANGELOG.md');
     if (!changelogFile.existsSync()) {
@@ -132,7 +132,7 @@ class ComposeCommand extends Command<void> {
       'sh',
       [
         '-c',
-        'cat $promptPath | gemini '
+        'cat "$promptPath" | gemini '
             '-o json --yolo '
             '-m $_kGeminiProModel '
             "--allowed-tools 'run_shell_command(git),run_shell_command(gh)' "

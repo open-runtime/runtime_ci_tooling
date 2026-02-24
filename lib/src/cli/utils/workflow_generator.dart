@@ -19,20 +19,28 @@ class _PlatformDefinition {
 /// Consumers can override the runner label per platform via:
 ///   `ci.runner_overrides: { "<platformId>": "<runs-on label>" }`
 const _platformDefinitions = <String, _PlatformDefinition>{
-  // Linux
-  'ubuntu': _PlatformDefinition(osFamily: 'linux', arch: 'x64', runner: 'ubuntu-latest'),
-  'ubuntu-x64': _PlatformDefinition(osFamily: 'linux', arch: 'x64', runner: 'ubuntu-latest'),
-  'ubuntu-arm64': _PlatformDefinition(osFamily: 'linux', arch: 'arm64', runner: 'ubuntu-24.04-arm'),
+  // Linux — org-managed runners
+  'ubuntu': _PlatformDefinition(osFamily: 'linux', arch: 'x64', runner: 'runtime-ubuntu-24.04-x64-256gb-64core'),
+  'ubuntu-x64': _PlatformDefinition(osFamily: 'linux', arch: 'x64', runner: 'runtime-ubuntu-24.04-x64-256gb-64core'),
+  'ubuntu-arm64': _PlatformDefinition(
+    osFamily: 'linux',
+    arch: 'arm64',
+    runner: 'runtime-ubuntu-24.04-arm64-208gb-64core',
+  ),
 
-  // macOS
+  // macOS — standard GitHub-hosted runners (no org-managed equivalents)
   'macos': _PlatformDefinition(osFamily: 'macos', arch: 'arm64', runner: 'macos-latest'),
   'macos-arm64': _PlatformDefinition(osFamily: 'macos', arch: 'arm64', runner: 'macos-latest'),
   'macos-x64': _PlatformDefinition(osFamily: 'macos', arch: 'x64', runner: 'macos-15-intel'),
 
-  // Windows
-  'windows': _PlatformDefinition(osFamily: 'windows', arch: 'x64', runner: 'windows-latest'),
-  'windows-x64': _PlatformDefinition(osFamily: 'windows', arch: 'x64', runner: 'windows-latest'),
-  'windows-arm64': _PlatformDefinition(osFamily: 'windows', arch: 'arm64', runner: 'windows-11-arm'),
+  // Windows — org-managed runners
+  'windows': _PlatformDefinition(osFamily: 'windows', arch: 'x64', runner: 'runtime-windows-2025-x64-256gb-64core'),
+  'windows-x64': _PlatformDefinition(osFamily: 'windows', arch: 'x64', runner: 'runtime-windows-2025-x64-256gb-64core'),
+  'windows-arm64': _PlatformDefinition(
+    osFamily: 'windows',
+    arch: 'arm64',
+    runner: 'runtime-windows-11-arm64-208gb-64core',
+  ),
 };
 
 /// Renders CI workflow YAML from a Mustache skeleton template and config.json.

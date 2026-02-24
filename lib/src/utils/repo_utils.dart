@@ -38,7 +38,10 @@ String? findRepoRoot(String packageName) {
   var current = Directory.current;
   do {
     final pubspec = File('${current.path}/pubspec.yaml');
-    if (pubspec.existsSync() && pubspec.readAsStringSync().contains('name: $packageName')) {
+    if (pubspec.existsSync() &&
+        pubspec.readAsStringSync().contains(
+          RegExp(r'^name:\s+' + RegExp.escape(packageName) + r'\s*$', multiLine: true),
+        )) {
       return current.path;
     }
     current = current.parent;

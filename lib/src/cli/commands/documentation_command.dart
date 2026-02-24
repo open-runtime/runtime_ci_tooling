@@ -59,7 +59,7 @@ class DocumentationCommand extends Command<void> {
       exit(1);
     }
     final prompt = CiProcessRunner.runSync(
-      'dart run $docScript "$prevTag" "$newVersion"',
+      'dart run "$docScript" "$prevTag" "$newVersion"',
       repoRoot,
       verbose: global.verbose,
     );
@@ -79,9 +79,9 @@ class DocumentationCommand extends Command<void> {
     // Build @ includes
     final includes = <String>[];
     if (File('$kStagingDir/commit_analysis.json').existsSync()) {
-      includes.add('@$kStagingDir/commit_analysis.json');
+      includes.add('"@$kStagingDir/commit_analysis.json"');
     } else if (File('$repoRoot/$kCicdRunsDir/explore/commit_analysis.json').existsSync()) {
-      includes.add('@$repoRoot/$kCicdRunsDir/explore/commit_analysis.json');
+      includes.add('"@$repoRoot/$kCicdRunsDir/explore/commit_analysis.json"');
     }
     includes.add('@README.md');
 
@@ -90,7 +90,7 @@ class DocumentationCommand extends Command<void> {
       'sh',
       [
         '-c',
-        'cat $promptPath | gemini '
+        'cat "$promptPath" | gemini '
             '-o json --yolo '
             '-m $_kGeminiProModel '
             "--allowed-tools 'run_shell_command(git),run_shell_command(gh),run_shell_command(cat),run_shell_command(head)' "

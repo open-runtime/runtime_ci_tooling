@@ -123,7 +123,7 @@ class ReleaseNotesCommand extends Command<void> {
       exit(1);
     }
     final prompt = CiProcessRunner.runSync(
-      'dart run $rnScript "$prevTag" "$newVersion" "$bumpType"',
+      'dart run "$rnScript" "$prevTag" "$newVersion" "$bumpType"',
       repoRoot,
       verbose: global.verbose,
     );
@@ -155,21 +155,21 @@ class ReleaseNotesCommand extends Command<void> {
     final artifactNames = ['commit_analysis.json', 'pr_data.json', 'breaking_changes.json'];
     for (final name in artifactNames) {
       if (File('$kStagingDir/$name').existsSync()) {
-        includes.add('@$kStagingDir/$name');
+        includes.add('"@$kStagingDir/$name"');
       } else if (File('$repoRoot/$kCicdRunsDir/explore/$name').existsSync()) {
-        includes.add('@$repoRoot/$kCicdRunsDir/explore/$name');
+        includes.add('"@$repoRoot/$kCicdRunsDir/explore/$name"');
       }
     }
     if (File('$kStagingDir/issue_manifest.json').existsSync()) {
-      includes.add('@$kStagingDir/issue_manifest.json');
+      includes.add('"@$kStagingDir/issue_manifest.json"');
     }
     // Include verified contributors for Gemini to reference
-    includes.add('@${releaseNotesDir.path}/contributors.json');
+    includes.add('"@${releaseNotesDir.path}/contributors.json"');
     if (File('$repoRoot/CHANGELOG.md').existsSync()) {
       includes.add('@CHANGELOG.md');
     }
     if (File('$repoRoot/$kVersionBumpsDir/v$newVersion.md').existsSync()) {
-      includes.add('@$kVersionBumpsDir/v$newVersion.md');
+      includes.add('"@$kVersionBumpsDir/v$newVersion.md"');
     }
 
     Logger.info('Running Gemini 3 Pro for release notes authoring...');
@@ -181,7 +181,7 @@ class ReleaseNotesCommand extends Command<void> {
       'sh',
       [
         '-c',
-        'cat $promptPath | gemini '
+        'cat "$promptPath" | gemini '
             '-o json --yolo '
             '-m $_kGeminiProModel '
             "--allowed-tools 'run_shell_command(git),run_shell_command(gh),run_shell_command(cat),run_shell_command(head),run_shell_command(tail)' "
