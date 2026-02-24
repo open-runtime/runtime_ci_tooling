@@ -104,12 +104,13 @@ jobs:
 
       - name: Configure Git for HTTPS with Token
         shell: bash
+        env:
+          GH_PAT: ${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}
         run: |
-          TOKEN="${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "git@github.com:"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "git@github.com:"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
 
       - uses: dart-lang/setup-dart@v1.7.1
         with:
@@ -212,12 +213,13 @@ jobs:
 
       - name: Configure Git for HTTPS with Token
         shell: bash
+        env:
+          GH_PAT: ${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}
         run: |
-          TOKEN="${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "git@github.com:"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "git@github.com:"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
 
       - uses: dart-lang/setup-dart@v1.7.1
         with:
@@ -308,12 +310,13 @@ jobs:
 
       - name: Configure Git for HTTPS with Token
         shell: bash
+        env:
+          GH_PAT: ${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}
         run: |
-          TOKEN="${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "git@github.com:"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "git@github.com:"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
 
       - uses: dart-lang/setup-dart@v1.7.1
         with:

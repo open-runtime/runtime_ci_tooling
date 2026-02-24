@@ -127,6 +127,18 @@ class CreateReleaseCommand extends Command<void> {
       }
     }
 
+    // Step 2c: Convert sibling deps to git format + strip resolution: workspace
+    final siblingConversions = SubPackageUtils.convertSiblingDepsForRelease(
+      repoRoot: repoRoot,
+      newVersion: newVersion,
+      effectiveRepo: effectiveRepo,
+      subPackages: subPackages,
+      verbose: global.verbose,
+    );
+    if (siblingConversions > 0) {
+      Logger.success('Converted $siblingConversions sibling dep(s) to git format');
+    }
+
     // Step 3: Assemble release notes folder from Stage 3 artifacts
     final releaseDir = Directory('$repoRoot/$kReleaseNotesDir/v$newVersion');
     releaseDir.createSync(recursive: true);
@@ -303,7 +315,8 @@ class CreateReleaseCommand extends Command<void> {
     }
 
     // Step 5: Create git tag (verify it doesn't already exist)
-    final tagCheck = Process.runSync('git', ['rev-parse', tag], workingDirectory: repoRoot);
+    // Use refs/tags/ prefix to avoid matching branches with the same name.
+    final tagCheck = Process.runSync('git', ['rev-parse', 'refs/tags/$tag'], workingDirectory: repoRoot);
     if (tagCheck.exitCode == 0) {
       Logger.error('Tag $tag already exists. Cannot create release.');
       exit(1);
@@ -317,6 +330,40 @@ class CreateReleaseCommand extends Command<void> {
     );
     CiProcessRunner.exec('git', ['push', 'origin', tag], cwd: repoRoot, fatal: true, verbose: global.verbose);
     Logger.success('Created tag: $tag');
+
+    // Step 5b: Create per-package tags for sub-packages with tag_pattern
+    final pkgTagsCreated = <String>[];
+    for (final pkg in subPackages) {
+      final tp = pkg['tag_pattern'] as String?;
+      if (tp == null) continue;
+      final pkgTag = tp.replaceAll('{{version}}', newVersion);
+      // Use refs/tags/ prefix to avoid matching branches with the same name.
+      final pkgTagCheck = Process.runSync('git', ['rev-parse', 'refs/tags/$pkgTag'], workingDirectory: repoRoot);
+      if (pkgTagCheck.exitCode == 0) {
+        Logger.warn('Per-package tag $pkgTag already exists -- skipping');
+        continue;
+      }
+      try {
+        CiProcessRunner.exec(
+          'git',
+          ['tag', '-a', pkgTag, '-m', '${pkg['name']} v$newVersion'],
+          cwd: repoRoot,
+          fatal: true,
+          verbose: global.verbose,
+        );
+        CiProcessRunner.exec('git', ['push', 'origin', pkgTag], cwd: repoRoot, fatal: true, verbose: global.verbose);
+        pkgTagsCreated.add(pkgTag);
+      } catch (e) {
+        Logger.error('Failed to create per-package tag $pkgTag: $e');
+        Logger.error('  Recovery: git tag -a $pkgTag -m "${pkg['name']} v$newVersion" && git push origin $pkgTag');
+      }
+    }
+    if (pkgTagsCreated.isNotEmpty) {
+      Logger.success(
+        'Created ${pkgTagsCreated.length} per-package tag(s): '
+        '${pkgTagsCreated.join(', ')}',
+      );
+    }
 
     // Step 6: Create GitHub Release using Stage 3 release notes
     var releaseBody = '';
@@ -359,6 +406,8 @@ class CreateReleaseCommand extends Command<void> {
 | Repository | `$effectiveRepo` |
 | pubspec.yaml | Bumped to `$newVersion` |
 ${subPackages.isNotEmpty ? '| Sub-packages | ${subPackages.map((p) => '`${p['name']}`').join(', ')} bumped to `$newVersion` |' : ''}
+${siblingConversions > 0 ? '| Sibling Deps | $siblingConversions dep(s) converted to git format |' : ''}
+${pkgTagsCreated.isNotEmpty ? '| Per-Package Tags | ${pkgTagsCreated.map((t) => '`$t`').join(', ')} |' : ''}
 
 ### Links
 
