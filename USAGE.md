@@ -501,14 +501,18 @@ dart run runtime_ci_tooling:manage_cicd create-release \
 
 ### test
 
-Run `dart test` excluding GCP-tagged tests.
+Run `dart test` with enhanced output capture and job summary.
 
 ```bash
 dart run runtime_ci_tooling:manage_cicd test
 ```
 
-Runs `dart test --exclude-tags gcp`, parses output for pass/fail/skip counts,
-and writes a GitHub Actions step summary.
+**Enhanced managed test behavior (when `ci.features.managed_test=true`):**
+- Excludes `gcp` and `integration` tags via `--exclude-tags gcp,integration`
+- Uses JSON and expanded file reporters for full output capture (including `print()`, isolate output, FFI)
+- Writes logs to `$TEST_LOG_DIR` (CI) or `.dart_tool/test-logs/` (local)
+- Generates a rich GitHub Actions step summary with pass/fail/skip counts and failure details
+- Runs tests in sub-packages (from `ci.sub_packages`) with `pub get` per package
 
 ---
 
@@ -1256,8 +1260,10 @@ final exists = await commandExists('git');
 - `ci.runner_overrides`: optional map to point platform IDs at custom `runs-on` labels (e.g. org-managed GitHub-hosted runners)
 
 **Optional features:**
-- `ci.features.build_runner`: When `true`, runs `dart run build_runner build --delete-conflicting-outputs` before analyze and test steps to regenerate `.g.dart` codegen files
-- `ci.features.web_test`: When `true`, adds a `web-test` job that provisions Chrome via `browser-actions/setup-chrome@v2` and runs `dart test -p chrome`. Configure concurrency and test paths via `ci.web_test.concurrency` (default `1`) and `ci.web_test.paths` (default `[]` = auto-discover)
+- `ci.features.build_runner`: When `true`, runs `dart run build_runner build --delete-conflicting-outputs` before analyze, test, and web-test steps to regenerate `.g.dart` codegen files
+- `ci.features.web_test`: When `true`, adds a `web-test` job that provisions Chrome via `browser-actions/setup-chrome@v2` and runs `dart test -p chrome`. Configure via `ci.web_test`:
+  - `concurrency` (1–32, default `1`): parallel test shards
+  - `paths`: list of relative repo paths (e.g. `["test/web/"]`): paths are normalized, shell-quoted, and validated (no traversal, no shell metacharacters). Empty list = run all tests
 
 **Key steps:**
 ```yaml

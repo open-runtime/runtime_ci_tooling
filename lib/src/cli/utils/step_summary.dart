@@ -51,4 +51,9 @@ abstract final class StepSummary {
     final openAttr = open ? ' open' : '';
     return '\n<details$openAttr>\n<summary>$title</summary>\n\n$content\n\n</details>\n';
   }
+
+  /// Escape HTML special characters for safe embedding in GitHub markdown.
+  static String escapeHtml(String input) {
+    return input.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+  }
 }

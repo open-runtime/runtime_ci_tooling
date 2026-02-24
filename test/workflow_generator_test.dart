@@ -524,21 +524,45 @@ void main() {
         final errors = WorkflowGenerator.validate(
           _validConfig(webTest: {'concurrency': 0}),
         );
-        expect(errors, anyElement(contains('positive integer')));
+        expect(errors, anyElement(contains('between 1 and 32')));
       });
 
       test('web_test.concurrency negative produces error', () {
         final errors = WorkflowGenerator.validate(
           _validConfig(webTest: {'concurrency': -1}),
         );
-        expect(errors, anyElement(contains('positive integer')));
+        expect(errors, anyElement(contains('between 1 and 32')));
+      });
+
+      test('web_test.concurrency exceeds upper bound produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {'concurrency': 33}),
+        );
+        expect(errors, anyElement(contains('between 1 and 32')));
+      });
+
+      test('web_test.concurrency double/float produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {'concurrency': 3.14}),
+        );
+        expect(errors, anyElement(contains('concurrency must be an integer')));
       });
 
       test('web_test.concurrency valid int passes', () {
         final errors = WorkflowGenerator.validate(
-          _validConfig(webTest: {'concurrency': 4}),
+          _validConfig(
+            features: {'proto': false, 'lfs': false, 'web_test': true},
+            webTest: {'concurrency': 4},
+          ),
         );
         expect(errors.where((e) => e.contains('web_test')), isEmpty);
+      });
+
+      test('web_test.concurrency at upper bound (32) passes', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {'concurrency': 32}),
+        );
+        expect(errors.where((e) => e.contains('concurrency')), isEmpty);
       });
 
       test('web_test.concurrency null is fine (defaults to 1)', () {
@@ -580,6 +604,46 @@ void main() {
           }),
         );
         expect(errors, anyElement(contains('must not traverse outside the repo')));
+      });
+
+      test('web_test.paths with embedded traversal (test/web/../../../etc/passwd) produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            features: {'proto': false, 'lfs': false, 'web_test': true},
+            webTest: {'paths': ['test/web/../../../etc/passwd']},
+          ),
+        );
+        expect(errors, anyElement(contains('must not traverse outside the repo')));
+      });
+
+      test('web_test.paths with shell metacharacters (\$(curl evil)) produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {
+            'paths': [r'$(curl evil)'],
+          }),
+        );
+        expect(errors, anyElement(contains('unsupported characters')));
+      });
+
+      test('web_test.paths with shell metacharacters (; rm -rf /) produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {
+            'paths': ['; rm -rf /'],
+          }),
+        );
+        expect(errors, anyElement(contains('unsupported characters')));
+      });
+
+      test('web_test.paths duplicate (after normalization) produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            features: {'proto': false, 'lfs': false, 'web_test': true},
+            webTest: {
+              'paths': ['test/web/foo_test.dart', 'test/web/./foo_test.dart'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('duplicate path')));
       });
 
       test('web_test.paths with backslashes produces error', () {
@@ -627,30 +691,141 @@ void main() {
         expect(errors, anyElement(contains('newlines/tabs')));
       });
 
-      test('valid web_test.paths passes', () {
+      test('web_test.paths with embedded traversal that escapes repo produces error', () {
         final errors = WorkflowGenerator.validate(
           _validConfig(webTest: {
-            'paths': ['test/web/foo_test.dart', 'test/web/bar_test.dart'],
+            'paths': ['test/../../../etc/passwd'],
           }),
+        );
+        expect(errors, anyElement(contains('must not traverse outside the repo')));
+      });
+
+      test('web_test.paths with embedded .. that stays in repo is fine', () {
+        // test/web/../../etc/passwd normalizes to etc/passwd (still inside repo)
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            features: {'proto': false, 'lfs': false, 'web_test': true},
+            webTest: {
+              'paths': ['test/web/../../etc/passwd'],
+            },
+          ),
+        );
+        expect(errors.where((e) => e.contains('traverse')), isEmpty);
+      });
+
+      test('web_test.paths with shell metacharacter \$ produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {
+            'paths': [r'$(curl evil.com)'],
+          }),
+        );
+        expect(errors, anyElement(contains('unsupported characters')));
+      });
+
+      test('web_test.paths with shell metacharacter ; produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {
+            'paths': ['test/foo; rm -rf /'],
+          }),
+        );
+        expect(errors, anyElement(contains('unsupported characters')));
+      });
+
+      test('web_test.paths with duplicate paths produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {
+            'paths': ['test/web/foo_test.dart', 'test/web/foo_test.dart'],
+          }),
+        );
+        expect(errors, anyElement(contains('duplicate path')));
+      });
+
+      test('web_test.paths with duplicate normalized paths produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {
+            'paths': ['test/web/./foo_test.dart', 'test/web/foo_test.dart'],
+          }),
+        );
+        expect(errors, anyElement(contains('duplicate path')));
+      });
+
+      test('web_test.paths with trailing whitespace produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {
+            'paths': ['test/web/foo_test.dart '],
+          }),
+        );
+        expect(errors, anyElement(contains('whitespace')));
+      });
+
+      test('web_test.paths with tab produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {
+            'paths': ['test/web/\tfoo_test.dart'],
+          }),
+        );
+        expect(errors, anyElement(contains('newlines/tabs')));
+      });
+
+      test('valid web_test.paths passes', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            features: {'proto': false, 'lfs': false, 'web_test': true},
+            webTest: {
+              'paths': ['test/web/foo_test.dart', 'test/web/bar_test.dart'],
+            },
+          ),
         );
         expect(errors.where((e) => e.contains('web_test')), isEmpty);
       });
 
       test('empty web_test.paths list is fine', () {
         final errors = WorkflowGenerator.validate(
-          _validConfig(webTest: {'paths': <String>[]}),
+          _validConfig(
+            features: {'proto': false, 'lfs': false, 'web_test': true},
+            webTest: {'paths': <String>[]},
+          ),
         );
         expect(errors.where((e) => e.contains('web_test')), isEmpty);
       });
 
       test('valid full web_test config passes', () {
         final errors = WorkflowGenerator.validate(
-          _validConfig(webTest: {
-            'concurrency': 2,
-            'paths': ['test/web/'],
-          }),
+          _validConfig(
+            features: {'proto': false, 'lfs': false, 'web_test': true},
+            webTest: {
+              'concurrency': 2,
+              'paths': ['test/web/'],
+            },
+          ),
         );
         expect(errors.where((e) => e.contains('web_test')), isEmpty);
+      });
+
+      test('web_test with unknown key (typo) produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {'concurreny': 2}), // typo: concurreny
+        );
+        expect(errors, anyElement(contains('unknown key "concurreny"')));
+      });
+
+      test('cross-validation: web_test config present but feature disabled produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            features: {'proto': false, 'lfs': false, 'web_test': false},
+            webTest: {'concurrency': 2, 'paths': ['test/web/']},
+          ),
+        );
+        expect(errors, anyElement(contains('web_test config is present but ci.features.web_test is not enabled')));
+      });
+
+      test('cross-validation: web_test feature enabled but config wrong type produces error', () {
+        final config = _validConfig(
+          features: {'proto': false, 'lfs': false, 'web_test': true},
+        );
+        config['web_test'] = 'yes';
+        final errors = WorkflowGenerator.validate(config);
+        expect(errors, anyElement(contains('web_test must be an object')));
       });
     });
 
@@ -755,6 +930,70 @@ void main() {
         () => WorkflowGenerator.loadCiConfig(tempDir.path),
         throwsA(isA<StateError>()),
       );
+    });
+  });
+
+  // ===========================================================================
+  // P0: render() — web_test output integration tests
+  // ===========================================================================
+  group('WorkflowGenerator.render()', () {
+    Map<String, dynamic> _minimalValidConfig({bool webTest = false, Map<String, dynamic>? webTestConfig}) {
+      return _validConfig(
+        dartSdk: '3.9.2',
+        features: {
+          'proto': false,
+          'lfs': false,
+          'format_check': false,
+          'web_test': webTest,
+        },
+        platforms: ['ubuntu'],
+        webTest: webTestConfig,
+      );
+    }
+
+    test('web_test=false: rendered output does not contain web-test job', () {
+      final gen = WorkflowGenerator(
+        ciConfig: _minimalValidConfig(webTest: false),
+        toolingVersion: '0.0.0-test',
+      );
+      final rendered = gen.render();
+      expect(rendered, isNot(contains('web-test:')));
+      expect(rendered, isNot(contains('dart test -p chrome')));
+    });
+
+    test('web_test=true: rendered output contains web-test job and chrome test', () {
+      final gen = WorkflowGenerator(
+        ciConfig: _minimalValidConfig(webTest: true),
+        toolingVersion: '0.0.0-test',
+      );
+      final rendered = gen.render();
+      expect(rendered, contains('web-test:'));
+      expect(rendered, contains('dart test -p chrome'));
+    });
+
+    test('web_test=true with paths: rendered output includes path args', () {
+      final gen = WorkflowGenerator(
+        ciConfig: _minimalValidConfig(
+          webTest: true,
+          webTestConfig: {'paths': ['test/web/foo_test.dart'], 'concurrency': 2},
+        ),
+        toolingVersion: '0.0.0-test',
+      );
+      final rendered = gen.render();
+      expect(rendered, contains("'test/web/foo_test.dart'"));
+      expect(rendered, contains('--concurrency=2'));
+    });
+
+    test('web_test=true with concurrency at upper bound (32): rendered output uses 32', () {
+      final gen = WorkflowGenerator(
+        ciConfig: _minimalValidConfig(
+          webTest: true,
+          webTestConfig: {'concurrency': 32},
+        ),
+        toolingVersion: '0.0.0-test',
+      );
+      final rendered = gen.render();
+      expect(rendered, contains('--concurrency=32'));
     });
   });
 }

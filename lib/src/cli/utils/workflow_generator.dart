@@ -55,6 +55,8 @@ const Set<String> _knownFeatureKeys = {
   'web_test',
 };
 
+const Set<String> _knownWebTestKeys = {'concurrency', 'paths'};
+
 /// Renders CI workflow YAML from a Mustache skeleton template and config.json.
 ///
 /// The skeleton uses `<% %>` delimiters (set via `{{=<% %>=}}` at the top)
@@ -70,6 +72,12 @@ class WorkflowGenerator {
   final String toolingVersion;
 
   WorkflowGenerator({required this.ciConfig, required this.toolingVersion});
+
+  /// Returns the web_test config map if present and valid; otherwise null.
+  static Map<String, dynamic>? _getWebTestConfig(Map<String, dynamic> ciConfig) {
+    final raw = ciConfig['web_test'];
+    return raw is Map<String, dynamic> ? raw : null;
+  }
 
   /// Load the CI config section from a repo's config.json.
   ///
@@ -96,7 +104,15 @@ class WorkflowGenerator {
   /// Render the CI workflow from the skeleton template.
   ///
   /// If [existingContent] is provided, user sections are preserved from it.
+  ///
+  /// Throws [StateError] if the config is invalid. Always validates before
+  /// rendering to prevent interpolation of unsafe values into shell commands.
   String render({String? existingContent}) {
+    final errors = validate(ciConfig);
+    if (errors.isNotEmpty) {
+      throw StateError('Cannot render with invalid config:\n  ${errors.join('\n  ')}');
+    }
+
     final skeletonPath = TemplateResolver.resolveTemplatePath('github/workflows/ci.skeleton.yaml');
     final skeletonFile = File(skeletonPath);
     if (!skeletonFile.existsSync()) {
@@ -180,10 +196,10 @@ class WorkflowGenerator {
       'build_runner': features['build_runner'] == true,
       'web_test': features['web_test'] == true,
 
-      // Web test config (only meaningful when web_test is true)
-      'web_test_concurrency': _resolveWebTestConcurrency(ciConfig),
-      'web_test_paths': _resolveWebTestPaths(ciConfig),
-      'web_test_has_paths': _resolveWebTestHasPaths(ciConfig),
+      // Web test config (only computed when web_test is true)
+      'web_test_concurrency': features['web_test'] == true ? _resolveWebTestConcurrency(ciConfig) : '1',
+      'web_test_paths': features['web_test'] == true ? _resolveWebTestPaths(ciConfig) : '',
+      'web_test_has_paths': features['web_test'] == true && _resolveWebTestHasPaths(ciConfig),
 
       // Secrets / env
       'has_secrets': secretsList.isNotEmpty,
@@ -205,36 +221,38 @@ class WorkflowGenerator {
   }
 
   static String _resolveWebTestConcurrency(Map<String, dynamic> ciConfig) {
-    final webTestConfig = ciConfig['web_test'];
-    if (webTestConfig is Map<String, dynamic>) {
+    final webTestConfig = _getWebTestConfig(ciConfig);
+    if (webTestConfig != null) {
       final concurrency = webTestConfig['concurrency'];
-      if (concurrency is int && concurrency > 0) {
+      if (concurrency is int && concurrency > 0 && concurrency <= 32) {
         return '$concurrency';
       }
     }
     return '1';
   }
 
-  static String _resolveWebTestPaths(Map<String, dynamic> ciConfig) {
-    final webTestConfig = ciConfig['web_test'];
-    if (webTestConfig is Map<String, dynamic>) {
+  /// Shared filter: extracts valid, normalized web test paths from config.
+  static List<String> _filteredWebTestPaths(Map<String, dynamic> ciConfig) {
+    final webTestConfig = _getWebTestConfig(ciConfig);
+    if (webTestConfig != null) {
       final paths = webTestConfig['paths'];
       if (paths is List && paths.isNotEmpty) {
-        return paths.whereType<String>().where((s) => s.trim().isNotEmpty).join(' ');
+        return paths.whereType<String>().where((s) => s.trim().isNotEmpty).map((s) => p.posix.normalize(s)).toList();
       }
     }
-    return '';
+    return const [];
+  }
+
+  static String _resolveWebTestPaths(Map<String, dynamic> ciConfig) {
+    final filtered = _filteredWebTestPaths(ciConfig);
+    if (filtered.isEmpty) return '';
+    // Shell-quote each path for defense-in-depth (validation already blocks
+    // dangerous characters, but quoting prevents breakage from future changes).
+    return filtered.map((s) => "'$s'").join(' ');
   }
 
   static bool _resolveWebTestHasPaths(Map<String, dynamic> ciConfig) {
-    final webTestConfig = ciConfig['web_test'];
-    if (webTestConfig is Map<String, dynamic>) {
-      final paths = webTestConfig['paths'];
-      if (paths is List && paths.isNotEmpty) {
-        return paths.whereType<String>().where((s) => s.trim().isNotEmpty).isNotEmpty;
-      }
-    }
-    return false;
+    return _filteredWebTestPaths(ciConfig).isNotEmpty;
   }
 
   /// Extract user sections from the existing file and re-insert them
@@ -437,12 +455,19 @@ class WorkflowGenerator {
       if (webTestConfig is! Map) {
         errors.add('ci.web_test must be an object, got ${webTestConfig.runtimeType}');
       } else {
+        // Detect unknown keys inside web_test config
+        for (final key in webTestConfig.keys) {
+          if (key is String && !_knownWebTestKeys.contains(key)) {
+            errors.add('ci.web_test contains unknown key "$key" (typo?)');
+          }
+        }
+
         final concurrency = webTestConfig['concurrency'];
         if (concurrency != null) {
           if (concurrency is! int) {
             errors.add('ci.web_test.concurrency must be an integer, got ${concurrency.runtimeType}');
-          } else if (concurrency < 1) {
-            errors.add('ci.web_test.concurrency must be a positive integer, got $concurrency');
+          } else if (concurrency < 1 || concurrency > 32) {
+            errors.add('ci.web_test.concurrency must be between 1 and 32, got $concurrency');
           }
         }
 
@@ -451,6 +476,7 @@ class WorkflowGenerator {
           if (paths is! List) {
             errors.add('ci.web_test.paths must be an array, got ${paths.runtimeType}');
           } else {
+            final seenPaths = <String>{};
             for (var i = 0; i < paths.length; i++) {
               final pathValue = paths[i];
               if (pathValue is! String || pathValue.trim().isEmpty) {
@@ -480,10 +506,24 @@ class WorkflowGenerator {
               }
               if (RegExp(r'[^A-Za-z0-9_./-]').hasMatch(pathValue)) {
                 errors.add('ci.web_test.paths[$i] contains unsupported characters: "$pathValue"');
+                continue;
+              }
+              if (!seenPaths.add(normalized)) {
+                errors.add('ci.web_test.paths contains duplicate path "$normalized"');
               }
             }
           }
         }
+      }
+    }
+
+    // Cross-validate: both mismatch directions
+    // Direction 1: config present but feature disabled (below)
+    // Direction 2: feature enabled but config wrong type — handled by web_test block above
+    if (features is Map) {
+      final webTestEnabled = features['web_test'] == true;
+      if (!webTestEnabled && webTestConfig is Map && webTestConfig.isNotEmpty) {
+        errors.add('ci.web_test config is present but ci.features.web_test is not enabled (dead config?)');
       }
     }
 
@@ -510,9 +550,10 @@ class WorkflowGenerator {
     }
 
     if (features['web_test'] == true) {
-      final webTestConfig = ciConfig['web_test'] as Map<String, dynamic>? ?? {};
-      final concurrency = webTestConfig['concurrency'] ?? 1;
-      final webPaths = webTestConfig['paths'] as List? ?? [];
+      final wtConfig = ciConfig['web_test'];
+      final wtMap = wtConfig is Map<String, dynamic> ? wtConfig : <String, dynamic>{};
+      final concurrency = wtMap['concurrency'] is int ? wtMap['concurrency'] : 1;
+      final webPaths = wtMap['paths'] is List ? wtMap['paths'] as List : [];
       Logger.info('  Web test: concurrency=$concurrency, paths=${webPaths.isEmpty ? "(all)" : webPaths.join(", ")}');
     }
 

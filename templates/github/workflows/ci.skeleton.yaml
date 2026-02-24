@@ -461,6 +461,7 @@ jobs:
 <%/secrets_list%>
 <%/has_secrets%>
     steps:
+      # ── shared:checkout ── keep in sync with single_platform / multi_platform ──
       - uses: actions/checkout@v6.0.2
         with:
 <%#format_check%>
@@ -472,6 +473,7 @@ jobs:
           lfs: true
 <%/lfs%>
 
+      # ── shared:git-config ── keep in sync with single_platform / multi_platform ──
       - name: Configure Git for HTTPS with Token
         shell: bash
         run: |
@@ -482,10 +484,12 @@ jobs:
           git config --global url."https://x-access-token:${TOKEN}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
           git config --global url."https://x-access-token:${TOKEN}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
 
+      # ── shared:dart-setup ── keep in sync with single_platform / multi_platform ──
       - uses: dart-lang/setup-dart@v1.7.1
         with:
           sdk: "<%dart_sdk%>"
 
+      # ── shared:pub-cache ── keep in sync with single_platform / multi_platform ──
       - name: Cache Dart pub dependencies
         uses: actions/cache@v5.0.3
         with:
@@ -493,6 +497,15 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
           restore-keys: ${{ runner.os }}-${{ runner.arch }}-dart-pub-
 
+      # ── shared:proto-setup ── keep in sync with single_platform / multi_platform ──
+<%#proto%>
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3.0.0
+
+      - run: dart pub global activate protoc_plugin 25.0.0
+
+<%/proto%>
+      # ── shared:pub-get ── keep in sync with single_platform / multi_platform ──
       - run: dart pub get
         env:
           GIT_LFS_SKIP_SMUDGE: "1"
