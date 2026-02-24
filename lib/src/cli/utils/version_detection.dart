@@ -13,8 +13,11 @@ const String kGeminiProModel = 'gemini-3.1-pro-preview';
 /// Version detection and semantic versioning utilities.
 abstract final class VersionDetection {
   /// Detect the previous release tag from git history.
-  static String detectPrevTag(String repoRoot, {bool verbose = false}) {
-    final result = CiProcessRunner.runSync(
+  ///
+  /// When [excludeTag] is provided (e.g. the tag about to be created), the
+  /// method returns the second-newest tag instead so the diff range is correct.
+  static String detectPrevTag(String repoRoot, {String? excludeTag, bool verbose = false}) {
+    var result = CiProcessRunner.runSync(
       "git tag -l 'v*' --sort=-version:refname | head -1",
       repoRoot,
       verbose: verbose,
@@ -22,6 +25,17 @@ abstract final class VersionDetection {
     if (result.isEmpty) {
       // No tags yet -- use the first commit
       return CiProcessRunner.runSync('git rev-list --max-parents=0 HEAD | head -1', repoRoot, verbose: verbose);
+    }
+    // If the newest tag matches excludeTag, pick the second-newest.
+    if (excludeTag != null && result == excludeTag) {
+      result = CiProcessRunner.runSync(
+        "git tag -l 'v*' --sort=-version:refname | head -2 | tail -1",
+        repoRoot,
+        verbose: verbose,
+      );
+      if (result.isEmpty || result == excludeTag) {
+        return CiProcessRunner.runSync('git rev-list --max-parents=0 HEAD | head -1', repoRoot, verbose: verbose);
+      }
     }
     return result;
   }
@@ -133,7 +147,7 @@ abstract final class VersionDetection {
       final promptPath = '${versionAnalysisDir.path}/prompt.txt';
       File(promptPath).writeAsStringSync(prompt);
       final geminiResult = CiProcessRunner.runSync(
-        'cat $promptPath | gemini '
+        'cat "$promptPath" | gemini '
         '-o json --yolo '
         '-m $kGeminiProModel '
         "--allowed-tools 'run_shell_command(git),run_shell_command(gh)' "
@@ -153,7 +167,7 @@ abstract final class VersionDetection {
         try {
           final bumpData = json.decode(File(bumpJsonPath).readAsStringSync()) as Map<String, dynamic>;
           final rawBump = (bumpData['bump'] as String?)?.trim().toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
-          if (rawBump == 'major' || rawBump == 'minor' || rawBump == 'patch' || rawBump == 'none') {
+          if (rawBump == 'major' || rawBump == 'minor' || rawBump == 'patch') {
             Logger.info('  Gemini analysis: $rawBump (overriding regex: $bump)');
             bump = rawBump!;
           } else {
@@ -202,14 +216,27 @@ abstract final class VersionDetection {
 
   /// Compare two semver versions. Returns negative if a < b, 0 if equal,
   /// positive if a > b.
+  ///
+  /// Handles pre-release suffixes: `1.0.0-beta.1 < 1.0.0` per semver spec.
   static int compareVersions(String a, String b) {
-    final aParts = a.split('.').map((p) => int.tryParse(p) ?? 0).toList();
-    final bParts = b.split('.').map((p) => int.tryParse(p) ?? 0).toList();
+    // Split off pre-release suffix (e.g. "1.0.0-beta.1" -> "1.0.0", "beta.1")
+    final aSplit = a.split('-');
+    final bSplit = b.split('-');
+    final aBase = aSplit.first;
+    final bBase = bSplit.first;
+    final aPreRelease = aSplit.length > 1 ? aSplit.sublist(1).join('-') : null;
+    final bPreRelease = bSplit.length > 1 ? bSplit.sublist(1).join('-') : null;
+
+    final aParts = aBase.split('.').map((p) => int.tryParse(p) ?? 0).toList();
+    final bParts = bBase.split('.').map((p) => int.tryParse(p) ?? 0).toList();
     for (var i = 0; i < 3; i++) {
       final av = i < aParts.length ? aParts[i] : 0;
       final bv = i < bParts.length ? bParts[i] : 0;
       if (av != bv) return av - bv;
     }
+    // When base versions are equal, pre-release < release per semver spec.
+    if (aPreRelease != null && bPreRelease == null) return -1;
+    if (aPreRelease == null && bPreRelease != null) return 1;
     return 0;
   }
 }

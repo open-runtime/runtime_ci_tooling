@@ -315,7 +315,8 @@ class CreateReleaseCommand extends Command<void> {
     }
 
     // Step 5: Create git tag (verify it doesn't already exist)
-    final tagCheck = Process.runSync('git', ['rev-parse', tag], workingDirectory: repoRoot);
+    // Use refs/tags/ prefix to avoid matching branches with the same name.
+    final tagCheck = Process.runSync('git', ['rev-parse', 'refs/tags/$tag'], workingDirectory: repoRoot);
     if (tagCheck.exitCode == 0) {
       Logger.error('Tag $tag already exists. Cannot create release.');
       exit(1);
@@ -336,20 +337,26 @@ class CreateReleaseCommand extends Command<void> {
       final tp = pkg['tag_pattern'] as String?;
       if (tp == null) continue;
       final pkgTag = tp.replaceAll('{{version}}', newVersion);
-      final pkgTagCheck = Process.runSync('git', ['rev-parse', pkgTag], workingDirectory: repoRoot);
+      // Use refs/tags/ prefix to avoid matching branches with the same name.
+      final pkgTagCheck = Process.runSync('git', ['rev-parse', 'refs/tags/$pkgTag'], workingDirectory: repoRoot);
       if (pkgTagCheck.exitCode == 0) {
         Logger.warn('Per-package tag $pkgTag already exists -- skipping');
         continue;
       }
-      CiProcessRunner.exec(
-        'git',
-        ['tag', '-a', pkgTag, '-m', '${pkg['name']} v$newVersion'],
-        cwd: repoRoot,
-        fatal: true,
-        verbose: global.verbose,
-      );
-      CiProcessRunner.exec('git', ['push', 'origin', pkgTag], cwd: repoRoot, fatal: true, verbose: global.verbose);
-      pkgTagsCreated.add(pkgTag);
+      try {
+        CiProcessRunner.exec(
+          'git',
+          ['tag', '-a', pkgTag, '-m', '${pkg['name']} v$newVersion'],
+          cwd: repoRoot,
+          fatal: true,
+          verbose: global.verbose,
+        );
+        CiProcessRunner.exec('git', ['push', 'origin', pkgTag], cwd: repoRoot, fatal: true, verbose: global.verbose);
+        pkgTagsCreated.add(pkgTag);
+      } catch (e) {
+        Logger.error('Failed to create per-package tag $pkgTag: $e');
+        Logger.error('  Recovery: git tag -a $pkgTag -m "${pkg['name']} v$newVersion" && git push origin $pkgTag');
+      }
     }
     if (pkgTagsCreated.isNotEmpty) {
       Logger.success(
