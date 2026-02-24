@@ -243,16 +243,25 @@ class CreateReleaseCommand extends Command<void> {
           verbose: global.verbose,
         );
       }
-      // Pull with rebase to handle concurrent pipeline jobs (e.g. Autodoc) that may have
-      // pushed to main between our checkout and now, causing a non-fast-forward push failure.
-      CiProcessRunner.exec(
-        'git',
-        ['pull', '--rebase', 'origin', 'main'],
-        cwd: repoRoot,
-        fatal: true,
-        verbose: global.verbose,
-      );
-      CiProcessRunner.exec('git', ['push', 'origin', 'main'], cwd: repoRoot, fatal: true, verbose: global.verbose);
+      // Try to push directly first. The release pipeline runs on a fresh checkout,
+      // so normally there are no remote changes to integrate. If the push fails
+      // (e.g. another pipeline job pushed between checkout and now), fall back to
+      // fetch + merge (NOT rebase — rebase fails when there are unstaged changes
+      // from earlier pipeline steps like autodoc/compose-artifacts).
+      final pushResult = Process.runSync('git', ['push', 'origin', 'main'], workingDirectory: repoRoot);
+      if (pushResult.exitCode != 0) {
+        Logger.warn('Direct push failed (non-fast-forward); fetching and merging remote changes...');
+        if (global.verbose) Logger.info('  push stderr: ${(pushResult.stderr as String).trim()}');
+        CiProcessRunner.exec('git', ['fetch', 'origin', 'main'], cwd: repoRoot, fatal: true, verbose: global.verbose);
+        CiProcessRunner.exec(
+          'git',
+          ['merge', 'origin/main', '--no-edit'],
+          cwd: repoRoot,
+          fatal: true,
+          verbose: global.verbose,
+        );
+        CiProcessRunner.exec('git', ['push', 'origin', 'main'], cwd: repoRoot, fatal: true, verbose: global.verbose);
+      }
       Logger.success('Committed and pushed changes');
     } else {
       Logger.info('No changes to commit');
