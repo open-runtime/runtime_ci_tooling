@@ -80,11 +80,16 @@ GamePlan? loadPlan({String? runDir}) {
 // Internal
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/// The explicit `--repo owner/repo` argument derived from config.
+String get _repoSlug => '${config.repoOwner}/${config.repoName}';
+
 Future<Map<String, dynamic>?> _fetchIssueData(int issueNumber, String repoRoot) async {
   final result = await Process.run('gh', [
     'issue',
     'view',
     '$issueNumber',
+    '--repo',
+    _repoSlug,
     '--json',
     'number,title,body,author,labels,state,comments',
   ], workingDirectory: repoRoot);
@@ -118,6 +123,8 @@ Future<List<Map<String, dynamic>>> _discoverOpenIssues(String repoRoot) async {
   final result = await Process.run('gh', [
     'issue',
     'list',
+    '--repo',
+    _repoSlug,
     '--state',
     'open',
     '--limit',

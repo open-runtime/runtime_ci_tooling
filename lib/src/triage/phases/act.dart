@@ -18,10 +18,18 @@ import '../utils/json_schemas.dart';
 ///   - Checks existing labels before applying duplicates
 ///   - Checks existing comments for bot signatures before posting duplicates
 ///   - Each auto-comment includes a hidden signature for dedup
+///
+/// Safety:
+///   - ALL gh commands use explicit `--repo owner/repo` to prevent
+///     fork → upstream leakage (resolved from .runtime_ci/config.json)
+///   - Org allowlist check runs before any actions are executed
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Constants
 // ═══════════════════════════════════════════════════════════════════════════════
+
+/// Allowed GitHub organizations. Actions are refused for repos outside these orgs.
+const Set<String> _kAllowedOrgs = {'open-runtime', 'pieces-app'};
 
 /// Hidden HTML comment signature embedded in every auto-posted comment.
 /// Format: <!-- triage-bot:$runId:$issueNumber -->
@@ -29,6 +37,10 @@ String _botSignature(String runDir, int issueNumber) {
   final runId = runDir.split('/').last;
   return '<!-- triage-bot:$runId:$issueNumber -->';
 }
+
+/// The explicit `--repo owner/repo` argument derived from config.
+/// Ensures gh never resolves from git remotes (which can point to upstream in forks).
+String get _repoSlug => '${config.repoOwner}/${config.repoName}';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Public API
@@ -41,7 +53,16 @@ Future<List<TriageDecision>> act(
   String repoRoot, {
   required String runDir,
 }) async {
-  print('Phase 3 [ACT]: Applying triage decisions for ${plan.issues.length} issue(s)');
+  // Safety: refuse to act if the configured repo owner is not in the allowlist
+  if (!_kAllowedOrgs.contains(config.repoOwner)) {
+    print(
+      'Phase 3 [ACT]: REFUSING to act — repo owner "${config.repoOwner}" '
+      'is not in allowed orgs: $_kAllowedOrgs',
+    );
+    return [];
+  }
+
+  print('Phase 3 [ACT]: Applying triage decisions for ${plan.issues.length} issue(s) on $_repoSlug');
 
   final decisions = <TriageDecision>[];
 
@@ -154,7 +175,7 @@ Future<void> _executeAction(TriageAction action, int issueNumber, String repoRoo
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// GitHub Operations (with idempotency)
+// GitHub Operations (with idempotency + explicit --repo)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Get the current state of an issue ('OPEN' or 'CLOSED').
@@ -164,6 +185,8 @@ Future<String> _getIssueState(int issueNumber, String repoRoot) async {
       'issue',
       'view',
       '$issueNumber',
+      '--repo',
+      _repoSlug,
       '--json',
       'state',
       '--jq',
@@ -185,15 +208,25 @@ Future<void> _applyLabelIdempotent(int issueNumber, String label, String repoRoo
     'issue',
     'edit',
     '$issueNumber',
+    '--repo',
+    _repoSlug,
     '--add-label',
     label,
   ], workingDirectory: repoRoot);
 
   if (result.exitCode != 0) {
     // Label might not exist in the repo -- create it first
-    await Process.run('gh', ['label', 'create', label, '--force'], workingDirectory: repoRoot);
+    await Process.run('gh', ['label', 'create', label, '--repo', _repoSlug, '--force'], workingDirectory: repoRoot);
     // Retry the label application
-    await Process.run('gh', ['issue', 'edit', '$issueNumber', '--add-label', label], workingDirectory: repoRoot);
+    await Process.run('gh', [
+      'issue',
+      'edit',
+      '$issueNumber',
+      '--repo',
+      _repoSlug,
+      '--add-label',
+      label,
+    ], workingDirectory: repoRoot);
   }
 }
 
@@ -204,6 +237,8 @@ Future<Set<String>> _getIssueLabels(int issueNumber, String repoRoot) async {
       'issue',
       'view',
       '$issueNumber',
+      '--repo',
+      _repoSlug,
       '--json',
       'labels',
       '--jq',
@@ -225,6 +260,8 @@ Future<bool> _hasExistingComment(int issueNumber, String searchText, String repo
       'issue',
       'view',
       '$issueNumber',
+      '--repo',
+      _repoSlug,
       '--json',
       'comments',
       '--jq',
@@ -240,11 +277,19 @@ Future<bool> _hasExistingComment(int issueNumber, String searchText, String repo
 }
 
 Future<void> _postComment(int issueNumber, String body, String repoRoot) async {
-  await Process.run('gh', ['issue', 'comment', '$issueNumber', '--body', body], workingDirectory: repoRoot);
+  await Process.run('gh', [
+    'issue',
+    'comment',
+    '$issueNumber',
+    '--repo',
+    _repoSlug,
+    '--body',
+    body,
+  ], workingDirectory: repoRoot);
 }
 
 Future<void> _closeIssue(int issueNumber, String reason, String repoRoot) async {
-  final args = ['issue', 'close', '$issueNumber'];
+  final args = ['issue', 'close', '$issueNumber', '--repo', _repoSlug];
   if (reason == 'not_planned') {
     args.addAll(['--reason', 'not planned']);
   }

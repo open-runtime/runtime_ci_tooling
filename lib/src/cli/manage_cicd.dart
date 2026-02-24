@@ -1103,11 +1103,11 @@ String _postProcessReleaseNotes(
 
     if (fabricated.isNotEmpty) {
       _warn('Stripping ${fabricated.length} fabricated issue references: ${fabricated.map((n) => "#$n").join(", ")}');
-      for (final num in fabricated) {
+      for (final issueNum in fabricated) {
         // Remove the link but keep descriptive text: "[#N](url) — desc" → "desc"
-        result = result.replaceAll(RegExp(r'- \[#' + num.toString() + r'\]\([^)]*\)[^\n]*\n'), '');
+        result = result.replaceAll(RegExp(r'- \[#' + issueNum.toString() + r'\]\([^)]*\)[^\n]*\n'), '');
         // Remove inline (#N) references
-        result = result.replaceAll('(#$num)', '');
+        result = result.replaceAll('(#$issueNum)', '');
       }
     }
   }

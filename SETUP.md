@@ -309,15 +309,18 @@ The CI workflow (`.github/workflows/ci.yaml`) is generated from your `ci` sectio
 | `features.proto` | bool | `false` | Enable protobuf generation step |
 | `features.lfs` | bool | `false` | Enable Git LFS checkout |
 | `features.format_check` | bool | `true` | Enable `dart format` check |
-| `features.analysis_cache` | bool | `true` | Cache analysis results across runs |
-| `features.managed_analyze` | bool | `true` | Run `dart analyze` via tooling |
-| `features.managed_test` | bool | `true` | Run `dart test` via tooling |
+| `features.analysis_cache` | bool | `false` | Cache analysis results across runs |
+| `features.managed_analyze` | bool | `false` | Run `dart analyze` via tooling |
+| `features.managed_test` | bool | `false` | Run `dart test` via tooling |
+| `platforms` | list | `["ubuntu"]` | Platform matrix. If 2+ entries, CI runs `analyze` once then `test` as a matrix. Valid: `ubuntu-x64`, `ubuntu-arm64`, `macos-arm64`, `macos-x64`, `windows-x64`, `windows-arm64` (plus aliases `ubuntu`, `macos`, `windows`). |
+| `runner_overrides` | object | `{}` | Override platform IDs to custom `runs-on` labels (e.g. org-managed GitHub-hosted runners). Example: `{ "ubuntu-arm64": "runtime-ubuntu-24.04-arm64-208gb-64core" }` |
 | `secrets` | object | `{}` | Additional secrets as `{ "ENV_NAME": "SECRET_NAME" }` |
 | `sub_packages` | list | `[]` | Sub-packages as `[{ "name": "...", "path": "..." }]` |
 
 You can add custom steps before/after tests using user-preservable sections in the
 generated workflow — look for `# --- BEGIN USER: pre-test ---` and
-`# --- END USER: post-test ---` markers.
+`# --- END USER: post-test ---` markers. To add additional jobs (including reusable workflow calls),
+use `# --- BEGIN USER: extra-jobs ---` / `# --- END USER: extra-jobs ---`.
 
 ### Customize the workflows
 

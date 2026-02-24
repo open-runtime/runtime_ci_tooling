@@ -31,6 +31,15 @@ Future<void> postReleaseTriage({
   required String runDir,
   bool verbose = false,
 }) async {
+  // Safety: refuse to act if the configured repo owner is not in the allowlist
+  if (!_kAllowedOrgs.contains(config.repoOwner)) {
+    print(
+      'POST-RELEASE: REFUSING to act — repo owner "${config.repoOwner}" '
+      'is not in allowed orgs: $_kAllowedOrgs',
+    );
+    return;
+  }
+
   print('POST-RELEASE TRIAGE: Closing the loop for v$newVersion');
   final stopwatch = Stopwatch()..start();
 
@@ -61,7 +70,7 @@ Future<void> postReleaseTriage({
   final actionsTaken = <Map<String, dynamic>>[];
 
   // Step 1: Own-repo GitHub issues
-  if (config.postReleaseCloseOwnRepo || true) {
+  if (config.postReleaseCloseOwnRepo) {
     for (final issue in ghIssues) {
       final number = issue['number'] as int;
       final confidence = (issue['confidence'] as num?)?.toDouble() ?? 0.0;
@@ -234,6 +243,13 @@ Future<Map<String, dynamic>?> _processCrossRepoIssue({
   required String repoRoot,
   required String runDir,
 }) async {
+  // Safety: only comment on repos in allowed orgs
+  final repoOwner = repo.split('/').first;
+  if (!_kAllowedOrgs.contains(repoOwner)) {
+    print('    WARNING: Skipping $repo#$issueNumber — org "$repoOwner" not in allowed orgs');
+    return null;
+  }
+
   final runId = runDir.split('/').last;
   final signature = '<!-- cross-repo-release:$runId:$issueNumber -->';
 
@@ -364,7 +380,18 @@ void _updateLinkedIssues({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// GitHub Helpers
+// Constants & Helpers
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Allowed GitHub organizations. Actions are refused for repos outside these orgs.
+const Set<String> _kAllowedOrgs = {'open-runtime', 'pieces-app'};
+
+/// The explicit `--repo owner/repo` argument derived from config.
+/// Ensures gh never resolves from git remotes (which can point to upstream in forks).
+String get _repoSlug => '${config.repoOwner}/${config.repoName}';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GitHub Helpers (all commands use explicit --repo)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 Future<String> _getIssueState(int issueNumber, String repoRoot) async {
@@ -373,6 +400,8 @@ Future<String> _getIssueState(int issueNumber, String repoRoot) async {
       'issue',
       'view',
       '$issueNumber',
+      '--repo',
+      _repoSlug,
       '--json',
       'state',
       '--jq',
@@ -386,9 +415,18 @@ Future<String> _getIssueState(int issueNumber, String repoRoot) async {
 
 Future<bool> _hasExistingComment(int issueNumber, String signature, {String? repo, required String repoRoot}) async {
   try {
-    final args = ['issue', 'view', '$issueNumber', '--json', 'comments', '--jq', '.comments[].body'];
-    if (repo != null) args.addAll(['--repo', repo]);
-    final result = await Process.run('gh', args, workingDirectory: repoRoot);
+    final targetRepo = repo ?? _repoSlug;
+    final result = await Process.run('gh', [
+      'issue',
+      'view',
+      '$issueNumber',
+      '--repo',
+      targetRepo,
+      '--json',
+      'comments',
+      '--jq',
+      '.comments[].body',
+    ], workingDirectory: repoRoot);
     return (result.stdout as String).contains(signature);
   } catch (_) {
     return false;
@@ -396,11 +434,18 @@ Future<bool> _hasExistingComment(int issueNumber, String signature, {String? rep
 }
 
 Future<void> _postComment(int issueNumber, String body, {String? repo, required String repoRoot}) async {
-  final args = ['issue', 'comment', '$issueNumber', '--body', body];
-  if (repo != null) args.addAll(['--repo', repo]);
-  await Process.run('gh', args, workingDirectory: repoRoot);
+  final targetRepo = repo ?? _repoSlug;
+  await Process.run('gh', [
+    'issue',
+    'comment',
+    '$issueNumber',
+    '--repo',
+    targetRepo,
+    '--body',
+    body,
+  ], workingDirectory: repoRoot);
 }
 
 Future<void> _closeIssue(int issueNumber, String repoRoot) async {
-  await Process.run('gh', ['issue', 'close', '$issueNumber'], workingDirectory: repoRoot);
+  await Process.run('gh', ['issue', 'close', '$issueNumber', '--repo', _repoSlug], workingDirectory: repoRoot);
 }

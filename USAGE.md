@@ -1242,8 +1242,17 @@ final exists = await commandExists('git');
 **Triggers:** Push to `main`, pull requests targeting `main`
 
 **Jobs:**
-1. `pre-check` -- Skip bot commits (author `github-actions[bot]` or `[skip ci]`)
-2. `analyze-and-test` -- Verify protos, run analysis, run tests
+1. `pre-check` — Skip bot commits (author `github-actions[bot]` or `[skip ci]`)
+2. Optional `auto-format` — If `ci.features.format_check=true`, auto-format `lib/` and push `bot(format)` commit
+3. **Single-platform mode** (default, `ci.platforms` missing or 1 entry):
+   - `analyze-and-test` — Verify protos, run analysis, run tests
+4. **Multi-platform mode** (`ci.platforms` has 2+ entries):
+   - `analyze` — Run analysis once (Ubuntu)
+   - `test` — Run tests as a matrix across OS+arch (`x64` + `arm64`)
+
+**Platform matrix configuration:**
+- `ci.platforms`: list of platform IDs (e.g. `["ubuntu-x64","ubuntu-arm64","macos-arm64","macos-x64","windows-x64","windows-arm64"]`)
+- `ci.runner_overrides`: optional map to point platform IDs at custom `runs-on` labels (e.g. org-managed GitHub-hosted runners)
 
 **Key steps:**
 ```yaml

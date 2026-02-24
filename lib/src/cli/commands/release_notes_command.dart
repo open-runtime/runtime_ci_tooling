@@ -15,6 +15,7 @@ import '../utils/prompt_resolver.dart';
 import '../utils/release_utils.dart';
 import '../utils/repo_utils.dart';
 import '../utils/step_summary.dart';
+import '../utils/sub_package_utils.dart';
 import '../utils/version_detection.dart';
 
 const String _kGeminiProModel = 'gemini-3.1-pro-preview';
@@ -131,6 +132,16 @@ class ReleaseNotesCommand extends Command<void> {
       exit(1);
     }
     ctx.savePrompt('release-notes', prompt);
+
+    // Enrich prompt with sub-package context for multi-package repos
+    SubPackageUtils.enrichPromptWithSubPackages(
+      repoRoot: repoRoot,
+      prevTag: prevTag,
+      promptFilePath: ctx.artifactPath('release-notes', 'prompt.txt'),
+      buildInstructions: SubPackageUtils.buildHierarchicalReleaseNotesInstructions,
+      newVersion: newVersion,
+      verbose: global.verbose,
+    );
 
     if (global.dryRun) {
       Logger.info('[DRY-RUN] Would run Gemini CLI for release notes (${prompt.length} chars)');
@@ -353,9 +364,9 @@ String _postProcessReleaseNotes(
       Logger.warn(
         'Stripping ${fabricated.length} fabricated issue references: ${fabricated.map((n) => "#$n").join(", ")}',
       );
-      for (final num in fabricated) {
-        result = result.replaceAll(RegExp(r'- \[#' + num.toString() + r'\]\([^)]*\)[^\n]*\n'), '');
-        result = result.replaceAll('(#$num)', '');
+      for (final issueNum in fabricated) {
+        result = result.replaceAll(RegExp(r'- \[#' + issueNum.toString() + r'\]\([^)]*\)[^\n]*\n'), '');
+        result = result.replaceAll('(#$issueNum)', '');
       }
     }
   }

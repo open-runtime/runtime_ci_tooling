@@ -15,11 +15,24 @@ import '../utils/json_schemas.dart';
 /// release notes, and documentation. Ensures comprehensive traceability.
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Constants
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Allowed GitHub organizations. Actions are refused for repos outside these orgs.
+const Set<String> _kAllowedOrgs = {'open-runtime', 'pieces-app'};
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Public API
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Cross-link all triaged issues to related artifacts.
 Future<void> link(GamePlan plan, List<TriageDecision> decisions, String repoRoot, {required String runDir}) async {
+  // Safety: refuse to link in repos outside the allowlist.
+  if (!_kAllowedOrgs.contains(config.repoOwner)) {
+    print('  SKIPPED: org "${config.repoOwner}" not in allowlist $_kAllowedOrgs');
+    return;
+  }
+
   print('Phase 5 [LINK]: Cross-linking ${decisions.length} issue(s)');
 
   final linksCreated = <LinkSpec>[];
@@ -142,6 +155,9 @@ Future<void> link(GamePlan plan, List<TriageDecision> decisions, String repoRoot
 // Internal
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/// The explicit `--repo owner/repo` argument derived from config.
+String get _repoSlug => '${config.repoOwner}/${config.repoName}';
+
 /// Check if a link reference already exists in issue comments.
 Future<bool> _isAlreadyLinked(int issueNumber, String searchText, String repoRoot) async {
   try {
@@ -149,6 +165,8 @@ Future<bool> _isAlreadyLinked(int issueNumber, String searchText, String repoRoo
       'issue',
       'view',
       '$issueNumber',
+      '--repo',
+      _repoSlug,
       '--json',
       'comments',
       '--jq',
@@ -164,7 +182,15 @@ Future<bool> _isAlreadyLinked(int issueNumber, String searchText, String repoRoo
 }
 
 Future<void> _postComment(int issueNumber, String body, String repoRoot) async {
-  await Process.run('gh', ['issue', 'comment', '$issueNumber', '--body', body], workingDirectory: repoRoot);
+  await Process.run('gh', [
+    'issue',
+    'comment',
+    '$issueNumber',
+    '--repo',
+    _repoSlug,
+    '--body',
+    body,
+  ], workingDirectory: repoRoot);
 }
 
 /// Add an issue to the linked_issues.json file in a release notes folder.
