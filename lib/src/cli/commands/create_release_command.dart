@@ -15,6 +15,7 @@ import '../utils/process_runner.dart';
 import '../utils/release_utils.dart';
 import '../utils/repo_utils.dart';
 import '../utils/step_summary.dart';
+import '../utils/sub_package_utils.dart';
 import '../utils/version_detection.dart';
 
 /// Create a GitHub release: copy artifacts, save release notes folder, commit,
@@ -89,12 +90,42 @@ class CreateReleaseCommand extends Command<void> {
     }
 
     // Step 2: Bump version in pubspec.yaml
+    //
+    // The regex matches the top-level `version:` field by requiring that it
+    // is followed by a semver-like value (digits and dots).  This avoids
+    // accidentally matching YAML comments (`# version: ...`) or indented
+    // dependency version constraints, which are prefixed with whitespace and
+    // use caret/range syntax (e.g. `  version: ^1.0.0`).
     final pubspecFile = File('$repoRoot/pubspec.yaml');
     final pubspecContent = pubspecFile.readAsStringSync();
-    pubspecFile.writeAsStringSync(
-      pubspecContent.replaceFirst(RegExp(r'^version: .*', multiLine: true), 'version: $newVersion'),
-    );
+    final versionPattern = RegExp(r'^version:\s+\d', multiLine: true);
+    if (!versionPattern.hasMatch(pubspecContent)) {
+      Logger.error('No "version:" field found in pubspec.yaml — cannot bump.');
+      exit(1);
+    }
+    // Replace the entire version line (including the value) using a
+    // separate regex so we capture the full line for replacement.
+    final versionLinePattern = RegExp(r'^version:\s+.*', multiLine: true);
+    pubspecFile.writeAsStringSync(pubspecContent.replaceFirst(versionLinePattern, 'version: $newVersion'));
     Logger.info('Bumped pubspec.yaml to version $newVersion');
+
+    // Step 2b: Bump version in sub-package pubspec.yaml files
+    final subPackages = SubPackageUtils.loadSubPackages(repoRoot);
+    SubPackageUtils.logSubPackages(subPackages);
+    for (final pkg in subPackages) {
+      final subPubspec = File('$repoRoot/${pkg['path']}/pubspec.yaml');
+      if (subPubspec.existsSync()) {
+        final content = subPubspec.readAsStringSync();
+        if (!versionPattern.hasMatch(content)) {
+          Logger.warn('No "version:" field in ${pkg['name']}/pubspec.yaml — skipping bump');
+          continue;
+        }
+        subPubspec.writeAsStringSync(content.replaceFirst(versionLinePattern, 'version: $newVersion'));
+        Logger.info('Bumped ${pkg['name']}/pubspec.yaml to version $newVersion');
+      } else {
+        Logger.warn('Sub-package pubspec not found: ${pkg['path']}/pubspec.yaml');
+      }
+    }
 
     // Step 3: Assemble release notes folder from Stage 3 artifacts
     final releaseDir = Directory('$repoRoot/$kReleaseNotesDir/v$newVersion');
@@ -199,6 +230,10 @@ class CreateReleaseCommand extends Command<void> {
       '$kVersionBumpsDir/',
       '$kRuntimeCiDir/autodoc.json',
     ];
+    // Add sub-package pubspec.yaml files to the commit
+    for (final pkg in subPackages) {
+      filesToAdd.add('${pkg['path']}/pubspec.yaml');
+    }
     if (Directory('$repoRoot/docs').existsSync()) filesToAdd.add('docs/');
     if (Directory('$repoRoot/$kCicdAuditDir').existsSync()) {
       filesToAdd.add('$kCicdAuditDir/');
@@ -323,6 +358,7 @@ class CreateReleaseCommand extends Command<void> {
 | Tag | [`$tag`](https://github.com/$effectiveRepo/tree/$tag) |
 | Repository | `$effectiveRepo` |
 | pubspec.yaml | Bumped to `$newVersion` |
+${subPackages.isNotEmpty ? '| Sub-packages | ${subPackages.map((p) => '`${p['name']}`').join(', ')} bumped to `$newVersion` |' : ''}
 
 ### Links
 

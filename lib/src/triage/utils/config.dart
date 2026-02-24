@@ -287,7 +287,7 @@ class TriageConfig {
 
   List<String> _strList(List<String> path, List<String> defaultValue) {
     final value = _navigate(path);
-    if (value is List) return value.cast<String>();
+    if (value is List) return value.whereType<String>().toList();
     return defaultValue;
   }
 

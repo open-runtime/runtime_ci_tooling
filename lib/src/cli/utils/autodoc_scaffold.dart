@@ -2,6 +2,17 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../../triage/utils/run_context.dart';
+import 'logger.dart';
+import 'workflow_generator.dart';
+
+/// Capitalize a snake_case name into a display-friendly title.
+///
+/// Splits on `_`, capitalizes the first letter of each non-empty segment,
+/// and joins with spaces. Empty segments (from leading, trailing, or
+/// consecutive underscores) are silently skipped.
+String _titleCase(String snakeName) {
+  return snakeName.split('_').where((w) => w.isNotEmpty).map((w) => '${w[0].toUpperCase()}${w.substring(1)}').join(' ');
+}
 
 /// Scaffold `.runtime_ci/autodoc.json` by scanning `lib/src/` for modules.
 ///
@@ -9,6 +20,10 @@ import '../../triage/utils/run_context.dart';
 /// (or no `lib/` directory was found to scan).
 ///
 /// This is the shared implementation used by both `init` and `autodoc --init`.
+///
+/// When a CI config with `sub_packages` is present, modules are also scaffolded
+/// for each sub-package that has a `lib/` directory. Sub-package module IDs are
+/// prefixed with `<sub_package_name>-` to avoid conflicts with root modules.
 bool scaffoldAutodocJson(String repoRoot, {bool overwrite = false}) {
   final configDir = Directory('$repoRoot/$kRuntimeCiDir');
   final autodocFile = File('$repoRoot/$kRuntimeCiDir/autodoc.json');
@@ -36,7 +51,7 @@ bool scaffoldAutodocJson(String repoRoot, {bool overwrite = false}) {
 
     for (final dir in subdirs) {
       final dirName = dir.path.split('/').last;
-      final displayName = dirName.split('_').map((w) => '${w[0].toUpperCase()}${w.substring(1)}').join(' ');
+      final displayName = _titleCase(dirName);
       modules.add({
         'id': dirName,
         'name': displayName,
@@ -64,7 +79,7 @@ bool scaffoldAutodocJson(String repoRoot, {bool overwrite = false}) {
     // No lib/src/ — use lib/ as single module
     modules.add({
       'id': 'core',
-      'name': packageName.split('_').map((w) => '${w[0].toUpperCase()}${w.substring(1)}').join(' '),
+      'name': _titleCase(packageName),
       'source_paths': ['lib/'],
       'lib_paths': ['lib/'],
       'output_path': 'docs/',
@@ -73,6 +88,11 @@ bool scaffoldAutodocJson(String repoRoot, {bool overwrite = false}) {
       'last_updated': null,
     });
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Sub-package module scaffolding
+  // ═══════════════════════════════════════════════════════════════════════════
+  _scaffoldSubPackageModules(repoRoot, modules);
 
   if (modules.isEmpty) return false;
 
@@ -90,4 +110,92 @@ bool scaffoldAutodocJson(String repoRoot, {bool overwrite = false}) {
   };
   autodocFile.writeAsStringSync('${const JsonEncoder.withIndent('  ').convert(autodocData)}\n');
   return true;
+}
+
+/// Discover sub-packages from CI config and scaffold autodoc modules for each
+/// one that has a `lib/` directory.
+///
+/// Each sub-package's modules are prefixed with the sub-package name to avoid
+/// ID collisions with root modules (e.g. `my_sub_pkg-core`, `my_sub_pkg-utils`).
+/// Output paths are scoped to the sub-package directory.
+void _scaffoldSubPackageModules(String repoRoot, List<Map<String, dynamic>> modules) {
+  final ciConfig = WorkflowGenerator.loadCiConfig(repoRoot);
+  if (ciConfig == null) return;
+
+  final subPackages = ciConfig['sub_packages'] as List? ?? [];
+  if (subPackages.isEmpty) return;
+
+  final validPackages = subPackages
+      .whereType<Map<String, dynamic>>()
+      .where((sp) => sp['name'] != null && sp['path'] != null)
+      .toList();
+
+  if (validPackages.isEmpty) return;
+
+  var scaffoldedCount = 0;
+
+  for (final sp in validPackages) {
+    final spName = sp['name'] as String;
+    // Normalize: strip trailing slashes to avoid double-slash paths like
+    // "packages/foo//lib/src/".
+    final spPath = (sp['path'] as String).replaceAll(RegExp(r'/+$'), '');
+
+    final spLibDir = Directory('$repoRoot/$spPath/lib');
+    if (!spLibDir.existsSync()) continue;
+
+    final spSrcDir = Directory('$repoRoot/$spPath/lib/src');
+
+    if (spSrcDir.existsSync()) {
+      // Scan sub-package's lib/src/ subdirectories
+      final subdirs =
+          spSrcDir.listSync().whereType<Directory>().where((d) => !d.path.split('/').last.startsWith('.')).toList()
+            ..sort((a, b) => a.path.compareTo(b.path));
+
+      for (final dir in subdirs) {
+        final dirName = dir.path.split('/').last;
+        final displayName = '$spName: ${_titleCase(dirName)}';
+        modules.add({
+          'id': '$spName-$dirName',
+          'name': displayName,
+          'source_paths': ['$spPath/lib/src/$dirName/'],
+          'lib_paths': ['$spPath/lib/src/$dirName/'],
+          'output_path': '$spPath/docs/$dirName/',
+          'generate': ['quickstart', 'api_reference'],
+          'hash': '',
+          'last_updated': null,
+        });
+      }
+
+      // Add top-level module for the sub-package entry points
+      modules.add({
+        'id': '$spName-top_level',
+        'name': '$spName: Package Entry Points',
+        'source_paths': ['$spPath/lib/'],
+        'lib_paths': <String>[],
+        'output_path': '$spPath/docs/',
+        'generate': ['quickstart'],
+        'hash': '',
+        'last_updated': null,
+      });
+    } else {
+      // No lib/src/ — use lib/ as a single module for this sub-package
+      final displayName = _titleCase(spName);
+      modules.add({
+        'id': '$spName-core',
+        'name': displayName,
+        'source_paths': ['$spPath/lib/'],
+        'lib_paths': ['$spPath/lib/'],
+        'output_path': '$spPath/docs/',
+        'generate': ['quickstart', 'api_reference'],
+        'hash': '',
+        'last_updated': null,
+      });
+    }
+
+    scaffoldedCount++;
+  }
+
+  if (scaffoldedCount > 0) {
+    Logger.info('  Discovered $scaffoldedCount sub-package(s) for autodoc scaffolding');
+  }
 }
