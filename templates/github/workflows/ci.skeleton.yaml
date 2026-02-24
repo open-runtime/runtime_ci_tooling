@@ -119,8 +119,8 @@ jobs:
         uses: actions/cache@v5.0.3
         with:
           path: ~/.pub-cache
-          key: ${{ runner.os }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
-          restore-keys: ${{ runner.os }}-dart-pub-
+          key: ${{ runner.os }}-${{ runner.arch }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-dart-pub-
 
 <%#proto%>
       - name: Install protoc
@@ -138,8 +138,8 @@ jobs:
         uses: actions/cache@v5.0.3
         with:
           path: ~/.dartServer
-          key: ${{ runner.os }}-dart-analysis-${{ hashFiles('**/*.dart', '**/pubspec.yaml') }}
-          restore-keys: ${{ runner.os }}-dart-analysis-
+          key: ${{ runner.os }}-${{ runner.arch }}-dart-analysis-${{ hashFiles('**/*.dart', '**/pubspec.yaml') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-dart-analysis-
 
 <%/analysis_cache%>
 <%#proto%>
@@ -227,8 +227,8 @@ jobs:
         uses: actions/cache@v5.0.3
         with:
           path: ~/.pub-cache
-          key: ${{ runner.os }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
-          restore-keys: ${{ runner.os }}-dart-pub-
+          key: ${{ runner.os }}-${{ runner.arch }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-dart-pub-
 
 <%#proto%>
       - name: Install protoc
@@ -284,11 +284,11 @@ jobs:
   test:
     needs: [pre-check, analyze<%#format_check%>, auto-format<%/format_check%>]
     if: needs.pre-check.outputs.should_run == 'true'
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        os: <%platform_matrix_json%>
+        include: <%platform_matrix_json%>
 <%#has_secrets%>
     env:
 <%#secrets_list%>
@@ -323,8 +323,8 @@ jobs:
         uses: actions/cache@v5.0.3
         with:
           path: ~/.pub-cache
-          key: ${{ runner.os }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
-          restore-keys: ${{ runner.os }}-dart-pub-
+          key: ${{ runner.os }}-${{ runner.arch }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-dart-pub-
 
       - run: dart pub get
         env:
@@ -345,3 +345,6 @@ jobs:
 # --- BEGIN USER: post-test ---
 # --- END USER: post-test ---
 <%/multi_platform%>
+
+# --- BEGIN USER: extra-jobs ---
+# --- END USER: extra-jobs ---

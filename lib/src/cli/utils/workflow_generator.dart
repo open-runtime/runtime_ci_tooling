@@ -6,18 +6,33 @@ import 'package:mustache_template/mustache_template.dart';
 import 'logger.dart';
 import 'template_resolver.dart';
 
-/// Maps platform config identifiers to GitHub Actions runner labels.
+class _PlatformDefinition {
+  final String osFamily; // linux | macos | windows
+  final String arch; // x64 | arm64
+  final String runner; // default `runs-on:` label
+
+  const _PlatformDefinition({required this.osFamily, required this.arch, required this.runner});
+}
+
+/// Maps platform identifiers to their default runner label + metadata.
 ///
-/// Architecture-specific variants:
-///   - `macos-arm64`: Apple Silicon (default for `macos-latest`)
-///   - `macos-x64`:   Intel macOS (`macos-15-intel`)
-///   - `macos`:        Alias for `macos-arm64`
-const _platformRunners = <String, String>{
-  'ubuntu': 'ubuntu-latest',
-  'macos': 'macos-latest',
-  'macos-arm64': 'macos-latest',
-  'macos-x64': 'macos-15-intel',
-  'windows': 'windows-latest',
+/// Consumers can override the runner label per platform via:
+///   `ci.runner_overrides: { "<platformId>": "<runs-on label>" }`
+const _platformDefinitions = <String, _PlatformDefinition>{
+  // Linux
+  'ubuntu': _PlatformDefinition(osFamily: 'linux', arch: 'x64', runner: 'ubuntu-latest'),
+  'ubuntu-x64': _PlatformDefinition(osFamily: 'linux', arch: 'x64', runner: 'ubuntu-latest'),
+  'ubuntu-arm64': _PlatformDefinition(osFamily: 'linux', arch: 'arm64', runner: 'ubuntu-24.04-arm'),
+
+  // macOS
+  'macos': _PlatformDefinition(osFamily: 'macos', arch: 'arm64', runner: 'macos-latest'),
+  'macos-arm64': _PlatformDefinition(osFamily: 'macos', arch: 'arm64', runner: 'macos-latest'),
+  'macos-x64': _PlatformDefinition(osFamily: 'macos', arch: 'x64', runner: 'macos-15-intel'),
+
+  // Windows
+  'windows': _PlatformDefinition(osFamily: 'windows', arch: 'x64', runner: 'windows-latest'),
+  'windows-x64': _PlatformDefinition(osFamily: 'windows', arch: 'x64', runner: 'windows-latest'),
+  'windows-arm64': _PlatformDefinition(osFamily: 'windows', arch: 'arm64', runner: 'windows-11-arm'),
 };
 
 /// Renders CI workflow YAML from a Mustache skeleton template and config.json.
@@ -98,9 +113,36 @@ class WorkflowGenerator {
 
     // Platform support
     final platformsRaw = ciConfig['platforms'] as List? ?? ['ubuntu'];
-    final platforms = platformsRaw.cast<String>().where((p) => _platformRunners.containsKey(p)).toList();
+    final platforms = <String>[];
+    for (final p in platformsRaw) {
+      if (p is String && _platformDefinitions.containsKey(p)) {
+        platforms.add(p);
+      }
+    }
     if (platforms.isEmpty) platforms.add('ubuntu');
     final isMultiPlatform = platforms.length > 1;
+
+    final runnerOverridesRaw = ciConfig['runner_overrides'];
+    final runnerOverrides = runnerOverridesRaw is Map<String, dynamic> ? runnerOverridesRaw : <String, dynamic>{};
+    String resolveRunner(String platformId) {
+      final override = runnerOverrides[platformId];
+      if (override is String && override.trim().isNotEmpty) {
+        return override.trim();
+      }
+      return _platformDefinitions[platformId]!.runner;
+    }
+
+    // For multi-platform, use a matrix.include list of objects. This allows us to
+    // carry architecture metadata and makes cache keys stable across x64/arm64.
+    final platformMatrix = platforms.map((platformId) {
+      final def = _platformDefinitions[platformId]!;
+      return <String, String>{
+        'platform_id': platformId,
+        'runner': resolveRunner(platformId),
+        'os_family': def.osFamily,
+        'arch': def.arch,
+      };
+    }).toList();
 
     return {
       'tooling_version': toolingVersion,
@@ -130,8 +172,8 @@ class WorkflowGenerator {
       // Platform support
       'multi_platform': isMultiPlatform,
       'single_platform': !isMultiPlatform,
-      'runner': isMultiPlatform ? '' : _platformRunners[platforms.first]!,
-      'platform_matrix_json': json.encode(platforms.map((p) => _platformRunners[p]!).toList()),
+      'runner': isMultiPlatform ? '' : resolveRunner(platforms.first),
+      'platform_matrix_json': json.encode(platformMatrix),
     };
   }
 
@@ -201,11 +243,33 @@ class WorkflowGenerator {
         errors.add('ci.platforms must be an array, got ${platforms.runtimeType}');
       } else {
         for (final p in platforms) {
-          if (p is! String || !_platformRunners.containsKey(p)) {
+          if (p is! String || !_platformDefinitions.containsKey(p)) {
             errors.add(
               'ci.platforms contains invalid platform "$p". '
-              'Valid: ${_platformRunners.keys.join(', ')}',
+              'Valid: ${_platformDefinitions.keys.join(', ')}',
             );
+          }
+        }
+      }
+    }
+
+    final runnerOverrides = ciConfig['runner_overrides'];
+    if (runnerOverrides != null) {
+      if (runnerOverrides is! Map) {
+        errors.add('ci.runner_overrides must be an object, got ${runnerOverrides.runtimeType}');
+      } else {
+        for (final entry in runnerOverrides.entries) {
+          final key = entry.key;
+          final value = entry.value;
+          if (key is! String || !_platformDefinitions.containsKey(key)) {
+            errors.add(
+              'ci.runner_overrides contains invalid platform key "$key". '
+              'Valid: ${_platformDefinitions.keys.join(', ')}',
+            );
+            continue;
+          }
+          if (value is! String || value.trim().isEmpty) {
+            errors.add('ci.runner_overrides["$key"] must be a non-empty string');
           }
         }
       }
