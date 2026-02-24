@@ -141,6 +141,11 @@ jobs:
         env:
           GIT_LFS_SKIP_SMUDGE: "1"
 
+<%#build_runner%>
+      - name: Run build_runner
+        run: dart run build_runner build --delete-conflicting-outputs
+
+<%/build_runner%>
       # ── shared:analysis-cache ── keep in sync with multi_platform ──
 <%#analysis_cache%>
       - name: Cache Dart analysis
@@ -272,6 +277,11 @@ jobs:
         env:
           GIT_LFS_SKIP_SMUDGE: "1"
 
+<%#build_runner%>
+      - name: Run build_runner
+        run: dart run build_runner build --delete-conflicting-outputs
+
+<%/build_runner%>
       # ── shared:analysis-cache ── keep in sync with single_platform ──
 <%#analysis_cache%>
       - name: Cache Dart analysis
@@ -372,6 +382,11 @@ jobs:
         env:
           GIT_LFS_SKIP_SMUDGE: "1"
 
+<%#build_runner%>
+      - name: Run build_runner
+        run: dart run build_runner build --delete-conflicting-outputs
+
+<%/build_runner%>
 # --- BEGIN USER: pre-test ---
 # --- END USER: pre-test ---
 

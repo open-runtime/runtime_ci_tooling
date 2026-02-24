@@ -175,6 +175,7 @@ void main() {
             'analysis_cache': false,
             'managed_analyze': true,
             'managed_test': false,
+            'build_runner': true,
           },
         ));
         expect(errors.where((e) => e.contains('features')), isEmpty);

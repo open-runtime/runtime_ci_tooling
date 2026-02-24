@@ -51,6 +51,7 @@ const Set<String> _knownFeatureKeys = {
   'analysis_cache',
   'managed_analyze',
   'managed_test',
+  'build_runner',
 };
 
 /// Renders CI workflow YAML from a Mustache skeleton template and config.json.
@@ -175,6 +176,7 @@ class WorkflowGenerator {
       'analysis_cache': features['analysis_cache'] == true,
       'managed_analyze': features['managed_analyze'] == true,
       'managed_test': features['managed_test'] == true,
+      'build_runner': features['build_runner'] == true,
 
       // Secrets / env
       'has_secrets': secretsList.isNotEmpty,
