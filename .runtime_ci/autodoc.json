@@ -17,8 +17,8 @@
         "quickstart",
         "api_reference"
       ],
-      "hash": "3a3446eb19a33f7d1e0dd8f645ac3c34815e11f778d62310c0f1d0cb705afa31",
-      "last_updated": "2026-02-24T17:50:05.194101Z"
+      "hash": "99c7a92e81912c5b018c4057b92ff8de2fd44626dc0e280951bd23b06976a9f2",
+      "last_updated": "2026-02-24T20:10:36.816165Z"
     },
     {
       "id": "prompts",
@@ -33,8 +33,8 @@
       "generate": [
         "api_reference"
       ],
-      "hash": "8fff83e8737936bbda3e027dd7859398dc5d36ade41a05473e4242ab5539f0da",
-      "last_updated": "2026-02-22T22:54:13.328217Z"
+      "hash": "6b81209cbf349342856e8fe6a4f2440f3bca8376f48afeaf905d3c3a4318655e",
+      "last_updated": "2026-02-24T20:10:36.819899Z"
     },
     {
       "id": "triage",
@@ -50,8 +50,8 @@
         "quickstart",
         "api_reference"
       ],
-      "hash": "0f772d6973751f3197ab4e9ffddaa66560b88c3d00afc739240e897ee8c40a96",
-      "last_updated": "2026-02-24T17:50:05.208119Z"
+      "hash": "c636f5d38274cf1c996dc0ff007c7bcbb18797e1e2f3b850ae4b724b803dd32f",
+      "last_updated": "2026-02-24T20:10:36.824215Z"
     },
     {
       "id": "utils",
@@ -66,8 +66,8 @@
       "generate": [
         "api_reference"
       ],
-      "hash": "ac646b6ff568500c241fbc7c87f25dd28a6cf985fa981e4f35bde28991ae578b",
-      "last_updated": "2026-02-22T21:15:05.822824Z"
+      "hash": "d4b56488defb7a90e22964c314353c5487997ec557cbca51d2cae2f9a9e7f9e5",
+      "last_updated": "2026-02-24T20:10:36.824791Z"
     }
   ],
   "templates": {
