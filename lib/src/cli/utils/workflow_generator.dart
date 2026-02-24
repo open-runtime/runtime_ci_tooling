@@ -204,6 +204,11 @@ class WorkflowGenerator {
   ///   `# --- BEGIN USER: <name> ---`
   ///   `# --- END USER: <name> ---`
   String _preserveUserSections(String rendered, String existing) {
+    // Normalize CRLF → LF so the regex matches regardless of line-ending style
+    // (Windows checkouts with core.autocrlf=true produce \r\n).
+    existing = existing.replaceAll('\r\n', '\n');
+    rendered = rendered.replaceAll('\r\n', '\n');
+
     final sectionPattern = RegExp(r'# --- BEGIN USER: (\S+) ---\n(.*?)# --- END USER: \1 ---', dotAll: true);
 
     // Extract user content from existing file

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:args/command_runner.dart';
 import 'package:crypto/crypto.dart';
@@ -482,26 +483,24 @@ Write the corrected file to the same path: $absOutputFile
 
     filePaths.sort();
 
-    final sink = AccumulatorSink<Digest>();
-    final input = sha256.startChunkedConversion(sink);
+    final builder = BytesBuilder(copy: false);
 
     for (final path in filePaths) {
       // Include the path name in the digest so renames affect the hash.
-      input.add(utf8.encode(path));
-      input.add(const [0]);
+      builder.add(utf8.encode(path));
+      builder.addByte(0);
 
       if (!path.startsWith('missing_dir:')) {
         try {
-          input.add(File(path).readAsBytesSync());
+          builder.add(File(path).readAsBytesSync());
         } catch (e) {
           Logger.warn('Could not read $path for module hash: $e');
         }
       }
 
-      input.add(const [0]);
+      builder.addByte(0);
     }
 
-    input.close();
-    return sink.events.single.toString();
+    return sha256.convert(builder.takeBytes()).toString();
   }
 }
