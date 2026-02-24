@@ -116,12 +116,14 @@ class AuditAllCommand extends Command<void> {
         index++;
 
         final pubspecPath = pubspecs[currentIndex];
-        final findings = auditor.auditPubspec(pubspecPath);
+        final allFindings = auditor.auditPubspec(pubspecPath);
 
         // Filter by minimum severity.
-        final filtered = findings.where((f) => f.severity.index <= severityFilter.index).toList();
+        final filtered = allFindings.where((f) => f.severity.index <= severityFilter.index).toList();
 
-        results.add(_AuditResult(index: currentIndex, pubspecPath: pubspecPath, findings: filtered));
+        results.add(
+          _AuditResult(index: currentIndex, pubspecPath: pubspecPath, findings: filtered, allFindings: allFindings),
+        );
       }
     }
 
@@ -190,7 +192,9 @@ class AuditAllCommand extends Command<void> {
 
       for (final result in pubspecsWithFindings) {
         final relative = p.relative(result.pubspecPath, from: rootDir.path);
-        final didFix = auditor.fixPubspec(result.pubspecPath, result.findings);
+        // Fix should apply to the full set of findings, even if the report
+        // is filtered to errors only (otherwise warnings never get fixed).
+        final didFix = auditor.fixPubspec(result.pubspecPath, result.allFindings);
         if (didFix) {
           fixedCount++;
           Logger.success('  Fixed: $relative');
@@ -325,6 +329,12 @@ class _AuditResult {
   final int index;
   final String pubspecPath;
   final List<AuditFinding> findings;
+  final List<AuditFinding> allFindings;
 
-  const _AuditResult({required this.index, required this.pubspecPath, required this.findings});
+  const _AuditResult({
+    required this.index,
+    required this.pubspecPath,
+    required this.findings,
+    required this.allFindings,
+  });
 }
