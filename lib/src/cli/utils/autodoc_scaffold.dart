@@ -3,7 +3,7 @@ import 'dart:io';
 
 import '../../triage/utils/run_context.dart';
 import 'logger.dart';
-import 'workflow_generator.dart';
+import 'sub_package_utils.dart';
 
 /// Capitalize a snake_case name into a display-friendly title.
 ///
@@ -118,18 +118,11 @@ bool scaffoldAutodocJson(String repoRoot, {bool overwrite = false}) {
 /// Each sub-package's modules are prefixed with the sub-package name to avoid
 /// ID collisions with root modules (e.g. `my_sub_pkg-core`, `my_sub_pkg-utils`).
 /// Output paths are scoped to the sub-package directory.
+///
+/// Delegates to [SubPackageUtils.loadSubPackages] for config loading so that
+/// malformed JSON is handled gracefully (logged + skipped) instead of crashing.
 void _scaffoldSubPackageModules(String repoRoot, List<Map<String, dynamic>> modules) {
-  final ciConfig = WorkflowGenerator.loadCiConfig(repoRoot);
-  if (ciConfig == null) return;
-
-  final subPackages = ciConfig['sub_packages'] as List? ?? [];
-  if (subPackages.isEmpty) return;
-
-  final validPackages = subPackages
-      .whereType<Map<String, dynamic>>()
-      .where((sp) => sp['name'] != null && sp['path'] != null)
-      .toList();
-
+  final validPackages = SubPackageUtils.loadSubPackages(repoRoot);
   if (validPackages.isEmpty) return;
 
   var scaffoldedCount = 0;

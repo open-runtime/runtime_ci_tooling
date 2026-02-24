@@ -57,8 +57,11 @@ abstract final class SubPackageUtils {
     if (subPackages.isEmpty) return '';
 
     // Guard: if prevTag is empty, git commands like `git log ..HEAD` are
-    // invalid.  Fall back to diffing the entire history (`--root`).
-    final diffRange = prevTag.isNotEmpty ? '$prevTag..HEAD' : 'HEAD';
+    // invalid.  Fall back to showing the entire history.
+    // For `git diff`, use the well-known empty tree SHA so we diff against
+    // an empty tree (showing all files as additions).  For `git log`, plain
+    // `HEAD` already lists the full commit history.
+    final diffRange = prevTag.isNotEmpty ? '$prevTag..HEAD' : '4b825dc642cb6eb9a060e54bf899d15f3f7f8f0e..HEAD';
     final logRange = prevTag.isNotEmpty ? '$prevTag..HEAD' : 'HEAD';
 
     final buffer = StringBuffer();

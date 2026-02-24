@@ -8,7 +8,7 @@ import '../utils/logger.dart';
 import '../utils/repo_utils.dart';
 import '../utils/sub_package_utils.dart';
 
-/// Run dart test.
+/// Run `dart test` on the root package and all configured sub-packages.
 class TestCommand extends Command<void> {
   @override
   final String name = 'test';

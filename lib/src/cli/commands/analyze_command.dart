@@ -7,7 +7,7 @@ import '../utils/logger.dart';
 import '../utils/repo_utils.dart';
 import '../utils/sub_package_utils.dart';
 
-/// Run dart analyze.
+/// Run `dart analyze` on the root package and all configured sub-packages.
 class AnalyzeCommand extends Command<void> {
   @override
   final String name = 'analyze';

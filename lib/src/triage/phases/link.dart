@@ -15,11 +15,24 @@ import '../utils/json_schemas.dart';
 /// release notes, and documentation. Ensures comprehensive traceability.
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Constants
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Allowed GitHub organizations. Actions are refused for repos outside these orgs.
+const Set<String> _kAllowedOrgs = {'open-runtime', 'pieces-app'};
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Public API
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Cross-link all triaged issues to related artifacts.
 Future<void> link(GamePlan plan, List<TriageDecision> decisions, String repoRoot, {required String runDir}) async {
+  // Safety: refuse to link in repos outside the allowlist.
+  if (!_kAllowedOrgs.contains(config.repoOwner)) {
+    print('  SKIPPED: org "${config.repoOwner}" not in allowlist $_kAllowedOrgs');
+    return;
+  }
+
   print('Phase 5 [LINK]: Cross-linking ${decisions.length} issue(s)');
 
   final linksCreated = <LinkSpec>[];
