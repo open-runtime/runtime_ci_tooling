@@ -31,7 +31,7 @@ const _platformDefinitions = <String, _PlatformDefinition>{
   // macOS — standard GitHub-hosted runners (no org-managed equivalents)
   'macos': _PlatformDefinition(osFamily: 'macos', arch: 'arm64', runner: 'macos-latest'),
   'macos-arm64': _PlatformDefinition(osFamily: 'macos', arch: 'arm64', runner: 'macos-latest'),
-  'macos-x64': _PlatformDefinition(osFamily: 'macos', arch: 'x64', runner: 'macos-15-intel'),
+  'macos-x64': _PlatformDefinition(osFamily: 'macos', arch: 'x64', runner: 'macos-15-large'),
 
   // Windows — org-managed runners
   'windows': _PlatformDefinition(osFamily: 'windows', arch: 'x64', runner: 'runtime-windows-2025-x64-256gb-64core'),

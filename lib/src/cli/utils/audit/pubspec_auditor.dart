@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:pub_semver/pub_semver.dart';
 import 'package:yaml/yaml.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 
@@ -12,6 +13,21 @@ final _sshUrlPattern = RegExp(r'^git@github\.com:([^/]+)/([^/]+)\.git$');
 
 /// RegExp matching HTTPS-format GitHub URLs so we can detect and flag them.
 final _httpsUrlPattern = RegExp(r'^https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?$');
+
+bool _constraintsEquivalent(String left, String right) {
+  final a = left.trim();
+  final b = right.trim();
+  if (a == b) return true;
+  try {
+    final ca = VersionConstraint.parse(a);
+    final cb = VersionConstraint.parse(b);
+    // Treat equivalent ranges as "matching" even if rendered differently.
+    return ca.allowsAll(cb) && cb.allowsAll(ca);
+  } catch (_) {
+    // Fall back to a whitespace-insensitive compare.
+    return a.replaceAll(RegExp(r'\s+'), '') == b.replaceAll(RegExp(r'\s+'), '');
+  }
+}
 
 /// Audits pubspec.yaml dependency declarations against a [PackageRegistry].
 ///
@@ -127,7 +143,7 @@ class PubspecAuditor {
       );
 
       // Also flag stale version if the bare constraint doesn't match.
-      if (value != entry.version) {
+      if (!_constraintsEquivalent(value, entry.version)) {
         findings.add(
           AuditFinding(
             pubspecPath: pubspecPath,
@@ -311,8 +327,8 @@ class PubspecAuditor {
     }
 
     // --- Rule 6: stale_version -----------------------------------------------
-    final versionValue = depMap['version'] as String?;
-    if (versionValue != null && versionValue != entry.version) {
+    final versionValue = depMap['version']?.toString();
+    if (versionValue != null && !_constraintsEquivalent(versionValue, entry.version)) {
       findings.add(
         AuditFinding(
           pubspecPath: pubspecPath,
@@ -324,12 +340,12 @@ class PubspecAuditor {
           expectedValue: entry.version,
         ),
       );
-    } else if (versionValue == null) {
+    } else if (versionValue == null || versionValue.trim().isEmpty) {
       findings.add(
         AuditFinding(
           pubspecPath: pubspecPath,
           dependencyName: depName,
-          severity: AuditSeverity.warning,
+          severity: AuditSeverity.error,
           category: AuditCategory.staleVersion,
           message:
               'No version constraint specified -- should have version: '
