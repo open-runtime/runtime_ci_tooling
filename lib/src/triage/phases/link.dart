@@ -142,6 +142,9 @@ Future<void> link(GamePlan plan, List<TriageDecision> decisions, String repoRoot
 // Internal
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/// The explicit `--repo owner/repo` argument derived from config.
+String get _repoSlug => '${config.repoOwner}/${config.repoName}';
+
 /// Check if a link reference already exists in issue comments.
 Future<bool> _isAlreadyLinked(int issueNumber, String searchText, String repoRoot) async {
   try {
@@ -149,6 +152,8 @@ Future<bool> _isAlreadyLinked(int issueNumber, String searchText, String repoRoo
       'issue',
       'view',
       '$issueNumber',
+      '--repo',
+      _repoSlug,
       '--json',
       'comments',
       '--jq',
@@ -164,7 +169,15 @@ Future<bool> _isAlreadyLinked(int issueNumber, String searchText, String repoRoo
 }
 
 Future<void> _postComment(int issueNumber, String body, String repoRoot) async {
-  await Process.run('gh', ['issue', 'comment', '$issueNumber', '--body', body], workingDirectory: repoRoot);
+  await Process.run('gh', [
+    'issue',
+    'comment',
+    '$issueNumber',
+    '--repo',
+    _repoSlug,
+    '--body',
+    body,
+  ], workingDirectory: repoRoot);
 }
 
 /// Add an issue to the linked_issues.json file in a release notes folder.

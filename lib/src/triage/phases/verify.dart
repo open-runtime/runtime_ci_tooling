@@ -134,6 +134,9 @@ Future<VerificationReport> verify(
 // Internal
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/// The explicit `--repo owner/repo` argument derived from config.
+String get _repoSlug => '${config.repoOwner}/${config.repoName}';
+
 /// Fetch current issue state from GitHub.
 Future<Map<String, dynamic>?> _fetchIssueState(int issueNumber, String repoRoot) async {
   try {
@@ -141,6 +144,8 @@ Future<Map<String, dynamic>?> _fetchIssueState(int issueNumber, String repoRoot)
       'issue',
       'view',
       '$issueNumber',
+      '--repo',
+      _repoSlug,
       '--json',
       'state,labels,comments',
     ], workingDirectory: repoRoot);

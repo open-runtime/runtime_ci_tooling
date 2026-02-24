@@ -15,10 +15,22 @@ import '../utils/json_schemas.dart';
 ///
 /// Configuration: triage_config.json -> cross_repo.repos
 ///
+/// Safety:
+///   - ALL gh commands use explicit `--repo owner/repo`
+///   - Org allowlist check: only posts to repos owned by allowed orgs
+///   - Duplicate check: verifies no existing cross-reference before posting
+///
 /// For each triaged issue:
 ///   1. Extract key terms from issue title
 ///   2. Search each cross-repo for related issues via gh search
 ///   3. Post cross-reference comments on related issues
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Constants
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Allowed GitHub organizations. Cross-repo actions are refused for repos outside these orgs.
+const Set<String> _kAllowedOrgs = {'open-runtime', 'pieces-app'};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Public API
@@ -42,7 +54,19 @@ Future<void> crossRepoLink(
     return;
   }
 
-  print('Phase 5b [CROSS-REPO]: Searching ${repos.length} dependent repos');
+  // Safety: filter out repos belonging to orgs outside the allowlist
+  final safeRepos = repos.where((r) => _kAllowedOrgs.contains(r.owner)).toList();
+  final skippedRepos = repos.where((r) => !_kAllowedOrgs.contains(r.owner)).toList();
+  for (final skipped in skippedRepos) {
+    print('  WARNING: Skipping ${skipped.fullName} — org "${skipped.owner}" not in allowed orgs: $_kAllowedOrgs');
+  }
+
+  if (safeRepos.isEmpty) {
+    print('Phase 5b [CROSS-REPO]: No cross-repo targets in allowed orgs');
+    return;
+  }
+
+  print('Phase 5b [CROSS-REPO]: Searching ${safeRepos.length} dependent repos');
 
   final crossLinks = <Map<String, dynamic>>[];
 
@@ -60,7 +84,7 @@ Future<void> crossRepoLink(
 
     print('  Issue #$issueNumber: searching for "$searchTerms"');
 
-    for (final repo in repos) {
+    for (final repo in safeRepos) {
       try {
         final relatedIssues = await _searchRepo(repo.owner, repo.repo, searchTerms, repoRoot);
 
@@ -119,7 +143,7 @@ Future<void> crossRepoLink(
   writeJson('$runDir/triage_cross_repo_links.json', {
     'links': crossLinks,
     'timestamp': DateTime.now().toIso8601String(),
-    'repos_searched': repos.map((r) => r.fullName).toList(),
+    'repos_searched': safeRepos.map((r) => r.fullName).toList(),
   });
 
   print('  Cross-repo links created: ${crossLinks.length}');
