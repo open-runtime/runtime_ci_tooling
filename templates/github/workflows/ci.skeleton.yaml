@@ -92,30 +92,35 @@ jobs:
 <%/secrets_list%>
 <%/has_secrets%>
     steps:
+      # ── shared:checkout ── keep in sync with multi_platform ──
       - uses: actions/checkout@v6.0.2
         with:
 <%#format_check%>
           ref: ${{ needs.auto-format.outputs.sha }}
 <%/format_check%>
+          fetch-depth: 1
           persist-credentials: false
 <%#lfs%>
           lfs: true
 <%/lfs%>
 
+      # ── shared:git-config ── keep in sync with multi_platform ──
       - name: Configure Git for HTTPS with Token
         shell: bash
-        env:
-          GH_PAT: ${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}
         run: |
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "git@github.com:"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
+          TOKEN="${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}"
+          echo "::add-mask::${TOKEN}"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "git@github.com:"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
 
+      # ── shared:dart-setup ── keep in sync with multi_platform ──
       - uses: dart-lang/setup-dart@v1.7.1
         with:
           sdk: "<%dart_sdk%>"
 
+      # ── shared:pub-cache ── keep in sync with multi_platform ──
       - name: Cache Dart pub dependencies
         uses: actions/cache@v5.0.3
         with:
@@ -123,6 +128,7 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
           restore-keys: ${{ runner.os }}-${{ runner.arch }}-dart-pub-
 
+      # ── shared:proto-setup ── keep in sync with multi_platform ──
 <%#proto%>
       - name: Install protoc
         uses: arduino/setup-protoc@v3.0.0
@@ -130,10 +136,12 @@ jobs:
       - run: dart pub global activate protoc_plugin 25.0.0
 
 <%/proto%>
+      # ── shared:pub-get ── keep in sync with multi_platform ──
       - run: dart pub get
         env:
           GIT_LFS_SKIP_SMUDGE: "1"
 
+      # ── shared:analysis-cache ── keep in sync with multi_platform ──
 <%#analysis_cache%>
       - name: Cache Dart analysis
         uses: actions/cache@v5.0.3
@@ -143,11 +151,13 @@ jobs:
           restore-keys: ${{ runner.os }}-${{ runner.arch }}-dart-analysis-
 
 <%/analysis_cache%>
+      # ── shared:proto-verify ── keep in sync with multi_platform ──
 <%#proto%>
       - name: Verify proto files
         run: dart run runtime_ci_tooling:manage_cicd verify-protos
 
 <%/proto%>
+      # ── shared:analyze ── keep in sync with multi_platform ──
 <%#managed_analyze%>
       - name: Analyze
         run: dart run runtime_ci_tooling:manage_cicd analyze
@@ -155,20 +165,21 @@ jobs:
 <%^managed_analyze%>
       - name: Analyze
         run: |
-          dart analyze 2>&1 | tee /tmp/analysis.txt
-          if grep -q "^  error -" /tmp/analysis.txt; then
+          dart analyze 2>&1 | tee "$RUNNER_TEMP/analysis.txt"
+          if grep -q "^  error -" "$RUNNER_TEMP/analysis.txt"; then
             echo "::error::Analysis errors found"
             exit 1
           fi
 <%/managed_analyze%>
 
+      # ── shared:sub-packages ── keep in sync with multi_platform ──
 <%#sub_packages%>
       - name: Analyze (<%name%>)
         working-directory: <%path%>
         run: |
           GIT_LFS_SKIP_SMUDGE=1 dart pub get
-          dart analyze 2>&1 | tee /tmp/sub_analysis.txt
-          if grep -q "^  error -" /tmp/sub_analysis.txt; then
+          dart analyze 2>&1 | tee "$RUNNER_TEMP/sub_analysis.txt"
+          if grep -q "^  error -" "$RUNNER_TEMP/sub_analysis.txt"; then
             echo "::error::Errors found in <%name%>"
             exit 1
           fi
@@ -177,6 +188,7 @@ jobs:
 # --- BEGIN USER: pre-test ---
 # --- END USER: pre-test ---
 
+      # ── shared:test ── keep in sync with multi_platform ──
 <%#managed_test%>
       - name: Test
         run: dart run runtime_ci_tooling:manage_cicd test
@@ -185,6 +197,16 @@ jobs:
       - name: Test
         run: dart test
 <%/managed_test%>
+
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts-<%runner%>
+          path: |
+            test/integration/fixtures/bin/
+            **/test-results/
+          retention-days: 7
 
 # --- BEGIN USER: post-test ---
 # --- END USER: post-test ---
@@ -201,30 +223,35 @@ jobs:
 <%/secrets_list%>
 <%/has_secrets%>
     steps:
+      # ── shared:checkout ── keep in sync with single_platform ──
       - uses: actions/checkout@v6.0.2
         with:
 <%#format_check%>
           ref: ${{ needs.auto-format.outputs.sha }}
 <%/format_check%>
+          fetch-depth: 1
           persist-credentials: false
 <%#lfs%>
           lfs: true
 <%/lfs%>
 
+      # ── shared:git-config ── keep in sync with single_platform ──
       - name: Configure Git for HTTPS with Token
         shell: bash
-        env:
-          GH_PAT: ${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}
         run: |
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "git@github.com:"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
+          TOKEN="${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}"
+          echo "::add-mask::${TOKEN}"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "git@github.com:"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
 
+      # ── shared:dart-setup ── keep in sync with single_platform ──
       - uses: dart-lang/setup-dart@v1.7.1
         with:
           sdk: "<%dart_sdk%>"
 
+      # ── shared:pub-cache ── keep in sync with single_platform ──
       - name: Cache Dart pub dependencies
         uses: actions/cache@v5.0.3
         with:
@@ -232,6 +259,7 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
           restore-keys: ${{ runner.os }}-${{ runner.arch }}-dart-pub-
 
+      # ── shared:proto-setup ── keep in sync with single_platform ──
 <%#proto%>
       - name: Install protoc
         uses: arduino/setup-protoc@v3.0.0
@@ -239,24 +267,28 @@ jobs:
       - run: dart pub global activate protoc_plugin 25.0.0
 
 <%/proto%>
+      # ── shared:pub-get ── keep in sync with single_platform ──
       - run: dart pub get
         env:
           GIT_LFS_SKIP_SMUDGE: "1"
 
+      # ── shared:analysis-cache ── keep in sync with single_platform ──
 <%#analysis_cache%>
       - name: Cache Dart analysis
         uses: actions/cache@v5.0.3
         with:
           path: ~/.dartServer
-          key: ${{ runner.os }}-dart-analysis-${{ hashFiles('**/*.dart', '**/pubspec.yaml') }}
-          restore-keys: ${{ runner.os }}-dart-analysis-
+          key: ${{ runner.os }}-${{ runner.arch }}-dart-analysis-${{ hashFiles('**/*.dart', '**/pubspec.yaml') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-dart-analysis-
 
 <%/analysis_cache%>
+      # ── shared:proto-verify ── keep in sync with single_platform ──
 <%#proto%>
       - name: Verify proto files
         run: dart run runtime_ci_tooling:manage_cicd verify-protos
 
 <%/proto%>
+      # ── shared:analyze ── keep in sync with single_platform ──
 <%#managed_analyze%>
       - name: Analyze
         run: dart run runtime_ci_tooling:manage_cicd analyze
@@ -264,20 +296,21 @@ jobs:
 <%^managed_analyze%>
       - name: Analyze
         run: |
-          dart analyze 2>&1 | tee /tmp/analysis.txt
-          if grep -q "^  error -" /tmp/analysis.txt; then
+          dart analyze 2>&1 | tee "$RUNNER_TEMP/analysis.txt"
+          if grep -q "^  error -" "$RUNNER_TEMP/analysis.txt"; then
             echo "::error::Analysis errors found"
             exit 1
           fi
 <%/managed_analyze%>
 
+      # ── shared:sub-packages ── keep in sync with single_platform ──
 <%#sub_packages%>
       - name: Analyze (<%name%>)
         working-directory: <%path%>
         run: |
           GIT_LFS_SKIP_SMUDGE=1 dart pub get
-          dart analyze 2>&1 | tee /tmp/sub_analysis.txt
-          if grep -q "^  error -" /tmp/sub_analysis.txt; then
+          dart analyze 2>&1 | tee "$RUNNER_TEMP/sub_analysis.txt"
+          if grep -q "^  error -" "$RUNNER_TEMP/sub_analysis.txt"; then
             echo "::error::Errors found in <%name%>"
             exit 1
           fi
@@ -298,30 +331,35 @@ jobs:
 <%/secrets_list%>
 <%/has_secrets%>
     steps:
+      # ── shared:checkout ── keep in sync with single_platform ──
       - uses: actions/checkout@v6.0.2
         with:
 <%#format_check%>
           ref: ${{ needs.auto-format.outputs.sha }}
 <%/format_check%>
+          fetch-depth: 1
           persist-credentials: false
 <%#lfs%>
           lfs: true
 <%/lfs%>
 
+      # ── shared:git-config ── keep in sync with single_platform ──
       - name: Configure Git for HTTPS with Token
         shell: bash
-        env:
-          GH_PAT: ${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}
         run: |
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "git@github.com:"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
+          TOKEN="${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}"
+          echo "::add-mask::${TOKEN}"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "git@github.com:"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
 
+      # ── shared:dart-setup ── keep in sync with single_platform ──
       - uses: dart-lang/setup-dart@v1.7.1
         with:
           sdk: "<%dart_sdk%>"
 
+      # ── shared:pub-cache ── keep in sync with single_platform ──
       - name: Cache Dart pub dependencies
         uses: actions/cache@v5.0.3
         with:
@@ -329,6 +367,7 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
           restore-keys: ${{ runner.os }}-${{ runner.arch }}-dart-pub-
 
+      # ── shared:pub-get ── keep in sync with single_platform ──
       - run: dart pub get
         env:
           GIT_LFS_SKIP_SMUDGE: "1"
@@ -336,6 +375,7 @@ jobs:
 # --- BEGIN USER: pre-test ---
 # --- END USER: pre-test ---
 
+      # ── shared:test ── keep in sync with single_platform ──
 <%#managed_test%>
       - name: Test
         run: dart run runtime_ci_tooling:manage_cicd test
@@ -344,6 +384,16 @@ jobs:
       - name: Test
         run: dart test
 <%/managed_test%>
+
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts-${{ matrix.os }}
+          path: |
+            test/integration/fixtures/bin/
+            **/test-results/
+          retention-days: 7
 
 # --- BEGIN USER: post-test ---
 # --- END USER: post-test ---
