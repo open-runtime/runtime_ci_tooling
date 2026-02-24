@@ -127,6 +127,18 @@ class CreateReleaseCommand extends Command<void> {
       }
     }
 
+    // Step 2c: Convert sibling deps to git format + strip resolution: workspace
+    final siblingConversions = SubPackageUtils.convertSiblingDepsForRelease(
+      repoRoot: repoRoot,
+      newVersion: newVersion,
+      effectiveRepo: effectiveRepo,
+      subPackages: subPackages,
+      verbose: global.verbose,
+    );
+    if (siblingConversions > 0) {
+      Logger.success('Converted $siblingConversions sibling dep(s) to git format');
+    }
+
     // Step 3: Assemble release notes folder from Stage 3 artifacts
     final releaseDir = Directory('$repoRoot/$kReleaseNotesDir/v$newVersion');
     releaseDir.createSync(recursive: true);
@@ -318,6 +330,34 @@ class CreateReleaseCommand extends Command<void> {
     CiProcessRunner.exec('git', ['push', 'origin', tag], cwd: repoRoot, fatal: true, verbose: global.verbose);
     Logger.success('Created tag: $tag');
 
+    // Step 5b: Create per-package tags for sub-packages with tag_pattern
+    final pkgTagsCreated = <String>[];
+    for (final pkg in subPackages) {
+      final tp = pkg['tag_pattern'] as String?;
+      if (tp == null) continue;
+      final pkgTag = tp.replaceAll('{{version}}', newVersion);
+      final pkgTagCheck = Process.runSync('git', ['rev-parse', pkgTag], workingDirectory: repoRoot);
+      if (pkgTagCheck.exitCode == 0) {
+        Logger.warn('Per-package tag $pkgTag already exists -- skipping');
+        continue;
+      }
+      CiProcessRunner.exec(
+        'git',
+        ['tag', '-a', pkgTag, '-m', '${pkg['name']} v$newVersion'],
+        cwd: repoRoot,
+        fatal: true,
+        verbose: global.verbose,
+      );
+      CiProcessRunner.exec('git', ['push', 'origin', pkgTag], cwd: repoRoot, fatal: true, verbose: global.verbose);
+      pkgTagsCreated.add(pkgTag);
+    }
+    if (pkgTagsCreated.isNotEmpty) {
+      Logger.success(
+        'Created ${pkgTagsCreated.length} per-package tag(s): '
+        '${pkgTagsCreated.join(', ')}',
+      );
+    }
+
     // Step 6: Create GitHub Release using Stage 3 release notes
     var releaseBody = '';
     final bodyFile = File('${releaseDir.path}/release_notes.md');
@@ -359,6 +399,8 @@ class CreateReleaseCommand extends Command<void> {
 | Repository | `$effectiveRepo` |
 | pubspec.yaml | Bumped to `$newVersion` |
 ${subPackages.isNotEmpty ? '| Sub-packages | ${subPackages.map((p) => '`${p['name']}`').join(', ')} bumped to `$newVersion` |' : ''}
+${siblingConversions > 0 ? '| Sibling Deps | $siblingConversions dep(s) converted to git format |' : ''}
+${pkgTagsCreated.isNotEmpty ? '| Per-Package Tags | ${pkgTagsCreated.map((t) => '`$t`').join(', ')} |' : ''}
 
 ### Links
 

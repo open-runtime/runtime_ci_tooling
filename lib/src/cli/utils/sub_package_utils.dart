@@ -1,5 +1,8 @@
 import 'dart:io';
 
+import 'package:yaml/yaml.dart';
+import 'package:yaml_edit/yaml_edit.dart';
+
 import 'logger.dart';
 import 'process_runner.dart';
 import 'workflow_generator.dart';
@@ -275,6 +278,103 @@ Rules:
     promptFile.writeAsStringSync('${promptFile.readAsStringSync()}\n$subPkgContext\n$hierarchicalInstructions');
     Logger.info('Appended sub-package context to prompt (${subPackages.length} packages)');
     return subPackages;
+  }
+
+  /// Convert bare sibling dependencies to git format and strip
+  /// `resolution: workspace`.
+  ///
+  /// For each sub-package pubspec, any dependency whose name matches another
+  /// sub-package (with a `tag_pattern`) is rewritten from a bare version
+  /// constraint to a full git dep block with `url`, `tag_pattern`, `path`,
+  /// and `version: ^newVersion`.
+  ///
+  /// Returns the total number of dependency conversions across all pubspecs.
+  static int convertSiblingDepsForRelease({
+    required String repoRoot,
+    required String newVersion,
+    required String effectiveRepo,
+    required List<Map<String, dynamic>> subPackages,
+    bool verbose = false,
+  }) {
+    // Build sibling lookup: {packageName -> {tag_pattern, path}}
+    // Only packages WITH tag_pattern participate.
+    final siblingMap = <String, Map<String, String>>{};
+    for (final pkg in subPackages) {
+      final tp = pkg['tag_pattern'] as String?;
+      if (tp == null) continue;
+      siblingMap[pkg['name'] as String] = {'tag_pattern': tp, 'path': pkg['path'] as String};
+    }
+    if (siblingMap.isEmpty) return 0;
+
+    final gitUrl = 'git@github.com:$effectiveRepo.git';
+    var totalConversions = 0;
+
+    for (final pkg in subPackages) {
+      final pkgName = pkg['name'] as String;
+      final pubspecFile = File('$repoRoot/${pkg['path']}/pubspec.yaml');
+      if (!pubspecFile.existsSync()) {
+        Logger.warn('Sub-package pubspec not found: ${pkg['path']}/pubspec.yaml');
+        continue;
+      }
+
+      final original = pubspecFile.readAsStringSync();
+      final editor = YamlEditor(original);
+      final doc = loadYaml(original) as YamlMap;
+      var conversions = 0;
+
+      // Scan both dependency sections.
+      for (final sectionKey in ['dependencies', 'dev_dependencies']) {
+        final section = doc[sectionKey] as YamlMap?;
+        if (section == null) continue;
+
+        for (final key in section.keys) {
+          final depName = key as String;
+          if (depName == pkgName) continue; // skip self
+          final sibling = siblingMap[depName];
+          if (sibling == null) continue; // not a sibling
+
+          final depValue = section[depName];
+          // Only convert bare string constraints (e.g., "^0.8.2") and
+          // null values (workspace refs). Map deps are already structured.
+          if (depValue is! String && depValue != null) continue;
+
+          final gitBlock = <String, Object>{
+            'url': gitUrl,
+            'tag_pattern': sibling['tag_pattern']!,
+            'path': sibling['path']!,
+          };
+          final newValue = <String, Object>{'git': gitBlock, 'version': '^$newVersion'};
+
+          try {
+            editor.update([sectionKey, depName], newValue);
+            conversions++;
+          } on Exception catch (e) {
+            Logger.warn('yaml_edit: failed to update $sectionKey.$depName -- $e');
+          }
+        }
+      }
+
+      // Strip `resolution: workspace` if present.
+      if (doc.containsKey('resolution')) {
+        try {
+          editor.remove(['resolution']);
+          if (verbose) {
+            Logger.info('Stripped resolution: workspace from ${pkg['name']}');
+          }
+        } on Exception catch (_) {}
+      }
+
+      final updated = editor.toString();
+      if (updated != original) {
+        pubspecFile.writeAsStringSync(updated);
+        totalConversions += conversions;
+        if (verbose) {
+          Logger.info('Converted $conversions sibling dep(s) in ${pkg['name']}');
+        }
+      }
+    }
+
+    return totalConversions;
   }
 
   /// Truncate a string to a maximum length, appending an indicator.
