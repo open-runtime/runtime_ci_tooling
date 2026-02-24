@@ -1,130 +1,119 @@
 # CI/CD CLI Quickstart
 
 ## 1. Overview
-The CI/CD CLI module provides a comprehensive suite of cross-platform commands for managing AI-powered release pipelines, automated issue triage, documentation generation, and workspace configuration. It exports `ManageCicdCli`, a robust `CommandRunner` pre-configured with dozens of pipeline commands like `explore`, `compose`, `triage`, and `autodoc`.
+The **CI/CD CLI** module provides a cross-platform command-line runner and programmatic utilities for managing AI-powered release pipelines, monorepo dependency auditing, and issue triage. It automates tasks like determining semantic version bumps (`DetermineVersionCommand`), composing changelogs (`ComposeCommand`), verifying workspace integrity (`PubspecAuditor`), and rendering CI/CD GitHub action workflows (`WorkflowGenerator`).
 
 ## 2. Import
-To use the CLI programmatically or extend its commands:
+Import the core CLI runner or specific programmatic utilities based on your needs:
+
 ```dart
+// Core CLI Runner
 import 'package:runtime_ci_tooling/src/cli/manage_cicd_cli.dart';
-import 'package:runtime_ci_tooling/src/cli/options/global_options.dart';
+
+// Standalone Utilities
+import 'package:runtime_ci_tooling/src/cli/utils/repo_utils.dart';
+import 'package:runtime_ci_tooling/src/cli/utils/workflow_generator.dart';
+import 'package:runtime_ci_tooling/src/cli/utils/audit/package_registry.dart';
+import 'package:runtime_ci_tooling/src/cli/utils/audit/pubspec_auditor.dart';
+import 'package:runtime_ci_tooling/src/cli/utils/audit/audit_finding.dart';
 ```
 
 ## 3. Setup
-You can invoke the CLI directly from the terminal or instantiate the runner in Dart.
+To execute CLI commands programmatically, instantiate the `ManageCicdCli` class. This runner comes pre-configured with all `runtime_ci_tooling` subcommands (e.g., `init`, `explore`, `triage`, `audit`).
 
-**Terminal Usage:**
-```bash
-# Initialize configuration (.runtime_ci/config.json)
-dart run runtime_ci_tooling:manage_cicd init
+```dart
+import 'package:runtime_ci_tooling/src/cli/manage_cicd_cli.dart';
 
-# Check prerequisite tools
-dart run runtime_ci_tooling:manage_cicd setup
+void main() async {
+  final cli = ManageCicdCli();
+  
+  // Example: Run 'status' with verbose logging
+  await cli.run(['--verbose', 'status']);
+}
 ```
 
-**Programmatic Setup:**
-```dart
-import 'dart:io';
-import 'package:runtime_ci_tooling/src/cli/manage_cicd_cli.dart';
-import 'package:runtime_ci_tooling/src/cli/manage_cicd_cli.dart' show UsageException;
+## 4. Common Operations
 
-Future<void> main(List<String> args) async {
+### Available Commands
+The `ManageCicdCli` supports a wide array of subcommands for the CI/CD lifecycle:
+- **Infrastructure Management**: `setup`, `validate`, `status`, `configure-mcp`
+- **Release Pipeline (Gemini-powered)**: `explore`, `compose`, `release-notes`, `documentation`, `release`
+- **CI/CD Actions**: `determine-version`, `create-release`, `archive-run`, `merge-audit-trails`
+- **Code Quality**: `test`, `analyze`, `verify-protos`
+- **Issue Triage**: `triage` (with subcommands `single`, `auto`, `status`, `pre-release`, `post-release`, `resume`)
+- **Monorepo & Templates**: `update`, `update-all`, `audit`, `audit-all`, `autodoc`, `init`, `consumers`
+
+### Bootstrapping a Repository
+You can initialize a repository by generating required CI configurations (`.runtime_ci/config.json`, `.runtime_ci/autodoc.json`, and `.git/hooks/pre-commit`).
+
+```dart
+import 'package:runtime_ci_tooling/src/cli/manage_cicd_cli.dart';
+
+Future<void> initRepository() async {
   final cli = ManageCicdCli();
-  try {
-    await cli.run(args);
-  } on UsageException catch (e) {
-    stderr.writeln(e.message);
-    stderr.writeln(e.usage);
-    exit(64);
-  } catch (e) {
-    stderr.writeln('Fatal error: $e');
-    exit(1);
+  // Analyzes the current workspace and scaffolds required CI/CD files
+  await cli.run(['init']);
+}
+```
+
+### Auditing Workspace Dependencies
+To validate that all `git` dependencies in a `pubspec.yaml` match the central workspace registry (checking URLs, tags, and version constraints):
+
+```dart
+import 'package:runtime_ci_tooling/src/cli/utils/audit/package_registry.dart';
+import 'package:runtime_ci_tooling/src/cli/utils/audit/pubspec_auditor.dart';
+import 'package:runtime_ci_tooling/src/cli/utils/audit/audit_finding.dart';
+
+void auditDependencies() {
+  final registry = PackageRegistry.load('configs/external_workspace_packages.yaml');
+  final auditor = PubspecAuditor(registry: registry);
+  
+  final findings = auditor.auditPubspec('pubspec.yaml');
+  
+  for (final finding in findings) {
+    if (finding.severity == AuditSeverity.error) {
+      print('Error in ${finding.dependencyName}: ${finding.message}');
+    }
   }
 }
 ```
 
-## 4. Commands Overview
+### Rendering GitHub Action Workflows
+You can programmatically generate a GitHub Actions workflow YAML based on your `.runtime_ci/config.json` specifications:
 
-The CLI handles several different groups of workflows. Some notable commands include:
-
-- **Initialization & Setup**: `init`, `setup`, `status`, `validate`, `configure-mcp`
-- **Release Pipeline**: `version`, `explore`, `compose`, `release-notes`, `release`, `create-release`, `determine-version`
-- **Triage**: `triage` (with subcommands `single`, `auto`, `status`, `resume`, `pre-release`, `post-release`)
-- **Monorepo & Auditing**: `audit`, `audit-all`, `consumers`, `update`, `update-all`
-- **Quality & Generation**: `analyze`, `test`, `verify-protos`, `autodoc`, `documentation`
-
-## 5. Common Operations
-
-### Programmatically Executing Commands
-You can run specific CI/CD stages programmatically. The CLI handles workspace resolution internally.
 ```dart
-final cli = ManageCicdCli();
+import 'package:runtime_ci_tooling/src/cli/utils/repo_utils.dart';
+import 'package:runtime_ci_tooling/src/cli/utils/workflow_generator.dart';
 
-// Check overall CI/CD configuration status
-await cli.run(['status', '--verbose']);
+void generateWorkflow() {
+  final repoRoot = RepoUtils.findRepoRoot();
+  if (repoRoot == null) return;
 
-// Run the full AI-powered release pipeline
-await cli.run(['release', '--dry-run']);
-```
-
-### Invoking Issue Triage
-The CLI intercepts and rewrites shorthand triage arguments (e.g., rewriting `triage 42` to `triage single 42`) for better ergonomics.
-```dart
-final cli = ManageCicdCli();
-
-// Triage a single issue (automatically routed to TriageSingleCommand)
-await cli.run(['triage', '123']);
-
-// Run auto-triage across all untriaged issues
-await cli.run(['triage', 'auto']);
-```
-
-### Auditing Dependencies
-Audit `pubspec.yaml` files against the external workspace packages registry:
-```dart
-final cli = ManageCicdCli();
-
-// Run audit on a single pubspec
-await cli.run(['audit', '--fix']);
-
-// Run audit on all pubspecs in a directory
-await cli.run(['audit-all', '--fix', '--severity', 'warning']);
-```
-
-### Generating Documentation via Autodoc
-Use the `AutodocCommand` programmatically to manage Gemini-powered documentation updates based on `autodoc.json`.
-```dart
-final cli = ManageCicdCli();
-
-// Scaffold an initial .runtime_ci/autodoc.json
-await cli.run(['autodoc', '--init']);
-
-// Force regenerate documentation for a specific module
-await cli.run(['autodoc', '--force', '--module', 'core']);
-```
-
-### Parsing Global Options
-If you are extending the CLI with custom commands, you can parse global options like `--dry-run` or `--verbose` from `ArgResults`.
-```dart
-// Inside your custom Command<void>.run() override:
-final globalOpts = ManageCicdCli.parseGlobalOptions(globalResults);
-
-if (globalOpts.dryRun) {
-  print('[DRY-RUN] Action skipped.');
-}
-if (globalOpts.verbose) {
-  print('Verbose logging enabled.');
+  final ciConfig = WorkflowGenerator.loadCiConfig(repoRoot);
+  if (ciConfig != null) {
+    final generator = WorkflowGenerator(
+      ciConfig: ciConfig, 
+      toolingVersion: '1.0.0'
+    );
+    final yamlOutput = generator.render();
+    print(yamlOutput);
+  }
 }
 ```
 
-## 6. Configuration
-The CLI behavior is driven by environment variables and local configuration files:
-- **`GEMINI_API_KEY`**: Required for all AI-powered tasks (`explore`, `compose`, `autodoc`, `triage`).
-- **`GH_TOKEN` / `GITHUB_TOKEN`**: Required for GitHub API operations and MCP server configuration.
-- **`.runtime_ci/config.json`**: Core project configuration generated by the `init` command.
-- **`.runtime_ci/autodoc.json`**: Controls the module mappings and prompt templates for the `autodoc` command.
-- **`.gemini/settings.json`**: Managed by the `configure-mcp` command to provide GitHub and Sentry MCP server configurations.
+## 5. Configuration
+The CLI relies heavily on the following configuration files and environment variables:
 
-## 7. Related Modules
-- **`triage`**: The modular engine powering the `TriageCommand` and its subcommands.
-- **`utils`**: Contains execution utilities used by the CLI commands, such as `WorkflowGenerator`, `TemplateResolver`, and `RepoUtils`.
+**Configuration Files:**
+* `.runtime_ci/config.json`: The core settings file (generated via `manage_cicd init`) specifying sub-packages, tool settings, thresholds, and GitHub platforms.
+* `.runtime_ci/autodoc.json`: Configuration mapping source directories to documentation outputs used by the `AutodocCommand`.
+* `configs/external_workspace_packages.yaml`: The central source of truth for repository references used by `AuditAllCommand` and `AuditCommand`.
+
+**Environment Variables:**
+* `GEMINI_API_KEY`: Required by exploration, triage, and changelog generation tools (`ExploreCommand`, `ComposeCommand`).
+* `GH_TOKEN` or `GITHUB_TOKEN`: Required to interact with GitHub APIs, configure MCP servers, and push release branches.
+* `CI_STAGING_DIR`: Optional. Used to override where CI artifacts are staged (defaults to `/tmp/` or system temp).
+
+## 6. Related Modules
+* **Triage (`lib/src/triage/`)**: Detailed AI triage logic invoked by the `TriageCommand` subcommands (`TriageSingleCommand`, `TriageAutoCommand`).
+* **Prompts (`lib/src/prompts/`)**: Contains the Gemini 3 Pro prompt definitions executed by tools like `ReleaseNotesCommand` and `AutodocCommand`.
