@@ -2173,7 +2173,7 @@ Future<void> _runTest(String repoRoot) async {
   final testArgs = <String>[
     'test',
     '--exclude-tags',
-    'gcp',
+    'gcp,integration',
     '--chain-stack-traces',
     '--reporter',
     'expanded',
@@ -2194,28 +2194,28 @@ Future<void> _runTest(String repoRoot) async {
   final stdoutBuf = StringBuffer();
   final stderrBuf = StringBuffer();
 
-  final stdoutDone = process.stdout.transform(const SystemEncoding().decoder).listen((data) {
+  final stdoutDone = process.stdout.transform(utf8.decoder).listen((data) {
     stdout.write(data);
     stdoutBuf.write(data);
   }).asFuture<void>();
 
-  final stderrDone = process.stderr.transform(const SystemEncoding().decoder).listen((data) {
+  final stderrDone = process.stderr.transform(utf8.decoder).listen((data) {
     stderr.write(data);
     stderrBuf.write(data);
   }).asFuture<void>();
 
-  // Wait for streams to drain and process to exit (45-min safety timeout)
+  // Wait for process to exit (45-min safety timeout)
   const processTimeout = Duration(minutes: 45);
   final exitCode = await process.exitCode.timeout(
     processTimeout,
     onTimeout: () {
       _error('Test process exceeded ${processTimeout.inMinutes}-minute timeout — killing.');
-      process.kill(ProcessSignal.sigkill);
+      process.kill(); // No signal arg — cross-platform safe
       return -1;
     },
   );
   try {
-    await Future.wait([stdoutDone, stderrDone]);
+    await Future.wait([stdoutDone, stderrDone]).timeout(const Duration(seconds: 30));
   } catch (_) {
     // Ignore stream errors (e.g. process killed before streams drained)
   }
@@ -2287,31 +2287,25 @@ _TestResults _parseTestResultsJson(String jsonPath) {
   // Tracking maps keyed by testID
   final testNames = <int, String>{};
   final testStartTimes = <int, int>{};
-  final testErrors = <int, String>{};
-  final testStackTraces = <int, String>{};
+  final testErrors = <int, StringBuffer>{};
+  final testStackTraces = <int, StringBuffer>{};
   final testPrints = <int, StringBuffer>{};
-  final skippedTests = <int, bool>{};
 
-  try {
-    final lines = file.readAsLinesSync();
-    for (final line in lines) {
-      if (line.trim().isEmpty) continue;
+  final lines = file.readAsLinesSync();
+  for (final line in lines) {
+    if (line.trim().isEmpty) continue;
+    try {
       final event = jsonDecode(line) as Map<String, dynamic>;
       final type = event['type'] as String?;
 
       switch (type) {
         case 'testStart':
           final test = event['test'] as Map<String, dynamic>?;
-          if (test != null) {
-            final id = test['id'] as int;
-            testNames[id] = test['name'] as String? ?? 'unknown';
-            testStartTimes[id] = event['time'] as int? ?? 0;
-            // Detect group-level "loading" entries (no real test)
-            final metadata = test['metadata'] as Map<String, dynamic>?;
-            if (metadata != null && metadata['skip'] == true) {
-              skippedTests[id] = true;
-            }
-          }
+          if (test == null) break;
+          final id = test['id'] as int?;
+          if (id == null) break;
+          testNames[id] = test['name'] as String? ?? 'unknown';
+          testStartTimes[id] = event['time'] as int? ?? 0;
 
         case 'testDone':
           final id = event['testID'] as int?;
@@ -2323,7 +2317,7 @@ _TestResults _parseTestResultsJson(String jsonPath) {
           // Skip synthetic/hidden entries (group-level loading events)
           if (hidden) break;
 
-          if (skipped || skippedTests[id] == true) {
+          if (skipped) {
             results.skipped++;
           } else if (resultStr == 'success') {
             results.passed++;
@@ -2334,8 +2328,8 @@ _TestResults _parseTestResultsJson(String jsonPath) {
             results.failures.add(
               _TestFailure(
                 name: testNames[id] ?? 'unknown',
-                error: testErrors[id] ?? '',
-                stackTrace: testStackTraces[id] ?? '',
+                error: testErrors[id]?.toString() ?? '',
+                stackTrace: testStackTraces[id]?.toString() ?? '',
                 printOutput: testPrints[id]?.toString() ?? '',
                 durationMs: endTime - startTime,
               ),
@@ -2345,8 +2339,13 @@ _TestResults _parseTestResultsJson(String jsonPath) {
         case 'error':
           final id = event['testID'] as int?;
           if (id == null) break;
-          testErrors[id] = event['error'] as String? ?? '';
-          testStackTraces[id] = event['stackTrace'] as String? ?? '';
+          // Accumulate multiple errors per test (e.g. test failure + tearDown exception)
+          testErrors.putIfAbsent(id, () => StringBuffer());
+          if (testErrors[id]!.isNotEmpty) testErrors[id]!.write('\n---\n');
+          testErrors[id]!.write(event['error'] as String? ?? '');
+          testStackTraces.putIfAbsent(id, () => StringBuffer());
+          if (testStackTraces[id]!.isNotEmpty) testStackTraces[id]!.write('\n---\n');
+          testStackTraces[id]!.write(event['stackTrace'] as String? ?? '');
 
         case 'print':
           final id = event['testID'] as int?;
@@ -2359,9 +2358,10 @@ _TestResults _parseTestResultsJson(String jsonPath) {
           final time = event['time'] as int? ?? 0;
           results.totalDurationMs = time;
       }
+    } catch (e) {
+      // Skip malformed JSON lines but continue parsing the rest
+      _warn('Skipping malformed JSON line: $e');
     }
-  } catch (e) {
-    _warn('Failed to parse JSON results: $e');
   }
 
   return results;
@@ -2375,15 +2375,18 @@ void _writeTestJobSummary(_TestResults results, int exitCode, String logDir) {
   final platformId =
       Platform.environment['PLATFORM_ID'] ?? Platform.environment['RUNNER_NAME'] ?? Platform.operatingSystem;
 
-  buf.writeln('## Test Results — $platformId\n');
+  buf.writeln('## Test Results — $platformId');
+  buf.writeln();
 
   if (!results.parsed) {
     // Fallback: no JSON file was produced (test binary crashed before writing)
     final status = exitCode == 0 ? 'passed' : 'failed';
     final icon = exitCode == 0 ? 'NOTE' : 'CAUTION';
     buf.writeln('> [!$icon]');
-    buf.writeln('> Tests $status (exit code $exitCode) — no structured results available.\n');
-    buf.writeln('Check the expanded output in test logs for details.\n');
+    buf.writeln('> Tests $status (exit code $exitCode) — no structured results available.');
+    buf.writeln();
+    buf.writeln('Check the expanded output in test logs for details.');
+    buf.writeln();
     buf.writeln(_artifactLink(':package: View full test logs'));
     _writeStepSummary(buf.toString());
     return;
@@ -2392,14 +2395,15 @@ void _writeTestJobSummary(_TestResults results, int exitCode, String logDir) {
   final total = results.passed + results.failed + results.skipped;
   final durationSec = (results.totalDurationMs / 1000).toStringAsFixed(1);
 
-  // Status banner
+  // Status banner — alert box lines must all be prefixed with >
   if (results.failed == 0) {
     buf.writeln('> [!NOTE]');
-    buf.writeln('> All $total tests passed in ${durationSec}s\n');
+    buf.writeln('> All $total tests passed in ${durationSec}s');
   } else {
     buf.writeln('> [!CAUTION]');
-    buf.writeln('> ${results.failed} of $total tests failed\n');
+    buf.writeln('> ${results.failed} of $total tests failed');
   }
+  buf.writeln();
 
   // Summary table
   buf.writeln('| Status | Count |');
@@ -2413,54 +2417,62 @@ void _writeTestJobSummary(_TestResults results, int exitCode, String logDir) {
 
   // Failed test details
   if (results.failures.isNotEmpty) {
-    buf.writeln('### Failed Tests\n');
+    buf.writeln('### Failed Tests');
+    buf.writeln();
 
     // Cap at 20 failures to avoid exceeding the 1 MiB summary limit
     final displayFailures = results.failures.take(20).toList();
     for (final f in displayFailures) {
       final durStr = f.durationMs > 0 ? ' (${f.durationMs}ms)' : '';
       buf.writeln('<details>');
-      buf.writeln('<summary><strong>:x: ${_escapeHtml(f.name)}</strong>$durStr</summary>\n');
+      buf.writeln('<summary><strong>:x: ${_escapeHtml(f.name)}</strong>$durStr</summary>');
+      buf.writeln();
 
       if (f.error.isNotEmpty) {
         // Truncate very long error messages
         final error = f.error.length > 2000 ? '${f.error.substring(0, 2000)}\n... (truncated)' : f.error;
         buf.writeln('**Error:**');
-        buf.writeln('```');
+        final errorFence = _codeFence(error);
+        buf.writeln(errorFence);
         buf.writeln(error);
-        buf.writeln('```\n');
+        buf.writeln(errorFence);
+        buf.writeln();
       }
 
       if (f.stackTrace.isNotEmpty) {
         // Truncate very long stack traces
         final stack = f.stackTrace.length > 1500 ? '${f.stackTrace.substring(0, 1500)}\n... (truncated)' : f.stackTrace;
         buf.writeln('**Stack Trace:**');
-        buf.writeln('```');
+        final stackFence = _codeFence(stack);
+        buf.writeln(stackFence);
         buf.writeln(stack);
-        buf.writeln('```\n');
+        buf.writeln(stackFence);
+        buf.writeln();
       }
 
       if (f.printOutput.isNotEmpty) {
-        final printLines = f.printOutput.split('\n');
-        final lineCount = printLines.length;
+        final trimmed = f.printOutput.trimRight();
+        final lineCount = trimmed.split('\n').length;
         // Truncate captured output if it's very long
-        final printPreview = f.printOutput.length > 1500
-            ? '${f.printOutput.substring(0, 1500)}\n... (truncated)'
-            : f.printOutput.trimRight();
+        final printPreview = trimmed.length > 1500 ? '${trimmed.substring(0, 1500)}\n... (truncated)' : trimmed;
         buf.writeln('**Captured Output ($lineCount lines):**');
-        buf.writeln('```');
+        final printFence = _codeFence(printPreview);
+        buf.writeln(printFence);
         buf.writeln(printPreview);
-        buf.writeln('```\n');
+        buf.writeln(printFence);
+        buf.writeln();
       }
 
-      buf.writeln('</details>\n');
+      buf.writeln('</details>');
+      buf.writeln();
     }
 
     if (results.failures.length > 20) {
       buf.writeln(
         '_...and ${results.failures.length - 20} more failures. '
-        'See test logs artifact for full details._\n',
+        'See test logs artifact for full details._',
       );
+      buf.writeln();
     }
   }
 
@@ -2474,7 +2486,17 @@ void _writeTestJobSummary(_TestResults results, int exitCode, String logDir) {
 
 /// Escape HTML special characters for safe embedding in GitHub markdown.
 String _escapeHtml(String input) {
-  return input.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+  return input.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+}
+
+/// Choose a code fence delimiter that does not appear in [content].
+/// Starts with triple backticks and extends as needed.
+String _codeFence(String content) {
+  var fence = '```';
+  while (content.contains(fence)) {
+    fence += '`';
+  }
+  return fence;
 }
 
 /// Run dart analyze and fail only on actual errors.
