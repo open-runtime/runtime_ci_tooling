@@ -11,3 +11,6 @@ build/
 .idea/
 *.iml
 .vscode/
+
+# Claude AI session data
+.claude/
