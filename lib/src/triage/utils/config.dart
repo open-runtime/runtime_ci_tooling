@@ -3,6 +3,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+
 /// Centralized, config-driven loader for the runtime CI tooling pipeline.
 ///
 /// Any repository that places a `.runtime_ci/config.json` file at its root
@@ -203,9 +205,37 @@ class TriageConfig {
     final conditional = _map(['agents', 'conditional', agentName], null);
     if (conditional == null) return true;
 
-    final requireFile = conditional['require_file'] as String?;
-    if (requireFile != null) {
-      return File('$repoRoot/$requireFile').existsSync();
+    final requireFileRaw = conditional['require_file'];
+    if (requireFileRaw != null) {
+      if (requireFileRaw is! String) {
+        print(
+          'Warning: agents.conditional.$agentName.require_file must be a string, got ${requireFileRaw.runtimeType}',
+        );
+        return false;
+      }
+      final requireFile = requireFileRaw.trim();
+      if (requireFile.isEmpty) {
+        print('Warning: agents.conditional.$agentName.require_file is empty');
+        return false;
+      }
+      if (requireFile.contains(RegExp(r'[\r\n\t]'))) {
+        print('Warning: agents.conditional.$agentName.require_file contains whitespace control characters');
+        return false;
+      }
+      if (p.isAbsolute(requireFile) || requireFile.startsWith('~')) {
+        print('Warning: agents.conditional.$agentName.require_file must be a relative path: $requireFile');
+        return false;
+      }
+
+      // Normalize and ensure the resolved path stays within the repo root.
+      final root = p.canonicalize(repoRoot);
+      final resolved = p.canonicalize(p.normalize(p.join(repoRoot, requireFile)));
+      if (!p.isWithin(root, resolved) && root != resolved) {
+        print('Warning: agents.conditional.$agentName.require_file escapes repo root: $requireFile');
+        return false;
+      }
+
+      return File(resolved).existsSync();
     }
 
     return true;

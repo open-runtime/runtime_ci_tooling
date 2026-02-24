@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:mustache_template/mustache_template.dart';
+import 'package:path/path.dart' as p;
 
 import 'logger.dart';
 import 'template_resolver.dart';
@@ -41,6 +42,15 @@ const _platformDefinitions = <String, _PlatformDefinition>{
     arch: 'arm64',
     runner: 'runtime-windows-11-arm64-208gb-64core',
   ),
+};
+
+const Set<String> _knownFeatureKeys = {
+  'proto',
+  'lfs',
+  'format_check',
+  'analysis_cache',
+  'managed_analyze',
+  'managed_test',
 };
 
 /// Renders CI workflow YAML from a Mustache skeleton template and config.json.
@@ -226,12 +236,43 @@ class WorkflowGenerator {
       errors.add('ci.dart_sdk is required');
     } else if (sdk is! String) {
       errors.add('ci.dart_sdk must be a string, got ${sdk.runtimeType}');
+    } else {
+      final trimmed = sdk.trim();
+      if (trimmed.isEmpty) {
+        errors.add('ci.dart_sdk must be a non-empty string');
+      } else if (trimmed != sdk) {
+        errors.add('ci.dart_sdk must not have leading/trailing whitespace');
+      } else if (trimmed.contains(RegExp(r'[\r\n\t]'))) {
+        errors.add('ci.dart_sdk must not contain newlines/tabs');
+      } else {
+        // dart-lang/setup-dart accepts semver versions or channels like stable/beta/dev.
+        final isChannel = trimmed == 'stable' || trimmed == 'beta' || trimmed == 'dev';
+        final isSemver = RegExp(r'^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$').hasMatch(trimmed);
+        if (!isChannel && !isSemver) {
+          errors.add('ci.dart_sdk must be a Dart SDK channel (stable|beta|dev) or a version like 3.9.2, got "$sdk"');
+        }
+      }
     }
     final features = ciConfig['features'];
     if (features == null) {
       errors.add('ci.features is required');
     } else if (features is! Map) {
       errors.add('ci.features must be an object, got ${features.runtimeType}');
+    } else {
+      for (final entry in features.entries) {
+        final key = entry.key;
+        final value = entry.value;
+        if (key is! String) {
+          errors.add('ci.features keys must be strings, got ${key.runtimeType}');
+          continue;
+        }
+        if (!_knownFeatureKeys.contains(key)) {
+          errors.add('ci.features contains unknown key "$key" (typo?)');
+        }
+        if (value is! bool) {
+          errors.add('ci.features["$key"] must be a bool, got ${value.runtimeType}');
+        }
+      }
     }
     final secrets = ciConfig['secrets'];
     if (secrets != null && secrets is! Map) {
@@ -256,6 +297,67 @@ class WorkflowGenerator {
               'ci.platforms contains invalid platform "$p". '
               'Valid: ${_platformDefinitions.keys.join(', ')}',
             );
+          }
+        }
+      }
+    }
+
+    // Validate sub-packages used in generated workflows. These values are rendered
+    // into YAML (e.g. working-directory), so disallow traversal/escaping.
+    final subPackages = ciConfig['sub_packages'];
+    if (subPackages != null) {
+      if (subPackages is! List) {
+        errors.add('ci.sub_packages must be an array, got ${subPackages.runtimeType}');
+      } else {
+        final seenNames = <String>{};
+        final seenPaths = <String>{};
+        for (final sp in subPackages) {
+          if (sp is! Map) {
+            errors.add('ci.sub_packages entries must be objects, got ${sp.runtimeType}');
+            continue;
+          }
+          final name = sp['name'];
+          final pathValue = sp['path'];
+          if (name is! String || name.trim().isEmpty) {
+            errors.add('ci.sub_packages[].name must be a non-empty string');
+          } else if (!seenNames.add(name)) {
+            errors.add('ci.sub_packages contains duplicate name "$name"');
+          }
+          if (pathValue is! String || pathValue.trim().isEmpty) {
+            errors.add('ci.sub_packages[].path must be a non-empty string');
+            continue;
+          }
+          if (pathValue != pathValue.trim()) {
+            errors.add(
+              'ci.sub_packages["${name is String ? name : '?'}"].path must not have leading/trailing whitespace',
+            );
+            continue;
+          }
+          if (pathValue.contains(RegExp(r'[\r\n\t]'))) {
+            errors.add('ci.sub_packages["${name is String ? name : '?'}"].path must not contain newlines/tabs');
+            continue;
+          }
+          if (p.isAbsolute(pathValue) || pathValue.startsWith('~')) {
+            errors.add('ci.sub_packages["${name is String ? name : '?'}"].path must be a relative repo path');
+            continue;
+          }
+          if (pathValue.contains('\\')) {
+            errors.add('ci.sub_packages["${name is String ? name : '?'}"].path must use forward slashes (/)');
+            continue;
+          }
+          final normalized = p.posix.normalize(pathValue);
+          if (normalized.startsWith('..') || normalized.contains('/../')) {
+            errors.add('ci.sub_packages["${name is String ? name : '?'}"].path must not traverse outside the repo');
+            continue;
+          }
+          if (RegExp(r'[^A-Za-z0-9_./-]').hasMatch(pathValue)) {
+            errors.add(
+              'ci.sub_packages["${name is String ? name : '?'}"].path contains unsupported characters: "$pathValue"',
+            );
+            continue;
+          }
+          if (!seenPaths.add(normalized)) {
+            errors.add('ci.sub_packages contains duplicate path "$normalized"');
           }
         }
       }
