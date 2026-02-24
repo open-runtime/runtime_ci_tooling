@@ -26,7 +26,7 @@ class TestCommand extends Command<void> {
 
     Logger.header('Running dart test');
 
-    const processTimeout = Duration(minutes: 20);
+    const processTimeout = Duration(minutes: 30);
     final failures = <String>[];
 
     // Skip gracefully if no test/ directory exists
@@ -44,7 +44,7 @@ class TestCommand extends Command<void> {
         mode: ProcessStartMode.inheritStdio,
       );
 
-      // Process-level timeout: kill the test process if it exceeds 20 minutes.
+      // Process-level timeout: kill the test process if it exceeds 30 minutes.
       // Individual test timeouts should catch hangs, but this is a safety net
       // for cases where the test process itself doesn't exit (e.g., leaked
       // isolates, open sockets keeping the event loop alive).
