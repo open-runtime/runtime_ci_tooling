@@ -129,9 +129,9 @@ void _scaffoldSubPackageModules(String repoRoot, List<Map<String, dynamic>> modu
 
   for (final sp in validPackages) {
     final spName = sp['name'] as String;
-    // Normalize: strip trailing slashes to avoid double-slash paths like
-    // "packages/foo//lib/src/".
-    final spPath = (sp['path'] as String).replaceAll(RegExp(r'/+$'), '');
+    // Path is already normalized (trailing slashes stripped) by
+    // SubPackageUtils.loadSubPackages().
+    final spPath = sp['path'] as String;
 
     final spLibDir = Directory('$repoRoot/$spPath/lib');
     if (!spLibDir.existsSync()) continue;

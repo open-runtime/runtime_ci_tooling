@@ -70,7 +70,7 @@ Future<void> postReleaseTriage({
   final actionsTaken = <Map<String, dynamic>>[];
 
   // Step 1: Own-repo GitHub issues
-  if (config.postReleaseCloseOwnRepo || true) {
+  if (config.postReleaseCloseOwnRepo) {
     for (final issue in ghIssues) {
       final number = issue['number'] as int;
       final confidence = (issue['confidence'] as num?)?.toDouble() ?? 0.0;
