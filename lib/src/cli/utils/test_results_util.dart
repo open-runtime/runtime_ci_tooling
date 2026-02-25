@@ -31,6 +31,11 @@ class TestResults {
   bool parsed = false;
 }
 
+/// Maximum chars to store per failure field to prevent unbounded memory growth.
+const int _maxStoredErrorChars = 8000;
+const int _maxStoredStackTraceChars = 6000;
+const int _maxStoredPrintChars = 6000;
+
 /// Test-results parsing and step-summary writing for CI.
 abstract final class TestResultsUtil {
   /// Parse the NDJSON file produced by `dart test --file-reporter json:...`.
@@ -42,13 +47,14 @@ abstract final class TestResultsUtil {
       return results;
     }
 
-    results.parsed = true;
-
     final testNames = <int, String>{};
     final testStartTimes = <int, int>{};
     final testErrors = <int, StringBuffer>{};
     final testStackTraces = <int, StringBuffer>{};
     final testPrints = <int, StringBuffer>{};
+
+    const _maxMalformedWarnings = 5;
+    var malformedCount = 0;
 
     final lines = file.readAsLinesSync();
     for (final line in lines) {
@@ -65,6 +71,7 @@ abstract final class TestResultsUtil {
             if (id == null) break;
             testNames[id] = test['name'] as String? ?? 'unknown';
             testStartTimes[id] = event['time'] as int? ?? 0;
+            results.parsed = true;
 
           case 'testDone':
             final id = event['testID'] as int?;
@@ -75,26 +82,39 @@ abstract final class TestResultsUtil {
 
             if (hidden) break;
 
+            results.parsed = true;
             if (skipped) {
               results.skipped++;
             } else if (resultStr == 'success') {
               results.passed++;
             } else if (resultStr == 'failure' || resultStr == 'error') {
               results.failed++;
-              final startTime = testStartTimes[id] ?? 0;
-              final endTime = event['time'] as int? ?? 0;
-              results.failures.add(
-                TestFailure(
-                  name: testNames[id] ?? 'unknown',
-                  error: testErrors[id]?.toString() ?? '',
-                  stackTrace: testStackTraces[id]?.toString() ?? '',
-                  printOutput: testPrints[id]?.toString() ?? '',
-                  durationMs: endTime - startTime,
-                ),
-              );
+              if (results.failures.length < 50) {
+                final startTime = testStartTimes[id] ?? 0;
+                final endTime = event['time'] as int? ?? 0;
+                final rawError = testErrors[id]?.toString() ?? '';
+                final rawStack = testStackTraces[id]?.toString() ?? '';
+                final rawPrint = testPrints[id]?.toString() ?? '';
+                results.failures.add(
+                  TestFailure(
+                    name: testNames[id] ?? 'unknown',
+                    error: rawError.length > _maxStoredErrorChars
+                        ? '${rawError.substring(0, _maxStoredErrorChars)}\n... (truncated)'
+                        : rawError,
+                    stackTrace: rawStack.length > _maxStoredStackTraceChars
+                        ? '${rawStack.substring(0, _maxStoredStackTraceChars)}\n... (truncated)'
+                        : rawStack,
+                    printOutput: rawPrint.length > _maxStoredPrintChars
+                        ? '${rawPrint.substring(0, _maxStoredPrintChars)}\n... (truncated)'
+                        : rawPrint,
+                    durationMs: endTime - startTime,
+                  ),
+                );
+              }
             }
 
           case 'error':
+            results.parsed = true;
             final id = event['testID'] as int?;
             if (id == null) break;
             testErrors.putIfAbsent(id, () => StringBuffer());
@@ -105,6 +125,7 @@ abstract final class TestResultsUtil {
             testStackTraces[id]!.write(event['stackTrace'] as String? ?? '');
 
           case 'print':
+            results.parsed = true;
             final id = event['testID'] as int?;
             if (id == null) break;
             final message = event['message'] as String? ?? '';
@@ -112,12 +133,23 @@ abstract final class TestResultsUtil {
             testPrints[id]!.writeln(message);
 
           case 'done':
+            results.parsed = true;
             final time = event['time'] as int? ?? 0;
             results.totalDurationMs = time;
         }
       } catch (e) {
-        Logger.warn('Skipping malformed JSON line: $e');
+        malformedCount++;
+        if (malformedCount <= _maxMalformedWarnings) {
+          Logger.warn('Skipping malformed JSON line: $e');
+        } else if (malformedCount == _maxMalformedWarnings + 1) {
+          Logger.warn('Skipping malformed JSON lines (circuit breaker — suppressing further warnings)');
+        }
       }
+    }
+
+    if (malformedCount > _maxMalformedWarnings) {
+      final remainder = malformedCount - _maxMalformedWarnings;
+      Logger.warn('Skipped $remainder additional malformed JSON line(s).');
     }
 
     return results;
@@ -208,9 +240,10 @@ abstract final class TestResultsUtil {
         if (f.error.isNotEmpty) {
           final error = f.error.length > 2000 ? '${f.error.substring(0, 2000)}\n... (truncated)' : f.error;
           buf.writeln('**Error:**');
-          final fence = _codeFence(error);
+          final safeError = StepSummary.escapeHtml(error);
+          final fence = _codeFence(safeError);
           buf.writeln(fence);
-          buf.writeln(error);
+          buf.writeln(safeError);
           buf.writeln(fence);
           buf.writeln();
         }
@@ -220,9 +253,10 @@ abstract final class TestResultsUtil {
               ? '${f.stackTrace.substring(0, 1500)}\n... (truncated)'
               : f.stackTrace;
           buf.writeln('**Stack Trace:**');
-          final fence = _codeFence(stack);
+          final safeStack = StepSummary.escapeHtml(stack);
+          final fence = _codeFence(safeStack);
           buf.writeln(fence);
-          buf.writeln(stack);
+          buf.writeln(safeStack);
           buf.writeln(fence);
           buf.writeln();
         }
@@ -232,9 +266,10 @@ abstract final class TestResultsUtil {
           final lineCount = trimmed.split('\n').length;
           final printPreview = trimmed.length > 1500 ? '${trimmed.substring(0, 1500)}\n... (truncated)' : trimmed;
           buf.writeln('**Captured Output ($lineCount lines):**');
-          final fence = _codeFence(printPreview);
+          final safePrint = StepSummary.escapeHtml(printPreview);
+          final fence = _codeFence(safePrint);
           buf.writeln(fence);
-          buf.writeln(printPreview);
+          buf.writeln(safePrint);
           buf.writeln(fence);
           buf.writeln();
         }
@@ -255,11 +290,23 @@ abstract final class TestResultsUtil {
     return buf.toString();
   }
 
+  /// Returns a markdown code fence string that will not appear inside [content].
+  /// Handles adversarial content with long backtick runs by using fence length
+  /// strictly greater than max consecutive backticks (up to 128).
   static String _codeFence(String content) {
-    var fence = '```';
-    while (content.contains(fence)) {
-      fence += '`';
+    var maxRun = 0;
+    var run = 0;
+    for (final c in content.codeUnits) {
+      if (c == 0x60) {
+        run++;
+      } else {
+        if (run > maxRun) maxRun = run;
+        run = 0;
+      }
     }
-    return fence;
+    if (run > maxRun) maxRun = run;
+    // Fence must be longer than any backtick run in content; allow up to 128
+    // to handle adversarial content without escaping.
+    return '`' * (maxRun + 1).clamp(3, 128);
   }
 }

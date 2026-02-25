@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import '../../triage/utils/config.dart';
@@ -12,8 +13,10 @@ abstract final class StepSummary {
   /// Write a markdown summary to $GITHUB_STEP_SUMMARY (visible in Actions UI).
   /// No-op when running locally (env var not set).
   /// Skips appending if the file would exceed the 1 MiB GitHub limit.
-  static void write(String markdown) {
-    final summaryFile = Platform.environment['GITHUB_STEP_SUMMARY'];
+  /// [environment] overrides Platform.environment (for testing).
+  static void write(String markdown, {Map<String, String>? environment}) {
+    final env = environment ?? Platform.environment;
+    final summaryFile = env['GITHUB_STEP_SUMMARY'];
     if (summaryFile == null || summaryFile.trim().isEmpty) return;
     if (RepoUtils.isSymlinkPath(summaryFile)) {
       Logger.warn('Refusing to write step summary through symlink: $summaryFile');
@@ -21,7 +24,9 @@ abstract final class StepSummary {
     }
     final file = File(summaryFile);
     final currentSize = file.existsSync() ? file.lengthSync() : 0;
-    if (currentSize + markdown.length > _maxSummaryBytes) {
+    // Use UTF-8 byte length (not markdown.length) — GitHub limit is 1 MiB.
+    final markdownBytes = utf8.encode(markdown).length;
+    if (currentSize + markdownBytes > _maxSummaryBytes) {
       Logger.warn('Step summary approaching 1 MiB limit — skipping append');
       return;
     }
@@ -65,11 +70,16 @@ abstract final class StepSummary {
   }
 
   /// Wrap content in a collapsible <details> block for step summaries.
+  /// Escapes title and content to prevent HTML injection (e.g. closing tags like
+  /// </details>) from breaking structure or executing unsafe HTML.
   static String collapsible(String title, String content, {bool open = false}) {
     if (content.trim().isEmpty) return '';
     final openAttr = open ? ' open' : '';
     final safeTitle = escapeHtml(title);
-    return '\n<details$openAttr>\n<summary>$safeTitle</summary>\n\n$content\n\n</details>\n';
+    // Escape content to prevent </details>, </summary>, <script>, etc. from breaking
+    // the collapsible structure or injecting unsafe HTML.
+    final safeContent = escapeHtml(content);
+    return '\n<details$openAttr>\n<summary>$safeTitle</summary>\n\n$safeContent\n\n</details>\n';
   }
 
   /// Escape HTML special characters for safe embedding in GitHub markdown.

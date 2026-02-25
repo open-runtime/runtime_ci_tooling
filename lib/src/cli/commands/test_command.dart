@@ -6,6 +6,7 @@ import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 
 import '../../triage/utils/config.dart';
+import '../utils/exit_util.dart';
 import '../utils/logger.dart';
 import '../utils/repo_utils.dart';
 import '../utils/step_summary.dart';
@@ -25,6 +26,10 @@ import '../utils/sub_package_utils.dart';
 /// All log files are written to `$TEST_LOG_DIR` (set by CI template) or
 /// `<repoRoot>/.dart_tool/test-logs/` locally.
 class TestCommand extends Command<void> {
+  /// Maximum bytes to buffer per stdout/stderr stream to prevent OOM.
+  static const int _maxLogBufferBytes = 2 * 1024 * 1024; // 2MB
+  /// Maximum bytes for pub get output (typically small).
+  static const int _maxPubGetBufferBytes = 512 * 1024; // 512KB
   @override
   final String name = 'test';
 
@@ -36,9 +41,14 @@ class TestCommand extends Command<void> {
     final repoRoot = RepoUtils.findRepoRoot();
     if (repoRoot == null) {
       Logger.error('Could not find ${config.repoName} repo root.');
-      exit(1);
+      await exitWithCode(1);
     }
+    await runWithRoot(repoRoot);
+  }
 
+  /// Run tests with an explicit [repoRoot], preserving the contract from
+  /// manage_cicd when invoked as `manage_cicd test` (CWD may differ from root).
+  static Future<void> runWithRoot(String repoRoot) async {
     Logger.header('Running dart test');
 
     const processTimeout = Duration(minutes: 45);
@@ -51,10 +61,10 @@ class TestCommand extends Command<void> {
       RepoUtils.ensureSafeDirectory(logDir);
     } on StateError catch (e) {
       Logger.error('$e');
-      exit(1);
+      await exitWithCode(1);
     } on FileSystemException catch (e) {
       Logger.error('Cannot use log directory: $e');
-      exit(1);
+      await exitWithCode(1);
     }
     Logger.info('Log directory: $logDir');
 
@@ -88,35 +98,76 @@ class TestCommand extends Command<void> {
       final process = await Process.start(Platform.resolvedExecutable, testArgs, workingDirectory: repoRoot);
 
       // Stream stdout and stderr to console in real-time while capturing
+      // (byte-bounded to prevent OOM from runaway test output)
       final stdoutBuf = StringBuffer();
       final stderrBuf = StringBuffer();
+      var stdoutBytes = 0;
+      var stderrBytes = 0;
+      var stdoutTruncated = false;
+      var stderrTruncated = false;
+      const truncationSuffix = '\n\n... (output truncated, exceeded 2MB bytes). See console.log for full output.)';
+      final truncationBytes = utf8.encode(truncationSuffix).length;
 
-      final stdoutSub = process.stdout.transform(utf8.decoder).listen((data) {
+      void onStdout(String data) {
         stdout.write(data);
-        stdoutBuf.write(data);
-      });
-      final stderrSub = process.stderr.transform(utf8.decoder).listen((data) {
+        if (stdoutTruncated) return;
+        final dataBytes = utf8.encode(data).length;
+        if (stdoutBytes + dataBytes <= _maxLogBufferBytes) {
+          stdoutBuf.write(data);
+          stdoutBytes += dataBytes;
+        } else {
+          final remaining = _maxLogBufferBytes - stdoutBytes - truncationBytes;
+          if (remaining > 0) {
+            final bytes = utf8.encode(data);
+            final toTake = bytes.length > remaining ? remaining : bytes.length;
+            stdoutBuf.write(utf8.decode(bytes.take(toTake).toList(), allowMalformed: true));
+          }
+          stdoutBuf.write(truncationSuffix);
+          stdoutTruncated = true;
+        }
+      }
+
+      void onStderr(String data) {
         stderr.write(data);
-        stderrBuf.write(data);
-      });
+        if (stderrTruncated) return;
+        final dataBytes = utf8.encode(data).length;
+        if (stderrBytes + dataBytes <= _maxLogBufferBytes) {
+          stderrBuf.write(data);
+          stderrBytes += dataBytes;
+        } else {
+          final remaining = _maxLogBufferBytes - stderrBytes - truncationBytes;
+          if (remaining > 0) {
+            final bytes = utf8.encode(data);
+            final toTake = bytes.length > remaining ? remaining : bytes.length;
+            stderrBuf.write(utf8.decode(bytes.take(toTake).toList(), allowMalformed: true));
+          }
+          stderrBuf.write(truncationSuffix);
+          stderrTruncated = true;
+        }
+      }
+
+      final stdoutSub = process.stdout.transform(Utf8Decoder(allowMalformed: true)).listen(onStdout);
+      final stderrSub = process.stderr.transform(Utf8Decoder(allowMalformed: true)).listen(onStderr);
 
       final stdoutDone = stdoutSub.asFuture<void>();
       final stderrDone = stderrSub.asFuture<void>();
 
       // Process-level timeout: kill the test process if it exceeds 45 minutes.
-      final exitCode = await process.exitCode.timeout(
-        processTimeout,
-        onTimeout: () {
-          Logger.error('Test process exceeded ${processTimeout.inMinutes}-minute timeout — killing.');
-          process.kill(); // No signal arg — cross-platform safe
-          return -1;
-        },
-      );
+      // On Unix: SIGTERM first, await up to 5s; if still alive, SIGKILL and await.
+      // On Windows: single kill, then await exit.
+      int exitCode;
+      try {
+        exitCode = await process.exitCode.timeout(processTimeout);
+      } on TimeoutException {
+        Logger.error('Test process exceeded ${processTimeout.inMinutes}-minute timeout — killing.');
+        exitCode = await _killAndAwaitExit(process);
+      }
 
       try {
         await Future.wait([stdoutDone, stderrDone]).timeout(const Duration(seconds: 30));
       } catch (_) {
-        // Process killed or streams timed out — cancel subscriptions to avoid leaks
+        // Process killed or streams timed out
+      } finally {
         await stdoutSub.cancel();
         await stderrSub.cancel();
       }
@@ -176,12 +227,19 @@ class TestCommand extends Command<void> {
 
       // Ensure dependencies are resolved (sub-packages have independent
       // pubspec.yaml files that the root `dart pub get` may not cover).
-      final pubGetResult = Process.runSync(
-        Platform.resolvedExecutable,
-        ['pub', 'get'],
-        workingDirectory: dir,
-        environment: {'GIT_LFS_SKIP_SMUDGE': '1'},
+      // Use Process.start so we can kill on timeout (Process.run would hang).
+      const pubGetTimeout = Duration(minutes: 5);
+      final pubGetResult = await _runPubGetWithTimeout(
+        dir,
+        pubGetTimeout,
+        onTimeout: () {
+          Logger.error('  dart pub get timed out for $name (${pubGetTimeout.inMinutes}-minute limit)');
+        },
       );
+      if (pubGetResult == null) {
+        failures.add(name);
+        continue;
+      }
       if (pubGetResult.exitCode != 0) {
         final pubGetStderr = (pubGetResult.stderr as String).trim();
         if (pubGetStderr.isNotEmpty) Logger.error(pubGetStderr);
@@ -190,21 +248,107 @@ class TestCommand extends Command<void> {
         continue;
       }
 
-      final spProcess = await Process.start(
-        Platform.resolvedExecutable,
-        ['test', '--exclude-tags', 'gcp,integration'],
-        workingDirectory: dir,
-        mode: ProcessStartMode.inheritStdio,
-      );
+      final spLogDir = p.join(logDir, name);
+      Directory(spLogDir).createSync(recursive: true);
+      final spJsonPath = p.join(spLogDir, 'results.json');
+      final spExpandedPath = p.join(spLogDir, 'expanded.txt');
 
-      final spExitCode = await spProcess.exitCode.timeout(
-        processTimeout,
-        onTimeout: () {
-          Logger.error('Test process for $name exceeded ${processTimeout.inMinutes}-minute timeout — killing.');
-          spProcess.kill(); // No signal arg — cross-platform safe
-          return -1;
-        },
-      );
+      final spTestArgs = <String>[
+        'test',
+        '--exclude-tags',
+        'gcp,integration',
+        '--chain-stack-traces',
+        '--reporter',
+        'expanded',
+        '--file-reporter',
+        'json:$spJsonPath',
+        '--file-reporter',
+        'expanded:$spExpandedPath',
+      ];
+
+      final spProcess = await Process.start(Platform.resolvedExecutable, spTestArgs, workingDirectory: dir);
+
+      final stdoutBuf = StringBuffer();
+      final stderrBuf = StringBuffer();
+      var stdoutBytes = 0;
+      var stderrBytes = 0;
+      var stdoutTruncated = false;
+      var stderrTruncated = false;
+      const spTruncationSuffix = '\n\n... (output truncated, exceeded 2MB bytes). See console.log for full output.)';
+      final spTruncationBytes = utf8.encode(spTruncationSuffix).length;
+
+      void onSpStdout(String data) {
+        stdout.write(data);
+        if (stdoutTruncated) return;
+        final dataBytes = utf8.encode(data).length;
+        if (stdoutBytes + dataBytes <= _maxLogBufferBytes) {
+          stdoutBuf.write(data);
+          stdoutBytes += dataBytes;
+        } else {
+          final remaining = _maxLogBufferBytes - stdoutBytes - spTruncationBytes;
+          if (remaining > 0) {
+            final bytes = utf8.encode(data);
+            final toTake = bytes.length > remaining ? remaining : bytes.length;
+            stdoutBuf.write(utf8.decode(bytes.take(toTake).toList(), allowMalformed: true));
+          }
+          stdoutBuf.write(spTruncationSuffix);
+          stdoutTruncated = true;
+        }
+      }
+
+      void onSpStderr(String data) {
+        stderr.write(data);
+        if (stderrTruncated) return;
+        final dataBytes = utf8.encode(data).length;
+        if (stderrBytes + dataBytes <= _maxLogBufferBytes) {
+          stderrBuf.write(data);
+          stderrBytes += dataBytes;
+        } else {
+          final remaining = _maxLogBufferBytes - stderrBytes - spTruncationBytes;
+          if (remaining > 0) {
+            final bytes = utf8.encode(data);
+            final toTake = bytes.length > remaining ? remaining : bytes.length;
+            stderrBuf.write(utf8.decode(bytes.take(toTake).toList(), allowMalformed: true));
+          }
+          stderrBuf.write(spTruncationSuffix);
+          stderrTruncated = true;
+        }
+      }
+
+      final stdoutSub = spProcess.stdout.transform(Utf8Decoder(allowMalformed: true)).listen(onSpStdout);
+      final stderrSub = spProcess.stderr.transform(Utf8Decoder(allowMalformed: true)).listen(onSpStderr);
+
+      int spExitCode;
+      try {
+        spExitCode = await spProcess.exitCode.timeout(processTimeout);
+      } on TimeoutException {
+        Logger.error('Test process for $name exceeded ${processTimeout.inMinutes}-minute timeout — killing.');
+        spExitCode = await _killAndAwaitExit(spProcess);
+      }
+
+      try {
+        await Future.wait([
+          stdoutSub.asFuture<void>(),
+          stderrSub.asFuture<void>(),
+        ]).timeout(const Duration(seconds: 30));
+      } catch (_) {
+        // Process killed or streams timed out
+      } finally {
+        await stdoutSub.cancel();
+        await stderrSub.cancel();
+      }
+
+      try {
+        RepoUtils.writeFileSafely(p.join(spLogDir, 'dart_stdout.log'), stdoutBuf.toString());
+        if (stderrBuf.isNotEmpty) {
+          RepoUtils.writeFileSafely(p.join(spLogDir, 'dart_stderr.log'), stderrBuf.toString());
+        }
+      } on FileSystemException catch (e) {
+        Logger.warn('Could not write sub-package log files: $e');
+      }
+
+      final spResults = TestResultsUtil.parseTestResultsJson(spJsonPath);
+      TestResultsUtil.writeTestJobSummary(spResults, spExitCode, platformId: name);
 
       if (spExitCode != 0) {
         Logger.error('Tests failed for $name (exit code $spExitCode)');
@@ -218,9 +362,90 @@ class TestCommand extends Command<void> {
       Logger.error('Tests failed for ${failures.length} package(s): ${failures.join(', ')}');
       final failureBullets = failures.map((name) => '- `${StepSummary.escapeHtml(name)}`').join('\n');
       StepSummary.write('\n## Sub-package Test Failures\n\n$failureBullets\n');
-      exit(1);
+      await exitWithCode(1);
     }
 
     Logger.success('All tests passed');
+    await stdout.flush();
+    await stderr.flush();
+  }
+
+  /// Runs `dart pub get` in [workingDirectory] with [timeout]. Kills the process
+  /// on timeout to avoid indefinite hangs. Returns null on timeout.
+  static Future<ProcessResult?> _runPubGetWithTimeout(
+    String workingDirectory,
+    Duration timeout, {
+    void Function()? onTimeout,
+  }) async {
+    final process = await Process.start(
+      Platform.resolvedExecutable,
+      ['pub', 'get'],
+      workingDirectory: workingDirectory,
+      environment: {'GIT_LFS_SKIP_SMUDGE': '1'},
+    );
+    final stdoutBuf = StringBuffer();
+    final stderrBuf = StringBuffer();
+    final stdoutBytes = <int>[0];
+    final stderrBytes = <int>[0];
+    final stdoutTruncated = <bool>[false];
+    final stderrTruncated = <bool>[false];
+    const pubGetTruncationSuffix = '\n\n... (output truncated).';
+    final pubGetTruncationBytes = utf8.encode(pubGetTruncationSuffix).length;
+
+    void capWrite(StringBuffer buf, String data, int maxBytes, List<bool> truncated, List<int> byteCount) {
+      if (truncated[0]) return;
+      final dataBytes = utf8.encode(data).length;
+      if (byteCount[0] + dataBytes <= maxBytes) {
+        buf.write(data);
+        byteCount[0] += dataBytes;
+      } else {
+        final remaining = maxBytes - byteCount[0] - pubGetTruncationBytes;
+        if (remaining > 0) {
+          final bytes = utf8.encode(data);
+          final toTake = bytes.length > remaining ? remaining : bytes.length;
+          buf.write(utf8.decode(bytes.take(toTake).toList(), allowMalformed: true));
+        }
+        buf.write(pubGetTruncationSuffix);
+        truncated[0] = true;
+      }
+    }
+
+    final stdoutSub = process.stdout
+        .transform(Utf8Decoder(allowMalformed: true))
+        .listen((data) => capWrite(stdoutBuf, data, _maxPubGetBufferBytes, stdoutTruncated, stdoutBytes));
+    final stderrSub = process.stderr
+        .transform(Utf8Decoder(allowMalformed: true))
+        .listen((data) => capWrite(stderrBuf, data, _maxPubGetBufferBytes, stderrTruncated, stderrBytes));
+    try {
+      final exitCode = await process.exitCode.timeout(timeout);
+      await Future.wait([stdoutSub.cancel(), stderrSub.cancel()]);
+      return ProcessResult(process.pid, exitCode, stdoutBuf.toString(), stderrBuf.toString());
+    } on TimeoutException {
+      onTimeout?.call();
+      await _killAndAwaitExit(process);
+      try {
+        await Future.wait([stdoutSub.cancel(), stderrSub.cancel()]);
+      } catch (_) {}
+      return null;
+    }
+  }
+
+  /// Kills [process] and awaits exit. On Unix: SIGTERM first, wait up to 5s;
+  /// if still alive, SIGKILL and await. On Windows: single kill, then await.
+  /// Returns -1 to indicate timeout-induced kill.
+  static Future<int> _killAndAwaitExit(Process process) async {
+    if (Platform.isWindows) {
+      process.kill();
+      await process.exitCode;
+      return -1;
+    }
+    process.kill(ProcessSignal.sigterm);
+    try {
+      await process.exitCode.timeout(const Duration(seconds: 5));
+    } on TimeoutException {
+      process.kill(ProcessSignal.sigkill);
+      await process.exitCode;
+    }
+    return -1;
   }
 }

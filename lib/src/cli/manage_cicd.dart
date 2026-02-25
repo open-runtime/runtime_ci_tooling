@@ -2165,8 +2165,8 @@ ${_artifactLink()}
 ///
 /// All log files are written to [logDir] (`$TEST_LOG_DIR` in CI, or
 /// `<repoRoot>/.dart_tool/test-logs/` locally).
-Future<void> _runTest(String _) async {
-  await TestCommand().run();
+Future<void> _runTest(String repoRoot) async {
+  await TestCommand.runWithRoot(repoRoot);
 }
 
 /// Run dart analyze and fail only on actual errors.

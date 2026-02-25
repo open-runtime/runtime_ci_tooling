@@ -207,6 +207,9 @@ class WorkflowGenerator {
       'line_length': _resolveLineLength(ciConfig['line_length']),
       'pat_secret': ciConfig['personal_access_token_secret'] as String? ?? 'GITHUB_TOKEN',
 
+      // Artifact retention: 7 days for test logs (policy applied consistently)
+      'artifact_retention_days': '7',
+
       // Feature flags
       'proto': features['proto'] == true,
       'lfs': features['lfs'] == true,
@@ -237,6 +240,7 @@ class WorkflowGenerator {
       'multi_platform': isMultiPlatform,
       'single_platform': !isMultiPlatform,
       'runner': isMultiPlatform ? '' : resolveRunner(platforms.first),
+      'single_platform_id': isMultiPlatform ? '' : platforms.first,
       'platform_matrix_json': json.encode(platformMatrix),
     };
   }

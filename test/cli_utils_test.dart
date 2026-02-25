@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:test/test.dart' hide TestFailure;
 
 import 'package:runtime_ci_tooling/src/cli/utils/repo_utils.dart';
+import 'package:runtime_ci_tooling/src/cli/utils/step_summary.dart';
 import 'package:runtime_ci_tooling/src/cli/utils/test_results_util.dart';
 
 bool _canCreateSymlink() {
@@ -42,10 +43,7 @@ void main() {
     });
 
     test('returns default path when TEST_LOG_DIR is unset', () {
-      final resolved = RepoUtils.resolveTestLogDir(
-        repoRoot,
-        environment: const <String, String>{},
-      );
+      final resolved = RepoUtils.resolveTestLogDir(repoRoot, environment: const <String, String>{});
       expect(resolved, equals(p.join(repoRoot, '.dart_tool', 'test-logs')));
     });
 
@@ -69,10 +67,8 @@ void main() {
 
     test('throws when TEST_LOG_DIR is relative', () {
       expect(
-        () => RepoUtils.resolveTestLogDir(
-          repoRoot,
-          environment: const <String, String>{'TEST_LOG_DIR': 'relative/path'},
-        ),
+        () =>
+            RepoUtils.resolveTestLogDir(repoRoot, environment: const <String, String>{'TEST_LOG_DIR': 'relative/path'}),
         throwsA(isA<StateError>()),
       );
     });
@@ -81,10 +77,7 @@ void main() {
       final runnerTemp = p.join(repoRoot, 'runner-temp');
       final outside = p.join(repoRoot, 'outside', 'logs');
       expect(
-        () => RepoUtils.resolveTestLogDir(
-          repoRoot,
-          environment: {'RUNNER_TEMP': runnerTemp, 'TEST_LOG_DIR': outside},
-        ),
+        () => RepoUtils.resolveTestLogDir(repoRoot, environment: {'RUNNER_TEMP': runnerTemp, 'TEST_LOG_DIR': outside}),
         throwsA(isA<StateError>()),
       );
     });
@@ -133,35 +126,19 @@ void main() {
       expect(File(filePath).readAsStringSync(), equals('hello world'));
     });
 
-    test(
-      'ensureSafeDirectory rejects symlink-backed directories',
-      skip: !symlinksSupported,
-      () {
-        final targetDir = Directory(p.join(tempDir.path, 'target'))
-          ..createSync(recursive: true);
-        final linkDirPath = p.join(tempDir.path, 'linked');
-        Link(linkDirPath).createSync(targetDir.path);
-        expect(
-          () => RepoUtils.ensureSafeDirectory(linkDirPath),
-          throwsA(isA<FileSystemException>()),
-        );
-      },
-    );
+    test('ensureSafeDirectory rejects symlink-backed directories', skip: !symlinksSupported, () {
+      final targetDir = Directory(p.join(tempDir.path, 'target'))..createSync(recursive: true);
+      final linkDirPath = p.join(tempDir.path, 'linked');
+      Link(linkDirPath).createSync(targetDir.path);
+      expect(() => RepoUtils.ensureSafeDirectory(linkDirPath), throwsA(isA<FileSystemException>()));
+    });
 
-    test(
-      'writeFileSafely rejects symlink file targets',
-      skip: !symlinksSupported,
-      () {
-        final targetFile = File(p.join(tempDir.path, 'target.txt'))
-          ..writeAsStringSync('base');
-        final linkPath = p.join(tempDir.path, 'linked.txt');
-        Link(linkPath).createSync(targetFile.path);
-        expect(
-          () => RepoUtils.writeFileSafely(linkPath, 'new content'),
-          throwsA(isA<FileSystemException>()),
-        );
-      },
-    );
+    test('writeFileSafely rejects symlink file targets', skip: !symlinksSupported, () {
+      final targetFile = File(p.join(tempDir.path, 'target.txt'))..writeAsStringSync('base');
+      final linkPath = p.join(tempDir.path, 'linked.txt');
+      Link(linkPath).createSync(targetFile.path);
+      expect(() => RepoUtils.writeFileSafely(linkPath, 'new content'), throwsA(isA<FileSystemException>()));
+    });
   });
 
   group('TestResultsUtil.parseTestResultsJson', () {
@@ -180,6 +157,39 @@ void main() {
     test('returns unparsed empty results when file does not exist', () {
       final missingPath = p.join(tempDir.path, 'missing.json');
       final results = TestResultsUtil.parseTestResultsJson(missingPath);
+      expect(results.parsed, isFalse);
+      expect(results.passed, equals(0));
+      expect(results.failed, equals(0));
+      expect(results.skipped, equals(0));
+      expect(results.failures, isEmpty);
+    });
+
+    test('returns unparsed results when NDJSON file is empty', () {
+      final jsonPath = p.join(tempDir.path, 'empty.json');
+      File(jsonPath).writeAsStringSync('');
+      final results = TestResultsUtil.parseTestResultsJson(jsonPath);
+      expect(results.parsed, isFalse);
+      expect(results.passed, equals(0));
+      expect(results.failed, equals(0));
+      expect(results.skipped, equals(0));
+      expect(results.failures, isEmpty);
+    });
+
+    test('returns unparsed results when NDJSON file has only blank lines', () {
+      final jsonPath = p.join(tempDir.path, 'blank.json');
+      File(jsonPath).writeAsStringSync('\n  \n\t\n');
+      final results = TestResultsUtil.parseTestResultsJson(jsonPath);
+      expect(results.parsed, isFalse);
+      expect(results.passed, equals(0));
+      expect(results.failed, equals(0));
+      expect(results.skipped, equals(0));
+      expect(results.failures, isEmpty);
+    });
+
+    test('returns unparsed results when file has valid JSON but no structured events', () {
+      final jsonPath = p.join(tempDir.path, 'no_events.json');
+      File(jsonPath).writeAsStringSync('{"type":"unknown","data":1}\n{"other":"value"}\n');
+      final results = TestResultsUtil.parseTestResultsJson(jsonPath);
       expect(results.parsed, isFalse);
       expect(results.passed, equals(0));
       expect(results.failed, equals(0));
@@ -217,6 +227,23 @@ void main() {
       expect(results.failures.first.durationMs, equals(40));
     });
 
+    test('caps failures list at 50 to prevent unbounded growth', () {
+      final lines = <String>[];
+      for (var i = 0; i < 60; i++) {
+        lines.addAll([
+          '{"type":"testStart","test":{"id":$i,"name":"fail_$i"},"time":${i * 2}}',
+          '{"type":"testDone","testID":$i,"result":"failure","hidden":false,"skipped":false,"time":${i * 2 + 1}}',
+        ]);
+      }
+      lines.add('{"type":"done","time":200}');
+      final jsonPath = p.join(tempDir.path, 'many_failures.json');
+      File(jsonPath).writeAsStringSync(lines.join('\n'));
+
+      final results = TestResultsUtil.parseTestResultsJson(jsonPath);
+      expect(results.failed, equals(60));
+      expect(results.failures.length, lessThanOrEqualTo(50));
+    });
+
     test('ignores malformed JSON lines and hidden test entries', () {
       final jsonPath = p.join(tempDir.path, 'results.json');
       File(jsonPath).writeAsStringSync(
@@ -237,15 +264,50 @@ void main() {
       expect(results.failed, equals(0));
       expect(results.failures, isEmpty);
     });
+
+    test('malformed JSON circuit breaker limits warning flood', () {
+      final jsonPath = p.join(tempDir.path, 'flood.json');
+      final lines = <String>[
+        '{"type":"testStart","test":{"id":1,"name":"ok"},"time":0}',
+        ...List.generate(10, (_) => '{invalid'),
+        '{"type":"testDone","testID":1,"result":"success","hidden":false,"skipped":false,"time":10}',
+        '{"type":"done","time":10}',
+      ];
+      File(jsonPath).writeAsStringSync(lines.join('\n'));
+
+      final results = TestResultsUtil.parseTestResultsJson(jsonPath);
+      expect(results.parsed, isTrue);
+      expect(results.passed, equals(1));
+    });
+
+    test('truncates stored failure details to prevent unbounded growth', () {
+      final longError = 'x' * 12000;
+      final longStack = 'y' * 10000;
+      final longPrint = 'z' * 8000;
+      final jsonPath = p.join(tempDir.path, 'huge.json');
+      File(jsonPath).writeAsStringSync(
+        [
+          '{"type":"testStart","test":{"id":1,"name":"huge"},"time":0}',
+          '{"type":"error","testID":1,"error":"$longError","stackTrace":"$longStack"}',
+          '{"type":"print","testID":1,"message":"$longPrint"}',
+          '{"type":"testDone","testID":1,"result":"failure","hidden":false,"skipped":false,"time":100}',
+          '{"type":"done","time":100}',
+        ].join('\n'),
+      );
+
+      final results = TestResultsUtil.parseTestResultsJson(jsonPath);
+      expect(results.failures, hasLength(1));
+      expect(results.failures.first.error.length, lessThan(10000));
+      expect(results.failures.first.error, contains('(truncated)'));
+      expect(results.failures.first.stackTrace.length, lessThan(7000));
+      expect(results.failures.first.stackTrace, contains('(truncated)'));
+      expect(results.failures.first.printOutput.length, lessThan(7000));
+      expect(results.failures.first.printOutput, contains('(truncated)'));
+    });
   });
 
   group('TestResultsUtil.writeTestJobSummary', () {
-    TestResults _parsed({
-      required int passed,
-      required int failed,
-      required int skipped,
-      int durationMs = 500,
-    }) {
+    TestResults _parsed({required int passed, required int failed, required int skipped, int durationMs = 500}) {
       final results = TestResults()
         ..parsed = true
         ..passed = passed
@@ -255,50 +317,39 @@ void main() {
       return results;
     }
 
-    test(
-      'emits NOTE when parsed results are successful and exit code is 0',
-      () {
-        String? summary;
-        final results = _parsed(passed: 3, failed: 0, skipped: 1);
+    test('emits NOTE when parsed results are successful and exit code is 0', () {
+      String? summary;
+      final results = _parsed(passed: 3, failed: 0, skipped: 1);
 
-        TestResultsUtil.writeTestJobSummary(
-          results,
-          0,
-          platformId: 'linux-x64',
-          writeSummary: (markdown) => summary = markdown,
-        );
+      TestResultsUtil.writeTestJobSummary(
+        results,
+        0,
+        platformId: 'linux-x64',
+        writeSummary: (markdown) => summary = markdown,
+      );
 
-        expect(summary, isNotNull);
-        expect(summary!, contains('## Test Results — linux-x64'));
-        expect(summary!, contains('> [!NOTE]'));
-        expect(summary!, contains('All 4 tests passed'));
-      },
-    );
+      expect(summary, isNotNull);
+      expect(summary!, contains('## Test Results — linux-x64'));
+      expect(summary!, contains('> [!NOTE]'));
+      expect(summary!, contains('All 4 tests passed'));
+    });
 
-    test(
-      'emits CAUTION when exit code is non-zero even if failed count is zero',
-      () {
-        String? summary;
-        final results = _parsed(passed: 2, failed: 0, skipped: 0);
+    test('emits CAUTION when exit code is non-zero even if failed count is zero', () {
+      String? summary;
+      final results = _parsed(passed: 2, failed: 0, skipped: 0);
 
-        TestResultsUtil.writeTestJobSummary(
-          results,
-          1,
-          platformId: 'linux <x64>',
-          writeSummary: (markdown) => summary = markdown,
-        );
+      TestResultsUtil.writeTestJobSummary(
+        results,
+        1,
+        platformId: 'linux <x64>',
+        writeSummary: (markdown) => summary = markdown,
+      );
 
-        expect(summary, isNotNull);
-        expect(summary!, contains('## Test Results — linux &lt;x64&gt;'));
-        expect(summary!, contains('> [!CAUTION]'));
-        expect(
-          summary!,
-          contains(
-            'Tests exited with code 1 despite no structured test failures.',
-          ),
-        );
-      },
-    );
+      expect(summary, isNotNull);
+      expect(summary!, contains('## Test Results — linux &lt;x64&gt;'));
+      expect(summary!, contains('> [!CAUTION]'));
+      expect(summary!, contains('Tests exited with code 1 despite no structured test failures.'));
+    });
 
     test('emits CAUTION for unparsed results with non-zero exit code', () {
       String? summary;
@@ -313,12 +364,7 @@ void main() {
 
       expect(summary, isNotNull);
       expect(summary!, contains('> [!CAUTION]'));
-      expect(
-        summary!,
-        contains(
-          'Tests failed (exit code 7) — no structured results available.',
-        ),
-      );
+      expect(summary!, contains('Tests failed (exit code 7) — no structured results available.'));
     });
 
     test('emits NOTE for unparsed results with zero exit code', () {
@@ -334,25 +380,14 @@ void main() {
 
       expect(summary, isNotNull);
       expect(summary!, contains('> [!NOTE]'));
-      expect(
-        summary!,
-        contains(
-          'Tests passed (exit code 0) — no structured results available.',
-        ),
-      );
+      expect(summary!, contains('Tests passed (exit code 0) — no structured results available.'));
     });
 
     test('emits CAUTION when parsed results contain failures', () {
       String? summary;
       final results = _parsed(passed: 1, failed: 1, skipped: 0);
       results.failures.add(
-        TestFailure(
-          name: 'failing test',
-          error: 'boom',
-          stackTrace: 'trace',
-          printOutput: '',
-          durationMs: 12,
-        ),
+        TestFailure(name: 'failing test', error: 'boom', stackTrace: 'trace', printOutput: '', durationMs: 12),
       );
 
       TestResultsUtil.writeTestJobSummary(
@@ -392,13 +427,99 @@ void main() {
       );
 
       expect(summary, isNotNull);
-      expect(
-        summary!,
-        contains(
-          '_...and 5 more failures. See test logs artifact for full details._',
+      expect(summary!, contains('_...and 5 more failures. See test logs artifact for full details._'));
+      expect(summary!, isNot(contains('failing test 24')));
+    });
+
+    test('escapes unsafe HTML in failure content (closing tags, etc.)', () {
+      String? summary;
+      final results = _parsed(passed: 0, failed: 1, skipped: 0);
+      results.failures.add(
+        TestFailure(
+          name: 'test with </details>',
+          error: 'Error: </details><script>alert(1)</script>',
+          stackTrace: '<summary>fake</summary>',
+          printOutput: '',
+          durationMs: 0,
         ),
       );
-      expect(summary!, isNot(contains('failing test 24')));
+
+      TestResultsUtil.writeTestJobSummary(
+        results,
+        1,
+        platformId: 'linux',
+        writeSummary: (markdown) => summary = markdown,
+      );
+
+      expect(summary, isNotNull);
+      expect(summary!, contains('&lt;/details&gt;'));
+      expect(summary!, contains('&lt;script&gt;'));
+      expect(summary!, contains('&lt;summary&gt;'));
+      expect(summary!, isNot(contains('<script>alert(1)</script>')));
+    });
+
+    test('handles adversarial backtick content in failure output', () {
+      String? summary;
+      final results = _parsed(passed: 0, failed: 1, skipped: 0);
+      results.failures.add(
+        TestFailure(
+          name: 'backtick test',
+          error: '```' * 10 + 'content' + '```' * 10,
+          stackTrace: '',
+          printOutput: '',
+          durationMs: 0,
+        ),
+      );
+
+      TestResultsUtil.writeTestJobSummary(
+        results,
+        1,
+        platformId: 'linux',
+        writeSummary: (markdown) => summary = markdown,
+      );
+
+      expect(summary, isNotNull);
+      expect(summary!, contains('### Failed Tests'));
+      expect(summary!, contains('backtick test'));
+      // Fence should be longer than content's backticks; output should be valid
+      expect(summary!.split('```').length, greaterThan(2));
+    });
+  });
+
+  group('StepSummary', () {
+    test('write uses byte size not char size for limit guard', () {
+      // GitHub step summary limit is 1 MiB; guard must use UTF-8 byte count.
+      // Multi-byte chars (e.g. 語) have more bytes than chars — old bug used
+      // markdown.length (chars) and could overflow.
+      late Directory tempDir;
+      tempDir = Directory.systemTemp.createTempSync('step_summary_bytes_');
+      try {
+        final summaryPath = p.join(tempDir.path, 'summary.md');
+        const maxBytes = (1024 * 1024) - (4 * 1024);
+        // Fill to maxBytes - 2 so that "語" (3 bytes) would exceed
+        File(summaryPath).writeAsStringSync('x' * (maxBytes - 2));
+        expect(File(summaryPath).lengthSync(), equals(maxBytes - 2));
+
+        StepSummary.write('語', environment: {'GITHUB_STEP_SUMMARY': summaryPath});
+        // Should skip append (would exceed); file size unchanged
+        expect(File(summaryPath).lengthSync(), equals(maxBytes - 2));
+      } finally {
+        if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    test('collapsible escapes content to prevent HTML injection', () {
+      final out = StepSummary.collapsible(
+        'Title</summary><script>evil</script>',
+        'Content with </details> and <img src=x onerror=alert(1)>',
+      );
+      expect(out, contains('&lt;/summary&gt;'));
+      expect(out, contains('&lt;script&gt;'));
+      expect(out, contains('&lt;/details&gt;'));
+      expect(out, contains('&lt;img'));
+      expect(out, isNot(contains('<script>evil</script>')));
+      expect(out, contains('<details>'));
+      expect(out, contains('</details>'));
     });
   });
 }

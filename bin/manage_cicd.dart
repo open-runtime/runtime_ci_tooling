@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:runtime_ci_tooling/src/cli/manage_cicd_cli.dart';
+import 'package:runtime_ci_tooling/src/cli/utils/exit_util.dart';
 
 Future<void> main(List<String> args) async {
   final cli = ManageCicdCli();
@@ -8,6 +9,6 @@ Future<void> main(List<String> args) async {
     await cli.run(args);
   } on UsageException catch (e) {
     stderr.writeln(e);
-    exit(64);
+    await exitWithCode(64);
   }
 }
