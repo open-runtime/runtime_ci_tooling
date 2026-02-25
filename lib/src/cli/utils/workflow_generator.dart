@@ -58,9 +58,9 @@ const Set<String> _knownFeatureKeys = {
 const Set<String> _knownWebTestKeys = {'concurrency', 'paths'};
 
 /// Safe identifier for env vars and GitHub secrets (e.g. API_KEY, GITHUB_TOKEN).
-/// Must start with letter or underscore, then alphanumeric/underscore only.
+/// Must start with uppercase letter, then uppercase letters, digits, underscores only.
 bool _isSafeSecretIdentifier(String s) {
-  return RegExp(r'^[A-Za-z_][A-Za-z0-9_]*$').hasMatch(s);
+  return RegExp(r'^[A-Z][A-Z0-9_]*$').hasMatch(s);
 }
 
 /// Runner label must not contain newlines, control chars, or YAML-injection chars.
@@ -415,11 +415,11 @@ class WorkflowGenerator {
         errors.add('ci.line_length must not have leading/trailing whitespace');
       } else if (lineLength.contains(RegExp(r'[\r\n\t\x00-\x1f]'))) {
         errors.add('ci.line_length must not contain newlines or control characters');
+      } else if (!RegExp(r'^\d+$').hasMatch(lineLength)) {
+        errors.add('ci.line_length string must be digits only (e.g. 120), got "$lineLength"');
       } else {
-        final parsed = int.tryParse(lineLength);
-        if (parsed == null) {
-          errors.add('ci.line_length string must be numeric, got "$lineLength"');
-        } else if (parsed < 1 || parsed > 10000) {
+        final parsed = int.parse(lineLength);
+        if (parsed < 1 || parsed > 10000) {
           errors.add('ci.line_length must be between 1 and 10000, got $lineLength');
         }
       }

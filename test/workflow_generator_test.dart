@@ -299,6 +299,27 @@ void main() {
         );
         expect(errors.where((e) => e.contains('secrets')), isEmpty);
       });
+
+      test('secrets key with leading underscore produces error (must start with uppercase letter)', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(secrets: {'_API_KEY': 'MY_SECRET'}),
+        );
+        expect(errors, anyElement(contains('safe identifier')));
+      });
+
+      test('secrets key with lowercase produces error (uppercase only)', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(secrets: {'api_key': 'MY_SECRET'}),
+        );
+        expect(errors, anyElement(contains('safe identifier')));
+      });
+
+      test('secrets value with lowercase produces error (uppercase only)', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(secrets: {'API_KEY': 'my_secret'}),
+        );
+        expect(errors, anyElement(contains('safe secret name')));
+      });
     });
 
     // ---- personal_access_token_secret ----
@@ -354,6 +375,20 @@ void main() {
           isEmpty,
         );
       });
+
+      test('pat with leading underscore produces error (must start with uppercase letter)', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(pat: '_MY_PAT'),
+        );
+        expect(errors, anyElement(contains('safe identifier')));
+      });
+
+      test('pat with lowercase produces error (uppercase only)', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(pat: 'my_pat'),
+        );
+        expect(errors, anyElement(contains('safe identifier')));
+      });
     });
 
     // ---- line_length ----
@@ -382,11 +417,25 @@ void main() {
         expect(errors.where((e) => e.contains('line_length')), isEmpty);
       });
 
-      test('string line_length "abc" produces error (must be numeric)', () {
+      test('string line_length "abc" produces error (must be digits only)', () {
         final errors = WorkflowGenerator.validate(
           _validConfig(lineLength: 'abc'),
         );
-        expect(errors, anyElement(contains('must be numeric')));
+        expect(errors, anyElement(contains('digits only')));
+      });
+
+      test('string line_length "+120" produces error (digits only, no sign)', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(lineLength: '+120'),
+        );
+        expect(errors, anyElement(contains('digits only')));
+      });
+
+      test('string line_length "-120" produces error (digits only, no sign)', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(lineLength: '-120'),
+        );
+        expect(errors, anyElement(contains('digits only')));
       });
 
       test('string line_length with leading/trailing whitespace produces error',

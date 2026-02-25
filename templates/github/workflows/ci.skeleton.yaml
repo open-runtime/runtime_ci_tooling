@@ -458,7 +458,7 @@ jobs:
 <%/multi_platform%>
 <%#web_test%>
   web-test:
-    needs: [pre-check<%#format_check%>, auto-format<%/format_check%><%#single_platform%>, analyze-and-test<%/single_platform%><%#multi_platform%>, analyze<%/multi_platform%>]
+    needs: [pre-check<%#format_check%>, auto-format<%/format_check%><%#multi_platform%>, analyze<%/multi_platform%>]
     if: needs.pre-check.outputs.should_run == 'true'
     runs-on: ubuntu-latest
 <%#has_secrets%>
