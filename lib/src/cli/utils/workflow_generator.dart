@@ -12,7 +12,11 @@ class _PlatformDefinition {
   final String arch; // x64 | arm64
   final String runner; // default `runs-on:` label
 
-  const _PlatformDefinition({required this.osFamily, required this.arch, required this.runner});
+  const _PlatformDefinition({
+    required this.osFamily,
+    required this.arch,
+    required this.runner,
+  });
 }
 
 /// Maps platform identifiers to their default runner label + metadata.
@@ -21,8 +25,16 @@ class _PlatformDefinition {
 ///   `ci.runner_overrides: { "<platformId>": "<runs-on label>" }`
 const _platformDefinitions = <String, _PlatformDefinition>{
   // Linux — org-managed runners
-  'ubuntu': _PlatformDefinition(osFamily: 'linux', arch: 'x64', runner: 'runtime-ubuntu-24.04-x64-256gb-64core'),
-  'ubuntu-x64': _PlatformDefinition(osFamily: 'linux', arch: 'x64', runner: 'runtime-ubuntu-24.04-x64-256gb-64core'),
+  'ubuntu': _PlatformDefinition(
+    osFamily: 'linux',
+    arch: 'x64',
+    runner: 'runtime-ubuntu-24.04-x64-256gb-64core',
+  ),
+  'ubuntu-x64': _PlatformDefinition(
+    osFamily: 'linux',
+    arch: 'x64',
+    runner: 'runtime-ubuntu-24.04-x64-256gb-64core',
+  ),
   'ubuntu-arm64': _PlatformDefinition(
     osFamily: 'linux',
     arch: 'arm64',
@@ -30,13 +42,33 @@ const _platformDefinitions = <String, _PlatformDefinition>{
   ),
 
   // macOS — standard GitHub-hosted runners (no org-managed equivalents)
-  'macos': _PlatformDefinition(osFamily: 'macos', arch: 'arm64', runner: 'macos-latest'),
-  'macos-arm64': _PlatformDefinition(osFamily: 'macos', arch: 'arm64', runner: 'macos-latest'),
-  'macos-x64': _PlatformDefinition(osFamily: 'macos', arch: 'x64', runner: 'macos-15-large'),
+  'macos': _PlatformDefinition(
+    osFamily: 'macos',
+    arch: 'arm64',
+    runner: 'macos-latest',
+  ),
+  'macos-arm64': _PlatformDefinition(
+    osFamily: 'macos',
+    arch: 'arm64',
+    runner: 'macos-latest',
+  ),
+  'macos-x64': _PlatformDefinition(
+    osFamily: 'macos',
+    arch: 'x64',
+    runner: 'macos-15-large',
+  ),
 
   // Windows — org-managed runners
-  'windows': _PlatformDefinition(osFamily: 'windows', arch: 'x64', runner: 'runtime-windows-2025-x64-256gb-64core'),
-  'windows-x64': _PlatformDefinition(osFamily: 'windows', arch: 'x64', runner: 'runtime-windows-2025-x64-256gb-64core'),
+  'windows': _PlatformDefinition(
+    osFamily: 'windows',
+    arch: 'x64',
+    runner: 'runtime-windows-2025-x64-256gb-64core',
+  ),
+  'windows-x64': _PlatformDefinition(
+    osFamily: 'windows',
+    arch: 'x64',
+    runner: 'runtime-windows-2025-x64-256gb-64core',
+  ),
   'windows-arm64': _PlatformDefinition(
     osFamily: 'windows',
     arch: 'arm64',
@@ -74,7 +106,9 @@ class WorkflowGenerator {
   WorkflowGenerator({required this.ciConfig, required this.toolingVersion});
 
   /// Returns the web_test config map if present and valid; otherwise null.
-  static Map<String, dynamic>? _getWebTestConfig(Map<String, dynamic> ciConfig) {
+  static Map<String, dynamic>? _getWebTestConfig(
+    Map<String, dynamic> ciConfig,
+  ) {
     final raw = ciConfig['web_test'];
     return raw is Map<String, dynamic> ? raw : null;
   }
@@ -96,7 +130,9 @@ class WorkflowGenerator {
     final ci = config['ci'];
     if (ci == null) return null;
     if (ci is! Map<String, dynamic>) {
-      throw StateError('Expected "ci" in $configPath to be an object, got ${ci.runtimeType}');
+      throw StateError(
+        'Expected "ci" in $configPath to be an object, got ${ci.runtimeType}',
+      );
     }
     return ci;
   }
@@ -110,10 +146,14 @@ class WorkflowGenerator {
   String render({String? existingContent}) {
     final errors = validate(ciConfig);
     if (errors.isNotEmpty) {
-      throw StateError('Cannot render with invalid config:\n  ${errors.join('\n  ')}');
+      throw StateError(
+        'Cannot render with invalid config:\n  ${errors.join('\n  ')}',
+      );
     }
 
-    final skeletonPath = TemplateResolver.resolveTemplatePath('github/workflows/ci.skeleton.yaml');
+    final skeletonPath = TemplateResolver.resolveTemplatePath(
+      'github/workflows/ci.skeleton.yaml',
+    );
     final skeletonFile = File(skeletonPath);
     if (!skeletonFile.existsSync()) {
       throw StateError('CI skeleton template not found at $skeletonPath');
@@ -136,14 +176,19 @@ class WorkflowGenerator {
   Map<String, dynamic> _buildContext() {
     final features = ciConfig['features'] as Map<String, dynamic>? ?? {};
     final secretsRaw = ciConfig['secrets'];
-    final secrets = secretsRaw is Map<String, dynamic> ? secretsRaw : <String, dynamic>{};
+    final secrets = secretsRaw is Map<String, dynamic>
+        ? secretsRaw
+        : <String, dynamic>{};
     final subPackages = ciConfig['sub_packages'] as List? ?? [];
 
     // Build secrets list for env block (skip non-string values)
     final secretsList = <Map<String, String>>[];
     for (final entry in secrets.entries) {
       if (entry.value is String) {
-        secretsList.add({'env_name': entry.key, 'secret_name': entry.value as String});
+        secretsList.add({
+          'env_name': entry.key,
+          'secret_name': entry.value as String,
+        });
       }
     }
 
@@ -159,7 +204,9 @@ class WorkflowGenerator {
     final isMultiPlatform = platforms.length > 1;
 
     final runnerOverridesRaw = ciConfig['runner_overrides'];
-    final runnerOverrides = runnerOverridesRaw is Map<String, dynamic> ? runnerOverridesRaw : <String, dynamic>{};
+    final runnerOverrides = runnerOverridesRaw is Map<String, dynamic>
+        ? runnerOverridesRaw
+        : <String, dynamic>{};
     String resolveRunner(String platformId) {
       final override = runnerOverrides[platformId];
       if (override is String && override.trim().isNotEmpty) {
@@ -184,7 +231,8 @@ class WorkflowGenerator {
       'tooling_version': toolingVersion,
       'dart_sdk': ciConfig['dart_sdk'] ?? '3.9.2',
       'line_length': '${ciConfig['line_length'] ?? 120}',
-      'pat_secret': ciConfig['personal_access_token_secret'] as String? ?? 'GITHUB_TOKEN',
+      'pat_secret':
+          ciConfig['personal_access_token_secret'] as String? ?? 'GITHUB_TOKEN',
 
       // Feature flags
       'proto': features['proto'] == true,
@@ -197,9 +245,14 @@ class WorkflowGenerator {
       'web_test': features['web_test'] == true,
 
       // Web test config (only computed when web_test is true)
-      'web_test_concurrency': features['web_test'] == true ? _resolveWebTestConcurrency(ciConfig) : '1',
-      'web_test_paths': features['web_test'] == true ? _resolveWebTestPaths(ciConfig) : '',
-      'web_test_has_paths': features['web_test'] == true && _resolveWebTestHasPaths(ciConfig),
+      'web_test_concurrency': features['web_test'] == true
+          ? _resolveWebTestConcurrency(ciConfig)
+          : '1',
+      'web_test_paths': features['web_test'] == true
+          ? _resolveWebTestPaths(ciConfig)
+          : '',
+      'web_test_has_paths':
+          features['web_test'] == true && _resolveWebTestHasPaths(ciConfig),
 
       // Secrets / env
       'has_secrets': secretsList.isNotEmpty,
@@ -237,7 +290,11 @@ class WorkflowGenerator {
     if (webTestConfig != null) {
       final paths = webTestConfig['paths'];
       if (paths is List && paths.isNotEmpty) {
-        return paths.whereType<String>().where((s) => s.trim().isNotEmpty).map((s) => p.posix.normalize(s)).toList();
+        return paths
+            .whereType<String>()
+            .where((s) => s.trim().isNotEmpty)
+            .map((s) => p.posix.normalize(s))
+            .toList();
       }
     }
     return const [];
@@ -248,7 +305,11 @@ class WorkflowGenerator {
     if (filtered.isEmpty) return '';
     // Shell-quote each path for defense-in-depth (validation already blocks
     // dangerous characters, but quoting prevents breakage from future changes).
-    return filtered.map((s) => "'$s'").join(' ');
+    return filtered.map(_shellQuote).join(' ');
+  }
+
+  static String _shellQuote(String value) {
+    return "'${value.replaceAll("'", "'\"'\"'")}'";
   }
 
   static bool _resolveWebTestHasPaths(Map<String, dynamic> ciConfig) {
@@ -267,7 +328,10 @@ class WorkflowGenerator {
     existing = existing.replaceAll('\r\n', '\n');
     rendered = rendered.replaceAll('\r\n', '\n');
 
-    final sectionPattern = RegExp(r'# --- BEGIN USER: (\S+) ---\n(.*?)# --- END USER: \1 ---', dotAll: true);
+    final sectionPattern = RegExp(
+      r'# --- BEGIN USER: (\S+) ---\n(.*?)# --- END USER: \1 ---',
+      dotAll: true,
+    );
 
     // Extract user content from existing file
     final userSections = <String, String>{};
@@ -285,8 +349,10 @@ class WorkflowGenerator {
     // Replace empty user sections in rendered output with preserved content
     var result = rendered;
     for (final entry in userSections.entries) {
-      final emptyPattern = '# --- BEGIN USER: ${entry.key} ---\n# --- END USER: ${entry.key} ---';
-      final replacement = '# --- BEGIN USER: ${entry.key} ---\n${entry.value}# --- END USER: ${entry.key} ---';
+      final emptyPattern =
+          '# --- BEGIN USER: ${entry.key} ---\n# --- END USER: ${entry.key} ---';
+      final replacement =
+          '# --- BEGIN USER: ${entry.key} ---\n${entry.value}# --- END USER: ${entry.key} ---';
       result = result.replaceFirst(emptyPattern, replacement);
     }
 
@@ -311,10 +377,15 @@ class WorkflowGenerator {
         errors.add('ci.dart_sdk must not contain newlines/tabs');
       } else {
         // dart-lang/setup-dart accepts semver versions or channels like stable/beta/dev.
-        final isChannel = trimmed == 'stable' || trimmed == 'beta' || trimmed == 'dev';
-        final isSemver = RegExp(r'^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$').hasMatch(trimmed);
+        final isChannel =
+            trimmed == 'stable' || trimmed == 'beta' || trimmed == 'dev';
+        final isSemver = RegExp(
+          r'^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$',
+        ).hasMatch(trimmed);
         if (!isChannel && !isSemver) {
-          errors.add('ci.dart_sdk must be a Dart SDK channel (stable|beta|dev) or a version like 3.9.2, got "$sdk"');
+          errors.add(
+            'ci.dart_sdk must be a Dart SDK channel (stable|beta|dev) or a version like 3.9.2, got "$sdk"',
+          );
         }
       }
     }
@@ -328,14 +399,18 @@ class WorkflowGenerator {
         final key = entry.key;
         final value = entry.value;
         if (key is! String) {
-          errors.add('ci.features keys must be strings, got ${key.runtimeType}');
+          errors.add(
+            'ci.features keys must be strings, got ${key.runtimeType}',
+          );
           continue;
         }
         if (!_knownFeatureKeys.contains(key)) {
           errors.add('ci.features contains unknown key "$key" (typo?)');
         }
         if (value is! bool) {
-          errors.add('ci.features["$key"] must be a bool, got ${value.runtimeType}');
+          errors.add(
+            'ci.features["$key"] must be a bool, got ${value.runtimeType}',
+          );
         }
       }
     }
@@ -349,12 +424,16 @@ class WorkflowGenerator {
     }
     final lineLength = ciConfig['line_length'];
     if (lineLength != null && lineLength is! int && lineLength is! String) {
-      errors.add('ci.line_length must be a number or string, got ${lineLength.runtimeType}');
+      errors.add(
+        'ci.line_length must be a number or string, got ${lineLength.runtimeType}',
+      );
     }
     final platforms = ciConfig['platforms'];
     if (platforms != null) {
       if (platforms is! List) {
-        errors.add('ci.platforms must be an array, got ${platforms.runtimeType}');
+        errors.add(
+          'ci.platforms must be an array, got ${platforms.runtimeType}',
+        );
       } else {
         for (final p in platforms) {
           if (p is! String || !_platformDefinitions.containsKey(p)) {
@@ -372,13 +451,17 @@ class WorkflowGenerator {
     final subPackages = ciConfig['sub_packages'];
     if (subPackages != null) {
       if (subPackages is! List) {
-        errors.add('ci.sub_packages must be an array, got ${subPackages.runtimeType}');
+        errors.add(
+          'ci.sub_packages must be an array, got ${subPackages.runtimeType}',
+        );
       } else {
         final seenNames = <String>{};
         final seenPaths = <String>{};
         for (final sp in subPackages) {
           if (sp is! Map) {
-            errors.add('ci.sub_packages entries must be objects, got ${sp.runtimeType}');
+            errors.add(
+              'ci.sub_packages entries must be objects, got ${sp.runtimeType}',
+            );
             continue;
           }
           final name = sp['name'];
@@ -399,20 +482,28 @@ class WorkflowGenerator {
             continue;
           }
           if (pathValue.contains(RegExp(r'[\r\n\t]'))) {
-            errors.add('ci.sub_packages["${name is String ? name : '?'}"].path must not contain newlines/tabs');
+            errors.add(
+              'ci.sub_packages["${name is String ? name : '?'}"].path must not contain newlines/tabs',
+            );
             continue;
           }
           if (p.isAbsolute(pathValue) || pathValue.startsWith('~')) {
-            errors.add('ci.sub_packages["${name is String ? name : '?'}"].path must be a relative repo path');
+            errors.add(
+              'ci.sub_packages["${name is String ? name : '?'}"].path must be a relative repo path',
+            );
             continue;
           }
           if (pathValue.contains('\\')) {
-            errors.add('ci.sub_packages["${name is String ? name : '?'}"].path must use forward slashes (/)');
+            errors.add(
+              'ci.sub_packages["${name is String ? name : '?'}"].path must use forward slashes (/)',
+            );
             continue;
           }
           final normalized = p.posix.normalize(pathValue);
           if (normalized.startsWith('..') || normalized.contains('/../')) {
-            errors.add('ci.sub_packages["${name is String ? name : '?'}"].path must not traverse outside the repo');
+            errors.add(
+              'ci.sub_packages["${name is String ? name : '?'}"].path must not traverse outside the repo',
+            );
             continue;
           }
           if (RegExp(r'[^A-Za-z0-9_./-]').hasMatch(pathValue)) {
@@ -431,7 +522,9 @@ class WorkflowGenerator {
     final runnerOverrides = ciConfig['runner_overrides'];
     if (runnerOverrides != null) {
       if (runnerOverrides is! Map) {
-        errors.add('ci.runner_overrides must be an object, got ${runnerOverrides.runtimeType}');
+        errors.add(
+          'ci.runner_overrides must be an object, got ${runnerOverrides.runtimeType}',
+        );
       } else {
         for (final entry in runnerOverrides.entries) {
           final key = entry.key;
@@ -444,7 +537,9 @@ class WorkflowGenerator {
             continue;
           }
           if (value is! String || value.trim().isEmpty) {
-            errors.add('ci.runner_overrides["$key"] must be a non-empty string');
+            errors.add(
+              'ci.runner_overrides["$key"] must be a non-empty string',
+            );
           }
         }
       }
@@ -453,7 +548,9 @@ class WorkflowGenerator {
     final webTestConfig = ciConfig['web_test'];
     if (webTestConfig != null) {
       if (webTestConfig is! Map) {
-        errors.add('ci.web_test must be an object, got ${webTestConfig.runtimeType}');
+        errors.add(
+          'ci.web_test must be an object, got ${webTestConfig.runtimeType}',
+        );
       } else {
         // Detect unknown keys inside web_test config
         for (final key in webTestConfig.keys) {
@@ -465,16 +562,22 @@ class WorkflowGenerator {
         final concurrency = webTestConfig['concurrency'];
         if (concurrency != null) {
           if (concurrency is! int) {
-            errors.add('ci.web_test.concurrency must be an integer, got ${concurrency.runtimeType}');
+            errors.add(
+              'ci.web_test.concurrency must be an integer, got ${concurrency.runtimeType}',
+            );
           } else if (concurrency < 1 || concurrency > 32) {
-            errors.add('ci.web_test.concurrency must be between 1 and 32, got $concurrency');
+            errors.add(
+              'ci.web_test.concurrency must be between 1 and 32, got $concurrency',
+            );
           }
         }
 
         final paths = webTestConfig['paths'];
         if (paths != null) {
           if (paths is! List) {
-            errors.add('ci.web_test.paths must be an array, got ${paths.runtimeType}');
+            errors.add(
+              'ci.web_test.paths must be an array, got ${paths.runtimeType}',
+            );
           } else {
             final seenPaths = <String>{};
             for (var i = 0; i < paths.length; i++) {
@@ -484,32 +587,46 @@ class WorkflowGenerator {
                 continue;
               }
               if (pathValue != pathValue.trim()) {
-                errors.add('ci.web_test.paths[$i] must not have leading/trailing whitespace');
+                errors.add(
+                  'ci.web_test.paths[$i] must not have leading/trailing whitespace',
+                );
                 continue;
               }
               if (pathValue.contains(RegExp(r'[\r\n\t]'))) {
-                errors.add('ci.web_test.paths[$i] must not contain newlines/tabs');
+                errors.add(
+                  'ci.web_test.paths[$i] must not contain newlines/tabs',
+                );
                 continue;
               }
               if (p.isAbsolute(pathValue) || pathValue.startsWith('~')) {
-                errors.add('ci.web_test.paths[$i] must be a relative repo path');
+                errors.add(
+                  'ci.web_test.paths[$i] must be a relative repo path',
+                );
                 continue;
               }
               if (pathValue.contains('\\')) {
-                errors.add('ci.web_test.paths[$i] must use forward slashes (/)');
+                errors.add(
+                  'ci.web_test.paths[$i] must use forward slashes (/)',
+                );
                 continue;
               }
               final normalized = p.posix.normalize(pathValue);
               if (normalized.startsWith('..') || normalized.contains('/../')) {
-                errors.add('ci.web_test.paths[$i] must not traverse outside the repo');
+                errors.add(
+                  'ci.web_test.paths[$i] must not traverse outside the repo',
+                );
                 continue;
               }
               if (RegExp(r'[^A-Za-z0-9_./-]').hasMatch(pathValue)) {
-                errors.add('ci.web_test.paths[$i] contains unsupported characters: "$pathValue"');
+                errors.add(
+                  'ci.web_test.paths[$i] contains unsupported characters: "$pathValue"',
+                );
                 continue;
               }
               if (!seenPaths.add(normalized)) {
-                errors.add('ci.web_test.paths contains duplicate path "$normalized"');
+                errors.add(
+                  'ci.web_test.paths contains duplicate path "$normalized"',
+                );
               }
             }
           }
@@ -523,7 +640,9 @@ class WorkflowGenerator {
     if (features is Map) {
       final webTestEnabled = features['web_test'] == true;
       if (!webTestEnabled && webTestConfig is Map && webTestConfig.isNotEmpty) {
-        errors.add('ci.web_test config is present but ci.features.web_test is not enabled (dead config?)');
+        errors.add(
+          'ci.web_test config is present but ci.features.web_test is not enabled (dead config?)',
+        );
       }
     }
 
@@ -542,7 +661,10 @@ class WorkflowGenerator {
     Logger.info('  PAT secret: ${ciConfig['personal_access_token_secret']}');
     Logger.info('  Platforms: ${platforms.join(', ')}');
 
-    final enabledFeatures = features.entries.where((e) => e.value == true).map((e) => e.key).toList();
+    final enabledFeatures = features.entries
+        .where((e) => e.value == true)
+        .map((e) => e.key)
+        .toList();
     if (enabledFeatures.isNotEmpty) {
       Logger.info('  Features: ${enabledFeatures.join(', ')}');
     } else {
@@ -551,10 +673,16 @@ class WorkflowGenerator {
 
     if (features['web_test'] == true) {
       final wtConfig = ciConfig['web_test'];
-      final wtMap = wtConfig is Map<String, dynamic> ? wtConfig : <String, dynamic>{};
-      final concurrency = wtMap['concurrency'] is int ? wtMap['concurrency'] : 1;
+      final wtMap = wtConfig is Map<String, dynamic>
+          ? wtConfig
+          : <String, dynamic>{};
+      final concurrency = wtMap['concurrency'] is int
+          ? wtMap['concurrency']
+          : 1;
       final webPaths = wtMap['paths'] is List ? wtMap['paths'] as List : [];
-      Logger.info('  Web test: concurrency=$concurrency, paths=${webPaths.isEmpty ? "(all)" : webPaths.join(", ")}');
+      Logger.info(
+        '  Web test: concurrency=$concurrency, paths=${webPaths.isEmpty ? "(all)" : webPaths.join(", ")}',
+      );
     }
 
     if (secrets.isNotEmpty) {

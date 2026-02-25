@@ -321,6 +321,8 @@ The CI workflow (`.github/workflows/ci.yaml`) is generated from your `ci` sectio
 | `secrets` | object | `{}` | Additional secrets as `{ "ENV_NAME": "SECRET_NAME" }` |
 | `sub_packages` | list | `[]` | Sub-packages as `[{ "name": "...", "path": "..." }]` |
 
+When `features.web_test` is `true`, the `web_test` object is optional; if omitted, defaults are used (`concurrency: 1`, `paths: []`).
+
 You can add custom steps before/after tests using user-preservable sections in the
 generated workflow — look for `# --- BEGIN USER: pre-test ---` and
 `# --- END USER: post-test ---` markers. To add additional jobs (including reusable workflow calls),

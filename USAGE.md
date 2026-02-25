@@ -514,6 +514,8 @@ dart run runtime_ci_tooling:manage_cicd test
 - Generates a rich GitHub Actions step summary with pass/fail/skip counts and failure details
 - Runs tests in sub-packages (from `ci.sub_packages`) with `pub get` per package
 
+When `ci.features.managed_test=false`, CI falls back to plain `dart test` with no enhanced capture/reporting.
+
 ---
 
 ### analyze

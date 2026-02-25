@@ -451,7 +451,7 @@ jobs:
 <%/multi_platform%>
 <%#web_test%>
   web-test:
-    needs: [pre-check<%#format_check%>, auto-format<%/format_check%>]
+    needs: [pre-check<%#format_check%>, auto-format<%/format_check%><%#single_platform%>, analyze-and-test<%/single_platform%><%#multi_platform%>, analyze<%/multi_platform%>]
     if: needs.pre-check.outputs.should_run == 'true'
     runs-on: ubuntu-latest
 <%#has_secrets%>
@@ -515,6 +515,12 @@ jobs:
         run: dart run build_runner build --delete-conflicting-outputs
 
 <%/build_runner%>
+      # ── shared:proto-verify ── keep in sync with single_platform / multi_platform analyze ──
+<%#proto%>
+      - name: Verify proto files
+        run: dart run runtime_ci_tooling:manage_cicd verify-protos
+
+<%/proto%>
       - name: Setup Chrome
         id: setup-chrome
         uses: browser-actions/setup-chrome@v2

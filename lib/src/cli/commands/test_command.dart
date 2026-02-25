@@ -7,8 +7,8 @@ import 'package:args/command_runner.dart';
 import '../../triage/utils/config.dart';
 import '../utils/logger.dart';
 import '../utils/repo_utils.dart';
+import '../utils/step_summary.dart';
 import '../utils/sub_package_utils.dart';
-import '../utils/test_results_util.dart';
 
 /// Run `dart test` on the root package and all configured sub-packages with
 /// full output capture (two-layer strategy).
@@ -27,7 +27,8 @@ class TestCommand extends Command<void> {
   final String name = 'test';
 
   @override
-  final String description = 'Run dart test with full output capture and job summary.';
+  final String description =
+      'Run dart test with full output capture and job summary.';
 
   @override
   Future<void> run() async {
@@ -43,7 +44,9 @@ class TestCommand extends Command<void> {
     final failures = <String>[];
 
     // Determine log directory: TEST_LOG_DIR (CI) or .dart_tool/test-logs/ (local)
-    final logDir = Platform.environment['TEST_LOG_DIR'] ?? '$repoRoot/.dart_tool/test-logs';
+    final logDir =
+        Platform.environment['TEST_LOG_DIR'] ??
+        '$repoRoot/.dart_tool/test-logs';
     Directory(logDir).createSync(recursive: true);
     Logger.info('Log directory: $logDir');
 
@@ -54,7 +57,9 @@ class TestCommand extends Command<void> {
     final testDir = Directory('$repoRoot/test');
     if (!testDir.existsSync()) {
       Logger.success('No test/ directory found — skipping root tests');
-      _writeTestStepSummary('## Test Results\n\n**No test/ directory found — skipped.**\n');
+      StepSummary.write(
+        '## Test Results\n\n**No test/ directory found — skipped.**\n',
+      );
     } else {
       // Build test arguments with two file reporters + expanded console output
       final testArgs = <String>[
@@ -74,7 +79,11 @@ class TestCommand extends Command<void> {
 
       // Use Process.start with piped output so we can both stream to console
       // AND capture the full output for summary generation.
-      final process = await Process.start(Platform.resolvedExecutable, testArgs, workingDirectory: repoRoot);
+      final process = await Process.start(
+        Platform.resolvedExecutable,
+        testArgs,
+        workingDirectory: repoRoot,
+      );
 
       // Stream stdout and stderr to console in real-time while capturing
       final stdoutBuf = StringBuffer();
@@ -94,14 +103,19 @@ class TestCommand extends Command<void> {
       final exitCode = await process.exitCode.timeout(
         processTimeout,
         onTimeout: () {
-          Logger.error('Test process exceeded ${processTimeout.inMinutes}-minute timeout — killing.');
+          Logger.error(
+            'Test process exceeded ${processTimeout.inMinutes}-minute timeout — killing.',
+          );
           process.kill(); // No signal arg — cross-platform safe
           return -1;
         },
       );
 
       try {
-        await Future.wait([stdoutDone, stderrDone]).timeout(const Duration(seconds: 30));
+        await Future.wait([
+          stdoutDone,
+          stderrDone,
+        ]).timeout(const Duration(seconds: 30));
       } catch (_) {
         // Ignore stream errors (e.g. process killed before streams drained)
       }
@@ -113,10 +127,10 @@ class TestCommand extends Command<void> {
       }
 
       // Parse the JSON results file for structured test data
-      final results = parseTestResultsJson(jsonPath);
+      final results = StepSummary.parseTestResultsJson(jsonPath);
 
       // Generate and write the rich job summary
-      writeTestJobSummary(results, exitCode, logDir);
+      StepSummary.writeTestJobSummary(results, exitCode);
 
       if (exitCode != 0) {
         Logger.error('Root tests failed with exit code $exitCode');
@@ -166,7 +180,9 @@ class TestCommand extends Command<void> {
       if (pubGetResult.exitCode != 0) {
         final pubGetStderr = (pubGetResult.stderr as String).trim();
         if (pubGetStderr.isNotEmpty) Logger.error(pubGetStderr);
-        Logger.error('  dart pub get failed for $name (exit code ${pubGetResult.exitCode})');
+        Logger.error(
+          '  dart pub get failed for $name (exit code ${pubGetResult.exitCode})',
+        );
         failures.add(name);
         continue;
       }
@@ -181,7 +197,9 @@ class TestCommand extends Command<void> {
       final spExitCode = await spProcess.exitCode.timeout(
         processTimeout,
         onTimeout: () {
-          Logger.error('Test process for $name exceeded ${processTimeout.inMinutes}-minute timeout — killing.');
+          Logger.error(
+            'Test process for $name exceeded ${processTimeout.inMinutes}-minute timeout — killing.',
+          );
           spProcess.kill(); // No signal arg — cross-platform safe
           return -1;
         },
@@ -196,19 +214,14 @@ class TestCommand extends Command<void> {
     }
 
     if (failures.isNotEmpty) {
-      Logger.error('Tests failed for ${failures.length} package(s): ${failures.join(', ')}');
+      Logger.error(
+        'Tests failed for ${failures.length} package(s): ${failures.join(', ')}',
+      );
+      final failureBullets = failures.map((name) => '- `$name`').join('\n');
+      StepSummary.write('\n## Sub-package Test Failures\n\n$failureBullets\n');
       exit(1);
     }
 
     Logger.success('All tests passed');
-  }
-}
-
-/// Write a markdown summary to $GITHUB_STEP_SUMMARY (visible in Actions UI).
-/// No-op when running locally (env var not set).
-void _writeTestStepSummary(String markdown) {
-  final summaryFile = Platform.environment['GITHUB_STEP_SUMMARY'];
-  if (summaryFile != null) {
-    File(summaryFile).writeAsStringSync(markdown, mode: FileMode.append);
   }
 }
