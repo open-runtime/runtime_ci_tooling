@@ -17,6 +17,7 @@ Shared CI/CD automation tooling for open-runtime or pieces-app packages. Provide
 - **Auto-Formatting CI**: CI workflow templates include an auto-format job that automatically commits dart formatting changes before analysis and testing.
 - **Template Updating**: Keep local configurations and CI workflows in sync with upstream changes.
 - **Global Activation Support**: Can be globally activated (`dart pub global activate runtime_ci_tooling`) to bypass workspace resolution issues, fully supported with path-agnostic template resolution.
+- **Secure Execution & Logging**: Safe subprocess execution with automatic credential redaction and verbose operation logging.
 - **Typed CLI Options**: Uses `build_cli` to generate typed and structured command-line options.
 
 ## Installation
@@ -25,7 +26,7 @@ Add `runtime_ci_tooling` to your `dev_dependencies`:
 
 ```yaml
 dev_dependencies:
-  runtime_ci_tooling: ^0.14.0
+  runtime_ci_tooling: ^0.14.1
 ```
 
 Or run:
@@ -96,8 +97,8 @@ dart run bin/triage_cli.dart <command> [options]
 **Usage Examples:**
 - **Single Issue**: `dart run bin/triage_cli.dart <issue_number>`
 - **Auto Triage**: `dart run bin/triage_cli.dart --auto`
-- **Pre-Release Scan**: `dart run bin/triage_cli.dart --pre-release --prev-tag v0.13.0 --version 0.14.0`
-- **Post-Release Loop**: `dart run bin/triage_cli.dart --post-release --version 0.14.0 --release-tag v0.14.0`
+- **Pre-Release Scan**: `dart run bin/triage_cli.dart --pre-release --prev-tag v0.14.0 --version 0.14.1`
+- **Post-Release Loop**: `dart run bin/triage_cli.dart --post-release --version 0.14.1 --release-tag v0.14.1`
 
 Run `dart run bin/triage_cli.dart --help` for full usage details.
 
