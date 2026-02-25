@@ -9,6 +9,9 @@ import 'repo_utils.dart';
 abstract final class StepSummary {
   /// Maximum safe size for $GITHUB_STEP_SUMMARY (1 MiB minus 4 KiB buffer).
   static const int _maxSummaryBytes = (1024 * 1024) - (4 * 1024);
+  static final RegExp _repoSlugPattern = RegExp(r'^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$');
+  static final RegExp _numericPattern = RegExp(r'^\d+$');
+  static final RegExp _refPattern = RegExp(r'^[A-Za-z0-9._/-]+$');
 
   /// Write a markdown summary to $GITHUB_STEP_SUMMARY (visible in Actions UI).
   /// No-op when running locally (env var not set).
@@ -39,33 +42,34 @@ abstract final class StepSummary {
 
   /// Build a link to the current workflow run's artifacts page.
   static String artifactLink([String label = 'View all artifacts']) {
-    final server = Platform.environment['GITHUB_SERVER_URL'] ?? 'https://github.com';
-    final repo = Platform.environment['GITHUB_REPOSITORY'];
+    final server = _safeGitHubServerUrl(Platform.environment['GITHUB_SERVER_URL']);
+    final repo = _safeRepoSlug(Platform.environment['GITHUB_REPOSITORY']);
     final runId = Platform.environment['GITHUB_RUN_ID'];
     if (repo == null || runId == null) return '';
+    if (!_numericPattern.hasMatch(runId)) return '';
     return '[$label]($server/$repo/actions/runs/$runId)';
   }
 
   /// Build a GitHub compare link between two refs.
   static String compareLink(String prevTag, String newTag, [String? label]) {
-    final server = Platform.environment['GITHUB_SERVER_URL'] ?? 'https://github.com';
-    final repo = Platform.environment['GITHUB_REPOSITORY'] ?? '${config.repoOwner}/${config.repoName}';
+    final server = _safeGitHubServerUrl(Platform.environment['GITHUB_SERVER_URL']);
+    final repo = _safeRepoSlug(Platform.environment['GITHUB_REPOSITORY']) ?? '${config.repoOwner}/${config.repoName}';
     final text = label ?? '$prevTag...$newTag';
     return '[$text]($server/$repo/compare/$prevTag...$newTag)';
   }
 
   /// Build a link to a file/path in the repository.
   static String ghLink(String label, String path) {
-    final server = Platform.environment['GITHUB_SERVER_URL'] ?? 'https://github.com';
-    final repo = Platform.environment['GITHUB_REPOSITORY'] ?? '${config.repoOwner}/${config.repoName}';
-    final sha = Platform.environment['GITHUB_SHA'] ?? 'main';
+    final server = _safeGitHubServerUrl(Platform.environment['GITHUB_SERVER_URL']);
+    final repo = _safeRepoSlug(Platform.environment['GITHUB_REPOSITORY']) ?? '${config.repoOwner}/${config.repoName}';
+    final sha = _safeRef(Platform.environment['GITHUB_SHA']) ?? 'main';
     return '[$label]($server/$repo/blob/$sha/$path)';
   }
 
   /// Build a link to a GitHub Release by tag.
   static String releaseLink(String tag) {
-    final server = Platform.environment['GITHUB_SERVER_URL'] ?? 'https://github.com';
-    final repo = Platform.environment['GITHUB_REPOSITORY'] ?? '${config.repoOwner}/${config.repoName}';
+    final server = _safeGitHubServerUrl(Platform.environment['GITHUB_SERVER_URL']);
+    final repo = _safeRepoSlug(Platform.environment['GITHUB_REPOSITORY']) ?? '${config.repoOwner}/${config.repoName}';
     return '[v$tag]($server/$repo/releases/tag/$tag)';
   }
 
@@ -90,5 +94,29 @@ abstract final class StepSummary {
         .replaceAll('>', '&gt;')
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&#39;');
+  }
+
+  static String _safeGitHubServerUrl(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return 'https://github.com';
+    final parsed = Uri.tryParse(raw.trim());
+    if (parsed == null || !parsed.isAbsolute) return 'https://github.com';
+    if (parsed.scheme != 'https' && parsed.scheme != 'http') return 'https://github.com';
+    if (parsed.host.isEmpty || parsed.userInfo.isNotEmpty) return 'https://github.com';
+    final cleanPath = parsed.path.endsWith('/') ? parsed.path.substring(0, parsed.path.length - 1) : parsed.path;
+    return '${parsed.scheme}://${parsed.host}${parsed.hasPort ? ':${parsed.port}' : ''}$cleanPath';
+  }
+
+  static String? _safeRepoSlug(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    final trimmed = raw.trim();
+    if (!_repoSlugPattern.hasMatch(trimmed)) return null;
+    return trimmed;
+  }
+
+  static String? _safeRef(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    final trimmed = raw.trim();
+    if (!_refPattern.hasMatch(trimmed)) return null;
+    return trimmed;
   }
 }

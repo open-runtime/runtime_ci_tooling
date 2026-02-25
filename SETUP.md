@@ -306,6 +306,7 @@ The CI workflow (`.github/workflows/ci.yaml`) is generated from your `ci` sectio
 | `dart_sdk` | string | **required** | Dart SDK version (e.g. `"3.9.2"`) |
 | `personal_access_token_secret` | string | `"GITHUB_TOKEN"` | GitHub secret name for PAT |
 | `line_length` | int/string | `120` | Line length for `dart format` checks (also controls the git pre-commit hook) |
+| `artifact_retention_days` | int/string | `7` | Retention window for uploaded CI test artifacts (1-90 days) |
 | `features.proto` | bool | `false` | Enable protobuf generation step |
 | `features.lfs` | bool | `false` | Enable Git LFS checkout |
 | `features.format_check` | bool | `true` | Enable `dart format` check |
@@ -331,6 +332,9 @@ When `features.web_test` is `true`, the `web_test` object is optional; if omitte
 
 Cross-validation rule:
 - If `features.web_test` is `false`, omit `web_test` or set it to `{}`. Non-empty `web_test` config with the feature disabled is treated as dead config and fails validation.
+
+Artifact retention policy:
+- CI test artifacts (logs, test-results, fixtures) default to **7 days** retention and can be overridden via `ci.artifact_retention_days` (1-90).
 
 You can add custom steps before/after tests using user-preservable sections in the
 generated workflow — look for `# --- BEGIN USER: pre-test ---` and

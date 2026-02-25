@@ -527,7 +527,7 @@ class UpdateCommand extends Command<void> {
     required String prefix,
   }) {
     for (final key in source.keys) {
-      if (key == '_comment') continue;
+      if (key == '_comment' || key.startsWith('_comment_')) continue;
       final fullKey = prefix.isEmpty ? key : '$prefix.$key';
 
       if (!target.containsKey(key)) {

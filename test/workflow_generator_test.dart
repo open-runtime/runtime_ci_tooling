@@ -336,6 +336,11 @@ void main() {
         expect(errors, anyElement(contains('digits only')));
       });
 
+      test('string line_length empty string produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(lineLength: ''));
+        expect(errors, anyElement(contains('must not be empty')));
+      });
+
       test('string line_length "+120" produces error (digits only, no sign)', () {
         final errors = WorkflowGenerator.validate(_validConfig(lineLength: '+120'));
         expect(errors, anyElement(contains('digits only')));
@@ -374,6 +379,33 @@ void main() {
       test('int line_length 10001 produces error (out of range)', () {
         final errors = WorkflowGenerator.validate(_validConfig(lineLength: 10001));
         expect(errors, anyElement(contains('between 1 and 10000')));
+      });
+    });
+
+    // ---- artifact_retention_days ----
+    group('artifact_retention_days', () {
+      test('int artifact_retention_days passes', () {
+        final config = _validConfig()..['artifact_retention_days'] = 14;
+        final errors = WorkflowGenerator.validate(config);
+        expect(errors.where((e) => e.contains('artifact_retention_days')), isEmpty);
+      });
+
+      test('string artifact_retention_days passes', () {
+        final config = _validConfig()..['artifact_retention_days'] = '30';
+        final errors = WorkflowGenerator.validate(config);
+        expect(errors.where((e) => e.contains('artifact_retention_days')), isEmpty);
+      });
+
+      test('artifact_retention_days empty string produces error', () {
+        final config = _validConfig()..['artifact_retention_days'] = '';
+        final errors = WorkflowGenerator.validate(config);
+        expect(errors, anyElement(contains('artifact_retention_days string must not be empty')));
+      });
+
+      test('artifact_retention_days above 90 produces error', () {
+        final config = _validConfig()..['artifact_retention_days'] = 91;
+        final errors = WorkflowGenerator.validate(config);
+        expect(errors, anyElement(contains('between 1 and 90')));
       });
     });
 
@@ -543,6 +575,17 @@ void main() {
           ),
         );
         expect(errors, anyElement(contains('whitespace')));
+      });
+
+      test('sub_packages name with leading/trailing whitespace produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': ' foo ', 'path': 'packages/foo'},
+            ],
+          ),
+        );
+        expect(errors, anyElement(contains('name must not have leading/trailing whitespace')));
       });
 
       test('sub_packages path with trailing tab triggers whitespace error', () {
@@ -1537,6 +1580,24 @@ void main() {
         expect(rendered, contains(specialContent));
       });
 
+      test('duplicate user section markers in existing content: last matched section wins', () {
+        final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
+        final base = gen.render();
+        final existing =
+            '''
+$base
+# --- BEGIN USER: pre-test ---
+      - run: echo first
+# --- END USER: pre-test ---
+# --- BEGIN USER: pre-test ---
+      - run: echo second
+# --- END USER: pre-test ---
+''';
+        final rendered = gen.render(existingContent: existing);
+        expect(rendered, contains('echo second'));
+        expect(rendered, isNot(contains('echo first')));
+      });
+
       test('null existingContent produces same output as no existingContent', () {
         final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
         final withoutExisting = gen.render();
@@ -1566,6 +1627,23 @@ void main() {
         final needs = (webTestJob['needs'] as YamlList).toList();
         expect(needs, contains('pre-check'));
         expect(needs, contains('auto-format'));
+      });
+
+      test('format_check renders repo-wide dart format command (.)', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(featureOverrides: {'format_check': true}),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        expect(rendered, contains('run: dart format --line-length 120 .'));
+      });
+
+      test('git-config steps use env indirection (GH_PAT) instead of inline secrets in run', () {
+        final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
+        final rendered = gen.render();
+        expect(rendered, contains('GH_PAT: \${{ secrets.'));
+        expect(rendered, contains('echo "::add-mask::\${GH_PAT}"'));
+        expect(rendered, isNot(contains('TOKEN="\${{ secrets.')));
       });
 
       test('web_test without format_check: web-test needs omits auto-format', () {
@@ -1629,6 +1707,21 @@ void main() {
         final needs = (webTestJob['needs'] as YamlList).toList();
         expect(needs, contains('pre-check'));
         expect(needs, contains('analyze-and-test'));
+      });
+
+      test('single-platform uses explicit PLATFORM_ID from single_platform_id context', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(featureOverrides: {'managed_test': true}, platforms: ['windows-x64']),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        final parsed = loadYaml(rendered) as YamlMap;
+        final job = parsed['jobs']['analyze-and-test'] as YamlMap;
+        final steps = (job['steps'] as YamlList).toList();
+        final testStep = steps.firstWhere((s) => s is YamlMap && s['name'] == 'Test', orElse: () => null);
+        expect(testStep, isNotNull);
+        final env = (testStep as YamlMap)['env'] as YamlMap;
+        expect(env['PLATFORM_ID'], equals('windows-x64'));
       });
 
       test('secrets render in web-test job env block', () {
@@ -1760,6 +1853,15 @@ void main() {
         final rendered = gen.render();
         expect(rendered, contains('retention-days: 7'));
         expect(rendered, contains('Policy: test artifact retention-days = 7'));
+      });
+
+      test('artifact retention-days can be overridden via ci.artifact_retention_days', () {
+        final ci = _minimalValidConfig(featureOverrides: {'managed_test': true});
+        ci['artifact_retention_days'] = 14;
+        final gen = WorkflowGenerator(ciConfig: ci, toolingVersion: '0.0.0-test');
+        final rendered = gen.render();
+        expect(rendered, contains('retention-days: 14'));
+        expect(rendered, contains('Policy: test artifact retention-days = 14'));
       });
 
       test('Windows pub-cache path uses format for Dart default (%LOCALAPPDATA%\\Pub\\Cache)', () {

@@ -12,6 +12,7 @@ import '../utils/repo_utils.dart';
 import '../utils/step_summary.dart';
 import '../utils/test_results_util.dart';
 import '../utils/sub_package_utils.dart';
+import '../utils/utf8_bounded_buffer.dart';
 
 /// Run `dart test` on the root package and all configured sub-packages with
 /// full output capture (two-layer strategy).
@@ -55,17 +56,7 @@ class TestCommand extends Command<void> {
     final failures = <String>[];
 
     // Determine log directory: TEST_LOG_DIR (CI) or .dart_tool/test-logs/ (local)
-    late final String logDir;
-    try {
-      logDir = RepoUtils.resolveTestLogDir(repoRoot);
-      RepoUtils.ensureSafeDirectory(logDir);
-    } on StateError catch (e) {
-      Logger.error('$e');
-      await exitWithCode(1);
-    } on FileSystemException catch (e) {
-      Logger.error('Cannot use log directory: $e');
-      await exitWithCode(1);
-    }
+    final logDir = await _resolveLogDirOrExit(repoRoot);
     Logger.info('Log directory: $logDir');
 
     final jsonPath = p.join(logDir, 'results.json');
@@ -98,52 +89,19 @@ class TestCommand extends Command<void> {
       final process = await Process.start(Platform.resolvedExecutable, testArgs, workingDirectory: repoRoot);
 
       // Stream stdout and stderr to console in real-time while capturing
-      // (byte-bounded to prevent OOM from runaway test output)
-      final stdoutBuf = StringBuffer();
-      final stderrBuf = StringBuffer();
-      var stdoutBytes = 0;
-      var stderrBytes = 0;
-      var stdoutTruncated = false;
-      var stderrTruncated = false;
+      // (byte-bounded to prevent OOM from runaway test output).
       const truncationSuffix = '\n\n... (output truncated, exceeded 2MB bytes). See console.log for full output.)';
-      final truncationBytes = utf8.encode(truncationSuffix).length;
+      final stdoutBuf = Utf8BoundedBuffer(maxBytes: _maxLogBufferBytes, truncationSuffix: truncationSuffix);
+      final stderrBuf = Utf8BoundedBuffer(maxBytes: _maxLogBufferBytes, truncationSuffix: truncationSuffix);
 
       void onStdout(String data) {
         stdout.write(data);
-        if (stdoutTruncated) return;
-        final dataBytes = utf8.encode(data).length;
-        if (stdoutBytes + dataBytes <= _maxLogBufferBytes) {
-          stdoutBuf.write(data);
-          stdoutBytes += dataBytes;
-        } else {
-          final remaining = _maxLogBufferBytes - stdoutBytes - truncationBytes;
-          if (remaining > 0) {
-            final bytes = utf8.encode(data);
-            final toTake = bytes.length > remaining ? remaining : bytes.length;
-            stdoutBuf.write(utf8.decode(bytes.take(toTake).toList(), allowMalformed: true));
-          }
-          stdoutBuf.write(truncationSuffix);
-          stdoutTruncated = true;
-        }
+        stdoutBuf.append(data);
       }
 
       void onStderr(String data) {
         stderr.write(data);
-        if (stderrTruncated) return;
-        final dataBytes = utf8.encode(data).length;
-        if (stderrBytes + dataBytes <= _maxLogBufferBytes) {
-          stderrBuf.write(data);
-          stderrBytes += dataBytes;
-        } else {
-          final remaining = _maxLogBufferBytes - stderrBytes - truncationBytes;
-          if (remaining > 0) {
-            final bytes = utf8.encode(data);
-            final toTake = bytes.length > remaining ? remaining : bytes.length;
-            stderrBuf.write(utf8.decode(bytes.take(toTake).toList(), allowMalformed: true));
-          }
-          stderrBuf.write(truncationSuffix);
-          stderrTruncated = true;
-        }
+        stderrBuf.append(data);
       }
 
       final stdoutSub = process.stdout.transform(Utf8Decoder(allowMalformed: true)).listen(onStdout);
@@ -175,7 +133,7 @@ class TestCommand extends Command<void> {
       // Write console output to log files
       try {
         RepoUtils.writeFileSafely(p.join(logDir, 'dart_stdout.log'), stdoutBuf.toString());
-        if (stderrBuf.isNotEmpty) {
+        if (!stderrBuf.isEmpty) {
           RepoUtils.writeFileSafely(p.join(logDir, 'dart_stderr.log'), stderrBuf.toString());
         }
       } on FileSystemException catch (e) {
@@ -249,7 +207,13 @@ class TestCommand extends Command<void> {
       }
 
       final spLogDir = p.join(logDir, name);
-      Directory(spLogDir).createSync(recursive: true);
+      try {
+        RepoUtils.ensureSafeDirectory(spLogDir);
+      } on FileSystemException catch (e) {
+        Logger.error('Cannot use sub-package log directory for $name: $e');
+        failures.add(name);
+        continue;
+      }
       final spJsonPath = p.join(spLogDir, 'results.json');
       final spExpandedPath = p.join(spLogDir, 'expanded.txt');
 
@@ -268,51 +232,18 @@ class TestCommand extends Command<void> {
 
       final spProcess = await Process.start(Platform.resolvedExecutable, spTestArgs, workingDirectory: dir);
 
-      final stdoutBuf = StringBuffer();
-      final stderrBuf = StringBuffer();
-      var stdoutBytes = 0;
-      var stderrBytes = 0;
-      var stdoutTruncated = false;
-      var stderrTruncated = false;
       const spTruncationSuffix = '\n\n... (output truncated, exceeded 2MB bytes). See console.log for full output.)';
-      final spTruncationBytes = utf8.encode(spTruncationSuffix).length;
+      final stdoutBuf = Utf8BoundedBuffer(maxBytes: _maxLogBufferBytes, truncationSuffix: spTruncationSuffix);
+      final stderrBuf = Utf8BoundedBuffer(maxBytes: _maxLogBufferBytes, truncationSuffix: spTruncationSuffix);
 
       void onSpStdout(String data) {
         stdout.write(data);
-        if (stdoutTruncated) return;
-        final dataBytes = utf8.encode(data).length;
-        if (stdoutBytes + dataBytes <= _maxLogBufferBytes) {
-          stdoutBuf.write(data);
-          stdoutBytes += dataBytes;
-        } else {
-          final remaining = _maxLogBufferBytes - stdoutBytes - spTruncationBytes;
-          if (remaining > 0) {
-            final bytes = utf8.encode(data);
-            final toTake = bytes.length > remaining ? remaining : bytes.length;
-            stdoutBuf.write(utf8.decode(bytes.take(toTake).toList(), allowMalformed: true));
-          }
-          stdoutBuf.write(spTruncationSuffix);
-          stdoutTruncated = true;
-        }
+        stdoutBuf.append(data);
       }
 
       void onSpStderr(String data) {
         stderr.write(data);
-        if (stderrTruncated) return;
-        final dataBytes = utf8.encode(data).length;
-        if (stderrBytes + dataBytes <= _maxLogBufferBytes) {
-          stderrBuf.write(data);
-          stderrBytes += dataBytes;
-        } else {
-          final remaining = _maxLogBufferBytes - stderrBytes - spTruncationBytes;
-          if (remaining > 0) {
-            final bytes = utf8.encode(data);
-            final toTake = bytes.length > remaining ? remaining : bytes.length;
-            stderrBuf.write(utf8.decode(bytes.take(toTake).toList(), allowMalformed: true));
-          }
-          stderrBuf.write(spTruncationSuffix);
-          stderrTruncated = true;
-        }
+        stderrBuf.append(data);
       }
 
       final stdoutSub = spProcess.stdout.transform(Utf8Decoder(allowMalformed: true)).listen(onSpStdout);
@@ -340,7 +271,7 @@ class TestCommand extends Command<void> {
 
       try {
         RepoUtils.writeFileSafely(p.join(spLogDir, 'dart_stdout.log'), stdoutBuf.toString());
-        if (stderrBuf.isNotEmpty) {
+        if (!stderrBuf.isEmpty) {
           RepoUtils.writeFileSafely(p.join(spLogDir, 'dart_stderr.log'), stderrBuf.toString());
         }
       } on FileSystemException catch (e) {
@@ -383,47 +314,42 @@ class TestCommand extends Command<void> {
       workingDirectory: workingDirectory,
       environment: {'GIT_LFS_SKIP_SMUDGE': '1'},
     );
-    final stdoutBuf = StringBuffer();
-    final stderrBuf = StringBuffer();
-    final stdoutBytes = <int>[0];
-    final stderrBytes = <int>[0];
-    final stdoutTruncated = <bool>[false];
-    final stderrTruncated = <bool>[false];
     const pubGetTruncationSuffix = '\n\n... (output truncated).';
-    final pubGetTruncationBytes = utf8.encode(pubGetTruncationSuffix).length;
+    final stdoutBuf = Utf8BoundedBuffer(maxBytes: _maxPubGetBufferBytes, truncationSuffix: pubGetTruncationSuffix);
+    final stderrBuf = Utf8BoundedBuffer(maxBytes: _maxPubGetBufferBytes, truncationSuffix: pubGetTruncationSuffix);
 
-    void capWrite(StringBuffer buf, String data, int maxBytes, List<bool> truncated, List<int> byteCount) {
-      if (truncated[0]) return;
-      final dataBytes = utf8.encode(data).length;
-      if (byteCount[0] + dataBytes <= maxBytes) {
-        buf.write(data);
-        byteCount[0] += dataBytes;
-      } else {
-        final remaining = maxBytes - byteCount[0] - pubGetTruncationBytes;
-        if (remaining > 0) {
-          final bytes = utf8.encode(data);
-          final toTake = bytes.length > remaining ? remaining : bytes.length;
-          buf.write(utf8.decode(bytes.take(toTake).toList(), allowMalformed: true));
-        }
-        buf.write(pubGetTruncationSuffix);
-        truncated[0] = true;
-      }
-    }
-
+    final stdoutDone = Completer<void>();
+    final stderrDone = Completer<void>();
     final stdoutSub = process.stdout
         .transform(Utf8Decoder(allowMalformed: true))
-        .listen((data) => capWrite(stdoutBuf, data, _maxPubGetBufferBytes, stdoutTruncated, stdoutBytes));
+        .listen(
+          (data) => stdoutBuf.append(data),
+          onDone: () => stdoutDone.complete(),
+          onError: (_) => stdoutDone.complete(),
+        );
     final stderrSub = process.stderr
         .transform(Utf8Decoder(allowMalformed: true))
-        .listen((data) => capWrite(stderrBuf, data, _maxPubGetBufferBytes, stderrTruncated, stderrBytes));
+        .listen(
+          (data) => stderrBuf.append(data),
+          onDone: () => stderrDone.complete(),
+          onError: (_) => stderrDone.complete(),
+        );
     try {
       final exitCode = await process.exitCode.timeout(timeout);
+      await Future.wait([
+        stdoutDone.future.timeout(const Duration(seconds: 5), onTimeout: () {}),
+        stderrDone.future.timeout(const Duration(seconds: 5), onTimeout: () {}),
+      ]);
       await Future.wait([stdoutSub.cancel(), stderrSub.cancel()]);
       return ProcessResult(process.pid, exitCode, stdoutBuf.toString(), stderrBuf.toString());
     } on TimeoutException {
       onTimeout?.call();
       await _killAndAwaitExit(process);
       try {
+        await Future.wait([
+          stdoutDone.future.timeout(const Duration(seconds: 5), onTimeout: () {}),
+          stderrDone.future.timeout(const Duration(seconds: 5), onTimeout: () {}),
+        ]);
         await Future.wait([stdoutSub.cancel(), stderrSub.cancel()]);
       } catch (_) {}
       return null;
@@ -447,5 +373,19 @@ class TestCommand extends Command<void> {
       await process.exitCode;
     }
     return -1;
+  }
+
+  static Future<String> _resolveLogDirOrExit(String repoRoot) async {
+    try {
+      final logDir = RepoUtils.resolveTestLogDir(repoRoot);
+      RepoUtils.ensureSafeDirectory(logDir);
+      return logDir;
+    } on StateError catch (e) {
+      Logger.error('$e');
+      await exitWithCode(1);
+    } on FileSystemException catch (e) {
+      Logger.error('Cannot use log directory: $e');
+      await exitWithCode(1);
+    }
   }
 }

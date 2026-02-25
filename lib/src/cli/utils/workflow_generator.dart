@@ -240,8 +240,8 @@ class WorkflowGenerator {
       'line_length': _resolveLineLength(ciConfig['line_length']),
       'pat_secret': ciConfig['personal_access_token_secret'] as String? ?? 'GITHUB_TOKEN',
 
-      // Artifact retention: 7 days for test logs (policy applied consistently)
-      'artifact_retention_days': '7',
+      // Artifact retention defaults to 7 days unless explicitly configured.
+      'artifact_retention_days': _resolveArtifactRetentionDays(ciConfig['artifact_retention_days']),
 
       // Feature flags
       'proto': features['proto'] == true,
@@ -296,6 +296,15 @@ class WorkflowGenerator {
       if (parsed != null) return '$parsed';
     }
     return '120';
+  }
+
+  static String _resolveArtifactRetentionDays(dynamic raw) {
+    if (raw is int && raw >= 1 && raw <= 90) return '$raw';
+    if (raw is String) {
+      final parsed = int.tryParse(raw.trim());
+      if (parsed != null && parsed >= 1 && parsed <= 90) return '$parsed';
+    }
+    return '7';
   }
 
   /// Shared filter: extracts valid, normalized web test paths from config.
@@ -458,6 +467,30 @@ class WorkflowGenerator {
         final parsed = int.parse(lineLength);
         if (parsed < 1 || parsed > 10000) {
           errors.add('ci.line_length must be between 1 and 10000, got $lineLength');
+        }
+      }
+    }
+    final artifactRetention = ciConfig['artifact_retention_days'];
+    if (artifactRetention != null && artifactRetention is! int && artifactRetention is! String) {
+      errors.add('ci.artifact_retention_days must be a number or string, got ${artifactRetention.runtimeType}');
+    } else if (artifactRetention is int) {
+      if (artifactRetention < 1 || artifactRetention > 90) {
+        errors.add('ci.artifact_retention_days must be between 1 and 90, got $artifactRetention');
+      }
+    } else if (artifactRetention is String) {
+      final trimmed = artifactRetention.trim();
+      if (trimmed.isEmpty) {
+        errors.add('ci.artifact_retention_days string must not be empty or whitespace-only');
+      } else if (trimmed != artifactRetention) {
+        errors.add('ci.artifact_retention_days must not have leading/trailing whitespace');
+      } else if (artifactRetention.contains(RegExp(r'[\r\n\t\x00-\x1f]'))) {
+        errors.add('ci.artifact_retention_days must not contain newlines or control characters');
+      } else if (!RegExp(r'^\d+$').hasMatch(artifactRetention)) {
+        errors.add('ci.artifact_retention_days string must be digits only (e.g. 7), got "$artifactRetention"');
+      } else {
+        final parsed = int.parse(artifactRetention);
+        if (parsed < 1 || parsed > 90) {
+          errors.add('ci.artifact_retention_days must be between 1 and 90, got $artifactRetention');
         }
       }
     }
@@ -677,6 +710,7 @@ class WorkflowGenerator {
     Logger.info('  Dart SDK: ${ciConfig['dart_sdk']}');
     Logger.info('  PAT secret: ${ciConfig['personal_access_token_secret']}');
     Logger.info('  Platforms: ${platforms.join(', ')}');
+    Logger.info('  Artifact retention days: ${_resolveArtifactRetentionDays(ciConfig['artifact_retention_days'])}');
 
     final enabledFeatures = features.entries.where((e) => e.value == true).map((e) => e.key).toList();
     if (enabledFeatures.isNotEmpty) {

@@ -141,7 +141,7 @@ dart run runtime_ci_tooling:manage_cicd init
 4. Creates `.runtime_ci/config.json` with detected values (skipped if already present)
 5. Creates `.runtime_ci/autodoc.json` from `lib/src/` directory structure (skipped if already present)
 6. Creates a starter `CHANGELOG.md` if none exists
-7. Installs `.git/hooks/pre-commit` to auto-format staged `lib/` Dart files before every commit
+7. Installs `.git/hooks/pre-commit` to auto-format staged Dart files under `lib/` before every commit
 8. Adds `.runtime_ci/runs/` to `.gitignore`
 9. Prints a summary of all actions taken and suggested next steps
 
@@ -1249,7 +1249,7 @@ final exists = await commandExists('git');
 
 **Jobs:**
 1. `pre-check` — Skip bot commits (author `github-actions[bot]` or `[skip ci]`)
-2. Optional `auto-format` — If `ci.features.format_check=true`, auto-format `lib/` and push `bot(format)` commit
+2. Optional `auto-format` — If `ci.features.format_check=true`, runs `dart format --line-length <N> .`, stages tracked `*.dart` updates, and pushes a `bot(format)` commit
 3. **Single-platform mode** (default, `ci.platforms` missing or 1 entry):
    - `analyze-and-test` — Verify protos, run analysis, run tests
 4. **Multi-platform mode** (`ci.platforms` has 2+ entries):
@@ -1266,6 +1266,7 @@ final exists = await commandExists('git');
 - `ci.features.web_test`: When `true`, adds a `web-test` job that provisions Chrome via SHA-pinned `browser-actions/setup-chrome@v2.1.1` and runs `dart test -p chrome`. Configure via `ci.web_test`:
   - `concurrency` (1–32, default `1`): parallel test shards
   - `paths`: list of relative repo paths (e.g. `["test/web/"]`): paths are normalized, shell-quoted, and validated (no traversal, no shell metacharacters). Empty list = run all tests
+- `ci.artifact_retention_days`: Optional retention period for uploaded test artifacts (1–90, default `7`)
 
 **Key steps:**
 ```yaml

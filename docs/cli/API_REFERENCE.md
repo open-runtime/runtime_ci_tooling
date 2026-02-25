@@ -109,6 +109,7 @@ All commands extend `Command<void>` from the `args` package.
 - **TestCommand**
   - `name`: `'test'`
   - `description`: 'Run dart test.'
+  - `runWithRoot(String repoRoot)`: `static Future<void>` - Execute managed tests against an explicit repository root.
 
 - **UpdateAllCommand** / **UpdateCommand**
   - `name`: `'update'` / `'update-all'`
@@ -233,6 +234,9 @@ if (isGitInstalled) {
   - `warn(String msg)`: `static void`
   - `error(String msg)`: `static void`
 
+- **Exit Utilities**
+  - `exitWithCode(int code)`: `Future<Never>` - Flushes stdout/stderr and then exits.
+
 ### Release & Versioning
 - **ReleaseUtils**
   - `buildReleaseCommitMessage(...)`: `static String`
@@ -269,17 +273,32 @@ if (isGitInstalled) {
   - `resolveToolingPackageRoot()`: `static String`
 - **RepoUtils**
   - `findRepoRoot()`: `static String?`
+  - `resolveTestLogDir(String repoRoot, {Map<String, String>? environment})`: `static String`
+  - `isSymlinkPath(String path)`: `static bool`
+  - `ensureSafeDirectory(String dirPath)`: `static void`
+  - `writeFileSafely(String filePath, String content, {FileMode mode = FileMode.write})`: `static void`
 - **StepSummary**
-  - `write(String markdown)`: `static void`
+  - `write(String markdown, {Map<String, String>? environment})`: `static void`
   - `artifactLink([String label = 'View all artifacts'])`: `static String`
   - `compareLink(String prevTag, String newTag, [String? label])`: `static String`
   - `ghLink(String label, String path)`: `static String`
   - `releaseLink(String tag)`: `static String`
   - `escapeHtml(String input)`: `static String`
   - `collapsible(String title, String content, {bool open = false})`: `static String`
+- **TestFailure**
+  - Parsed failure record from NDJSON test output.
+  - Fields: `name`, `error`, `stackTrace`, `printOutput`, `durationMs`.
+- **TestResults**
+  - Parsed aggregate test results.
+  - Fields: `passed`, `failed`, `skipped`, `totalDurationMs`, `failures`, `parsed`.
 - **TestResultsUtil**
   - `parseTestResultsJson(String jsonPath)`: `static TestResults`
-  - `writeTestJobSummary(TestResults results, int exitCode)`: `static void`
+  - `writeTestJobSummary(TestResults results, int exitCode, {String? platformId, void Function(String markdown)? writeSummary})`: `static void`
+- **Utf8BoundedBuffer**
+  - `Utf8BoundedBuffer({required int maxBytes, required String truncationSuffix})`
+  - `append(String data)`: `void`
+  - `truncateToUtf8Bytes(String input, int maxBytes)`: `static String`
+  - `byteLength`, `isTruncated`, `isEmpty`
 - **TemplateResolver**
   - `resolvePackageRoot()`: `static String`
   - `resolveTemplatesDir()`: `static String`

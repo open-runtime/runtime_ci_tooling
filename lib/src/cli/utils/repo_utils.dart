@@ -51,6 +51,9 @@ abstract final class RepoUtils {
 
     final runnerTempRaw = env['RUNNER_TEMP']?.trim();
     if (runnerTempRaw != null && runnerTempRaw.isNotEmpty) {
+      if (_controlChars.hasMatch(runnerTempRaw)) {
+        throw StateError('RUNNER_TEMP must not contain newlines or control characters');
+      }
       final runnerTemp = p.normalize(runnerTempRaw);
       if (!(normalized == runnerTemp || p.isWithin(runnerTemp, normalized))) {
         throw StateError('TEST_LOG_DIR must be within RUNNER_TEMP: "$runnerTemp"');

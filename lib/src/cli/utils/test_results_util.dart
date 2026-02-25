@@ -240,10 +240,9 @@ abstract final class TestResultsUtil {
         if (f.error.isNotEmpty) {
           final error = f.error.length > 2000 ? '${f.error.substring(0, 2000)}\n... (truncated)' : f.error;
           buf.writeln('**Error:**');
-          final safeError = StepSummary.escapeHtml(error);
-          final fence = _codeFence(safeError);
+          final fence = _codeFence(error);
           buf.writeln(fence);
-          buf.writeln(safeError);
+          buf.writeln(error);
           buf.writeln(fence);
           buf.writeln();
         }
@@ -253,10 +252,9 @@ abstract final class TestResultsUtil {
               ? '${f.stackTrace.substring(0, 1500)}\n... (truncated)'
               : f.stackTrace;
           buf.writeln('**Stack Trace:**');
-          final safeStack = StepSummary.escapeHtml(stack);
-          final fence = _codeFence(safeStack);
+          final fence = _codeFence(stack);
           buf.writeln(fence);
-          buf.writeln(safeStack);
+          buf.writeln(stack);
           buf.writeln(fence);
           buf.writeln();
         }
@@ -266,10 +264,9 @@ abstract final class TestResultsUtil {
           final lineCount = trimmed.split('\n').length;
           final printPreview = trimmed.length > 1500 ? '${trimmed.substring(0, 1500)}\n... (truncated)' : trimmed;
           buf.writeln('**Captured Output ($lineCount lines):**');
-          final safePrint = StepSummary.escapeHtml(printPreview);
-          final fence = _codeFence(safePrint);
+          final fence = _codeFence(printPreview);
           buf.writeln(fence);
-          buf.writeln(safePrint);
+          buf.writeln(printPreview);
           buf.writeln(fence);
           buf.writeln();
         }
@@ -292,7 +289,7 @@ abstract final class TestResultsUtil {
 
   /// Returns a markdown code fence string that will not appear inside [content].
   /// Handles adversarial content with long backtick runs by using fence length
-  /// strictly greater than max consecutive backticks (up to 128).
+  /// strictly greater than max consecutive backticks.
   static String _codeFence(String content) {
     var maxRun = 0;
     var run = 0;
@@ -305,8 +302,8 @@ abstract final class TestResultsUtil {
       }
     }
     if (run > maxRun) maxRun = run;
-    // Fence must be longer than any backtick run in content; allow up to 128
-    // to handle adversarial content without escaping.
-    return '`' * (maxRun + 1).clamp(3, 128);
+    // Fence must be longer than any backtick run in content.
+    // Content is already preview-truncated, so this is naturally bounded.
+    return '`' * (maxRun + 1 < 3 ? 3 : maxRun + 1);
   }
 }

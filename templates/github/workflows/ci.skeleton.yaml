@@ -108,13 +108,14 @@ jobs:
       # ── shared:git-config ── keep in sync with multi_platform ──
       - name: Configure Git for HTTPS with Token
         shell: bash
+        env:
+          GH_PAT: ${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}
         run: |
-          TOKEN="${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}"
-          echo "::add-mask::${TOKEN}"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "git@github.com:"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
+          echo "::add-mask::${GH_PAT}"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "git@github.com:"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
 
       # ── shared:dart-setup ── keep in sync with multi_platform ──
       - uses: dart-lang/setup-dart@v1.7.1
@@ -263,13 +264,14 @@ jobs:
       # ── shared:git-config ── keep in sync with single_platform ──
       - name: Configure Git for HTTPS with Token
         shell: bash
+        env:
+          GH_PAT: ${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}
         run: |
-          TOKEN="${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}"
-          echo "::add-mask::${TOKEN}"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "git@github.com:"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
+          echo "::add-mask::${GH_PAT}"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "git@github.com:"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
 
       # ── shared:dart-setup ── keep in sync with single_platform ──
       - uses: dart-lang/setup-dart@v1.7.1
@@ -377,13 +379,14 @@ jobs:
       # ── shared:git-config ── keep in sync with single_platform ──
       - name: Configure Git for HTTPS with Token
         shell: bash
+        env:
+          GH_PAT: ${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}
         run: |
-          TOKEN="${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}"
-          echo "::add-mask::${TOKEN}"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "git@github.com:"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
+          echo "::add-mask::${GH_PAT}"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "git@github.com:"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
 
       # ── shared:dart-setup ── keep in sync with single_platform ──
       - uses: dart-lang/setup-dart@v1.7.1
@@ -488,13 +491,14 @@ jobs:
       # ── shared:git-config ── keep in sync with single_platform / multi_platform ──
       - name: Configure Git for HTTPS with Token
         shell: bash
+        env:
+          GH_PAT: ${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}
         run: |
-          TOKEN="${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}"
-          echo "::add-mask::${TOKEN}"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "git@github.com:"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
-          git config --global url."https://x-access-token:${TOKEN}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
+          echo "::add-mask::${GH_PAT}"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "git@github.com:"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
 
       # ── shared:dart-setup ── keep in sync with single_platform / multi_platform ──
       - uses: dart-lang/setup-dart@v1.7.1
@@ -557,12 +561,14 @@ jobs:
 <%/web_test_has_paths%>
 
       - name: Upload web test artifacts on failure
-        if: failure() && hashFiles('**/test-results/**') != ''
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: web-test-artifacts
           path: |
             **/test-results/
+            ${{ runner.temp }}/test-results/
+          if-no-files-found: ignore
           retention-days: <%artifact_retention_days%>
 
 <%/web_test%>
