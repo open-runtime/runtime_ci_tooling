@@ -1,0 +1,404 @@
+import 'dart:io';
+
+import 'package:path/path.dart' as p;
+import 'package:test/test.dart' hide TestFailure;
+
+import 'package:runtime_ci_tooling/src/cli/utils/repo_utils.dart';
+import 'package:runtime_ci_tooling/src/cli/utils/test_results_util.dart';
+
+bool _canCreateSymlink() {
+  final tempDir = Directory.systemTemp.createTempSync('symlink_probe_');
+  try {
+    final target = File(p.join(tempDir.path, 'target.txt'));
+    target.writeAsStringSync('ok');
+    final linkPath = p.join(tempDir.path, 'link.txt');
+    Link(linkPath).createSync(target.path);
+    return RepoUtils.isSymlinkPath(linkPath);
+  } on FileSystemException {
+    return false;
+  } finally {
+    if (tempDir.existsSync()) {
+      tempDir.deleteSync(recursive: true);
+    }
+  }
+}
+
+void main() {
+  final symlinksSupported = _canCreateSymlink();
+
+  group('RepoUtils.resolveTestLogDir', () {
+    late Directory tempDir;
+    late String repoRoot;
+
+    setUp(() {
+      tempDir = Directory.systemTemp.createTempSync('repo_utils_resolve_');
+      repoRoot = tempDir.path;
+    });
+
+    tearDown(() {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    test('returns default path when TEST_LOG_DIR is unset', () {
+      final resolved = RepoUtils.resolveTestLogDir(
+        repoRoot,
+        environment: const <String, String>{},
+      );
+      expect(resolved, equals(p.join(repoRoot, '.dart_tool', 'test-logs')));
+    });
+
+    test('returns default path when TEST_LOG_DIR is empty/whitespace', () {
+      final resolved = RepoUtils.resolveTestLogDir(
+        repoRoot,
+        environment: const <String, String>{'TEST_LOG_DIR': '   '},
+      );
+      expect(resolved, equals(p.join(repoRoot, '.dart_tool', 'test-logs')));
+    });
+
+    test('throws when TEST_LOG_DIR contains control characters', () {
+      expect(
+        () => RepoUtils.resolveTestLogDir(
+          repoRoot,
+          environment: const <String, String>{'TEST_LOG_DIR': '/tmp/logs\nbad'},
+        ),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('throws when TEST_LOG_DIR is relative', () {
+      expect(
+        () => RepoUtils.resolveTestLogDir(
+          repoRoot,
+          environment: const <String, String>{'TEST_LOG_DIR': 'relative/path'},
+        ),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('throws when TEST_LOG_DIR is outside RUNNER_TEMP', () {
+      final runnerTemp = p.join(repoRoot, 'runner-temp');
+      final outside = p.join(repoRoot, 'outside', 'logs');
+      expect(
+        () => RepoUtils.resolveTestLogDir(
+          repoRoot,
+          environment: {'RUNNER_TEMP': runnerTemp, 'TEST_LOG_DIR': outside},
+        ),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('accepts TEST_LOG_DIR inside RUNNER_TEMP', () {
+      final runnerTemp = p.join(repoRoot, 'runner-temp');
+      final inside = p.join(runnerTemp, 'logs');
+      final resolved = RepoUtils.resolveTestLogDir(
+        repoRoot,
+        environment: {'RUNNER_TEMP': runnerTemp, 'TEST_LOG_DIR': inside},
+      );
+      expect(resolved, equals(inside));
+    });
+  });
+
+  group('RepoUtils filesystem safety', () {
+    late Directory tempDir;
+
+    setUp(() {
+      tempDir = Directory.systemTemp.createTempSync('repo_utils_fs_');
+    });
+
+    tearDown(() {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    test('ensureSafeDirectory creates a missing normal directory', () {
+      final dirPath = p.join(tempDir.path, 'logs');
+      RepoUtils.ensureSafeDirectory(dirPath);
+      expect(Directory(dirPath).existsSync(), isTrue);
+      expect(RepoUtils.isSymlinkPath(dirPath), isFalse);
+    });
+
+    test('writeFileSafely writes to a normal file path', () {
+      final filePath = p.join(tempDir.path, 'stdout.log');
+      RepoUtils.writeFileSafely(filePath, 'hello world');
+      expect(File(filePath).readAsStringSync(), equals('hello world'));
+    });
+
+    test('writeFileSafely appends when FileMode.append is used', () {
+      final filePath = p.join(tempDir.path, 'stdout.log');
+      RepoUtils.writeFileSafely(filePath, 'hello');
+      RepoUtils.writeFileSafely(filePath, ' world', mode: FileMode.append);
+      expect(File(filePath).readAsStringSync(), equals('hello world'));
+    });
+
+    test(
+      'ensureSafeDirectory rejects symlink-backed directories',
+      skip: !symlinksSupported,
+      () {
+        final targetDir = Directory(p.join(tempDir.path, 'target'))
+          ..createSync(recursive: true);
+        final linkDirPath = p.join(tempDir.path, 'linked');
+        Link(linkDirPath).createSync(targetDir.path);
+        expect(
+          () => RepoUtils.ensureSafeDirectory(linkDirPath),
+          throwsA(isA<FileSystemException>()),
+        );
+      },
+    );
+
+    test(
+      'writeFileSafely rejects symlink file targets',
+      skip: !symlinksSupported,
+      () {
+        final targetFile = File(p.join(tempDir.path, 'target.txt'))
+          ..writeAsStringSync('base');
+        final linkPath = p.join(tempDir.path, 'linked.txt');
+        Link(linkPath).createSync(targetFile.path);
+        expect(
+          () => RepoUtils.writeFileSafely(linkPath, 'new content'),
+          throwsA(isA<FileSystemException>()),
+        );
+      },
+    );
+  });
+
+  group('TestResultsUtil.parseTestResultsJson', () {
+    late Directory tempDir;
+
+    setUp(() {
+      tempDir = Directory.systemTemp.createTempSync('test_results_parse_');
+    });
+
+    tearDown(() {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    test('returns unparsed empty results when file does not exist', () {
+      final missingPath = p.join(tempDir.path, 'missing.json');
+      final results = TestResultsUtil.parseTestResultsJson(missingPath);
+      expect(results.parsed, isFalse);
+      expect(results.passed, equals(0));
+      expect(results.failed, equals(0));
+      expect(results.skipped, equals(0));
+      expect(results.failures, isEmpty);
+    });
+
+    test('parses pass/fail/skipped counts and failure details', () {
+      final jsonPath = p.join(tempDir.path, 'results.json');
+      File(jsonPath).writeAsStringSync(
+        [
+          '{"type":"testStart","test":{"id":1,"name":"passes"},"time":100}',
+          '{"type":"testDone","testID":1,"result":"success","hidden":false,"skipped":false,"time":120}',
+          '{"type":"testStart","test":{"id":2,"name":"fails"},"time":130}',
+          '{"type":"print","testID":2,"message":"hello from test"}',
+          '{"type":"error","testID":2,"error":"boom","stackTrace":"trace line"}',
+          '{"type":"testDone","testID":2,"result":"failure","hidden":false,"skipped":false,"time":170}',
+          '{"type":"testStart","test":{"id":3,"name":"skipped"},"time":180}',
+          '{"type":"testDone","testID":3,"result":"success","hidden":false,"skipped":true,"time":190}',
+          '{"type":"done","time":200}',
+        ].join('\n'),
+      );
+
+      final results = TestResultsUtil.parseTestResultsJson(jsonPath);
+      expect(results.parsed, isTrue);
+      expect(results.passed, equals(1));
+      expect(results.failed, equals(1));
+      expect(results.skipped, equals(1));
+      expect(results.totalDurationMs, equals(200));
+      expect(results.failures, hasLength(1));
+      expect(results.failures.first.name, equals('fails'));
+      expect(results.failures.first.error, contains('boom'));
+      expect(results.failures.first.stackTrace, contains('trace line'));
+      expect(results.failures.first.printOutput, contains('hello from test'));
+      expect(results.failures.first.durationMs, equals(40));
+    });
+
+    test('ignores malformed JSON lines and hidden test entries', () {
+      final jsonPath = p.join(tempDir.path, 'results.json');
+      File(jsonPath).writeAsStringSync(
+        [
+          '{"type":"testStart","test":{"id":10,"name":"hidden fail"},"time":10}',
+          '{bad json line',
+          '{"type":"error","testID":10,"error":"hidden boom","stackTrace":"hidden trace"}',
+          '{"type":"testDone","testID":10,"result":"failure","hidden":true,"skipped":false,"time":20}',
+          '{"type":"testStart","test":{"id":11,"name":"visible pass"},"time":21}',
+          '{"type":"testDone","testID":11,"result":"success","hidden":false,"skipped":false,"time":30}',
+          '{"type":"done","time":30}',
+        ].join('\n'),
+      );
+
+      final results = TestResultsUtil.parseTestResultsJson(jsonPath);
+      expect(results.parsed, isTrue);
+      expect(results.passed, equals(1));
+      expect(results.failed, equals(0));
+      expect(results.failures, isEmpty);
+    });
+  });
+
+  group('TestResultsUtil.writeTestJobSummary', () {
+    TestResults _parsed({
+      required int passed,
+      required int failed,
+      required int skipped,
+      int durationMs = 500,
+    }) {
+      final results = TestResults()
+        ..parsed = true
+        ..passed = passed
+        ..failed = failed
+        ..skipped = skipped
+        ..totalDurationMs = durationMs;
+      return results;
+    }
+
+    test(
+      'emits NOTE when parsed results are successful and exit code is 0',
+      () {
+        String? summary;
+        final results = _parsed(passed: 3, failed: 0, skipped: 1);
+
+        TestResultsUtil.writeTestJobSummary(
+          results,
+          0,
+          platformId: 'linux-x64',
+          writeSummary: (markdown) => summary = markdown,
+        );
+
+        expect(summary, isNotNull);
+        expect(summary!, contains('## Test Results — linux-x64'));
+        expect(summary!, contains('> [!NOTE]'));
+        expect(summary!, contains('All 4 tests passed'));
+      },
+    );
+
+    test(
+      'emits CAUTION when exit code is non-zero even if failed count is zero',
+      () {
+        String? summary;
+        final results = _parsed(passed: 2, failed: 0, skipped: 0);
+
+        TestResultsUtil.writeTestJobSummary(
+          results,
+          1,
+          platformId: 'linux <x64>',
+          writeSummary: (markdown) => summary = markdown,
+        );
+
+        expect(summary, isNotNull);
+        expect(summary!, contains('## Test Results — linux &lt;x64&gt;'));
+        expect(summary!, contains('> [!CAUTION]'));
+        expect(
+          summary!,
+          contains(
+            'Tests exited with code 1 despite no structured test failures.',
+          ),
+        );
+      },
+    );
+
+    test('emits CAUTION for unparsed results with non-zero exit code', () {
+      String? summary;
+      final results = TestResults(); // parsed=false by default
+
+      TestResultsUtil.writeTestJobSummary(
+        results,
+        7,
+        platformId: 'runner',
+        writeSummary: (markdown) => summary = markdown,
+      );
+
+      expect(summary, isNotNull);
+      expect(summary!, contains('> [!CAUTION]'));
+      expect(
+        summary!,
+        contains(
+          'Tests failed (exit code 7) — no structured results available.',
+        ),
+      );
+    });
+
+    test('emits NOTE for unparsed results with zero exit code', () {
+      String? summary;
+      final results = TestResults(); // parsed=false by default
+
+      TestResultsUtil.writeTestJobSummary(
+        results,
+        0,
+        platformId: 'runner',
+        writeSummary: (markdown) => summary = markdown,
+      );
+
+      expect(summary, isNotNull);
+      expect(summary!, contains('> [!NOTE]'));
+      expect(
+        summary!,
+        contains(
+          'Tests passed (exit code 0) — no structured results available.',
+        ),
+      );
+    });
+
+    test('emits CAUTION when parsed results contain failures', () {
+      String? summary;
+      final results = _parsed(passed: 1, failed: 1, skipped: 0);
+      results.failures.add(
+        TestFailure(
+          name: 'failing test',
+          error: 'boom',
+          stackTrace: 'trace',
+          printOutput: '',
+          durationMs: 12,
+        ),
+      );
+
+      TestResultsUtil.writeTestJobSummary(
+        results,
+        0,
+        platformId: 'linux',
+        writeSummary: (markdown) => summary = markdown,
+      );
+
+      expect(summary, isNotNull);
+      expect(summary!, contains('> [!CAUTION]'));
+      expect(summary!, contains('1 of 2 tests failed'));
+      expect(summary!, contains('### Failed Tests'));
+      expect(summary!, contains('failing test'));
+    });
+
+    test('truncates failure details after 20 entries in summary', () {
+      String? summary;
+      final results = _parsed(passed: 0, failed: 25, skipped: 0);
+      for (var i = 0; i < 25; i++) {
+        results.failures.add(
+          TestFailure(
+            name: 'failing test $i',
+            error: 'boom $i',
+            stackTrace: 'trace $i',
+            printOutput: '',
+            durationMs: i,
+          ),
+        );
+      }
+
+      TestResultsUtil.writeTestJobSummary(
+        results,
+        1,
+        platformId: 'linux',
+        writeSummary: (markdown) => summary = markdown,
+      );
+
+      expect(summary, isNotNull);
+      expect(
+        summary!,
+        contains(
+          '_...and 5 more failures. See test logs artifact for full details._',
+        ),
+      );
+      expect(summary!, isNot(contains('failing test 24')));
+    });
+  });
+}

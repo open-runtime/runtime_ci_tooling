@@ -312,16 +312,25 @@ The CI workflow (`.github/workflows/ci.yaml`) is generated from your `ci` sectio
 | `features.analysis_cache` | bool | `false` | Cache analysis results across runs |
 | `features.managed_analyze` | bool | `false` | Run `dart analyze` via tooling |
 | `features.managed_test` | bool | `false` | Run `dart test` via tooling |
-| `features.build_runner` | bool | `false` | Run `dart run build_runner build --delete-conflicting-outputs` before analyze, test, and web-test |
+| `features.build_runner` | bool | `false` | Run `dart run build_runner build --delete-conflicting-outputs` before analyze, test, and web-test. In multi-platform mode this runs once in `analyze` and once per matrix `test` job. |
 | `features.web_test` | bool | `false` | Add a standalone `web-test` job that runs `dart test -p chrome` on Ubuntu |
 | `web_test.concurrency` | int | `1` | Number of concurrent browser test suites (1–32) |
-| `web_test.paths` | list | `[]` | Specific test paths to run (empty = run all tests via `dart test -p chrome`) |
+| `web_test.paths` | list | `[]` | Specific test paths to run (empty = run all tests via `dart test -p chrome`). Paths are strictly validated (rules below). |
 | `platforms` | list | `["ubuntu"]` | Platform matrix. If 2+ entries, CI runs `analyze` once then `test` as a matrix. Valid: `ubuntu-x64`, `ubuntu-arm64`, `macos-arm64`, `macos-x64`, `windows-x64`, `windows-arm64` (plus aliases `ubuntu`, `macos`, `windows`). |
 | `runner_overrides` | object | `{}` | Override platform IDs to custom `runs-on` labels (e.g. org-managed GitHub-hosted runners). Example: `{ "ubuntu-arm64": "runtime-ubuntu-24.04-arm64-208gb-64core" }` |
 | `secrets` | object | `{}` | Additional secrets as `{ "ENV_NAME": "SECRET_NAME" }` |
 | `sub_packages` | list | `[]` | Sub-packages as `[{ "name": "...", "path": "..." }]` |
 
 When `features.web_test` is `true`, the `web_test` object is optional; if omitted, defaults are used (`concurrency: 1`, `paths: []`).
+
+`web_test.paths` validation rules:
+- Entries must be non-empty strings with no leading/trailing whitespace.
+- Paths must be relative (no absolute paths, no `~`, no traversal like `..`).
+- Paths must use forward slashes (`/`) and only `[A-Za-z0-9_./-]` characters.
+- `.` (repo root), duplicates (after normalization), and leading `-` are rejected.
+
+Cross-validation rule:
+- If `features.web_test` is `false`, omit `web_test` or set it to `{}`. Non-empty `web_test` config with the feature disabled is treated as dead config and fails validation.
 
 You can add custom steps before/after tests using user-preservable sections in the
 generated workflow — look for `# --- BEGIN USER: pre-test ---` and
@@ -413,6 +422,7 @@ The `validate` command checks:
 - TOML files contain required `prompt` and `description` keys
 - Dart files pass `dart analyze`
 - Markdown files exist and are non-empty
+- `.runtime_ci/config.json` `ci` semantics via `WorkflowGenerator.validate()` (field rules + cross-validation such as `features.web_test` vs `web_test`)
 
 The `status` command shows:
 - Installation status of all required/optional tools
@@ -455,13 +465,18 @@ The `.runtime_ci/config.json` file controls all behavior. Here is the complete s
   },
   "cross_repo": {
     "enabled": true,
+    "orgs": ["your-org"],
     "repos": [
       {
         "owner": "your-org",
         "repo": "dependent-repo",
         "relationship": "dependency"
       }
-    ]
+    ],
+    "discovery": {
+      "enabled": true,
+      "search_orgs": ["your-org"]
+    }
   },
   "labels": {
     "type": ["bug", "feature-request", "enhancement", "documentation", "question"],
@@ -514,6 +529,15 @@ The `.runtime_ci/config.json` file controls all behavior. Here is the complete s
 | `changelog_path` | `String` | `"CHANGELOG.md"` | Path to the CHANGELOG file |
 | `release_notes_path` | `String` | `"release_notes"` | Directory for release notes artifacts |
 
+#### `sentry`
+
+| Key | Default | Description |
+|---|---|---|
+| `organization` | `""` | Sentry organization slug |
+| `projects` | `[]` | List of Sentry project slugs to scan |
+| `scan_on_pre_release` | `true` | Whether to scan Sentry errors during pre-release |
+| `recent_errors_hours` | `168` | Hours of recent errors to include (168 = 7 days) |
+
 #### `thresholds`
 
 Controls automated triage actions based on aggregated agent confidence:
@@ -550,9 +574,12 @@ Available agents: `code_analysis`, `pr_correlation`, `duplicate`, `sentiment`, `
 | Key | Default | Description |
 |---|---|---|
 | `enabled` | `true` | Enable cross-repository issue discovery and linking |
+| `orgs` | `[]` | Optional allowlist of organizations for cross-repo operations |
 | `repos` | `[]` | List of dependent repositories to scan |
+| `discovery.enabled` | `true` | Enable automatic discovery of related repositories |
+| `discovery.search_orgs` | `[]` | Organizations scanned when discovery is enabled |
 
-Each repo entry: `{ "owner": "...", "repo": "...", "relationship": "dependency|consumer|..." }`
+Each repo entry: `{ "owner": "...", "repo": "...", "relationship": "dependency|consumer|related|..." }`. The default relationship is `related` when omitted.
 
 ---
 

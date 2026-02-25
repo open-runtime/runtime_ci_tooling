@@ -201,7 +201,6 @@ jobs:
           set -o pipefail
           mkdir -p "$TEST_LOG_DIR"
           dart run runtime_ci_tooling:manage_cicd test 2>&1 | tee "$TEST_LOG_DIR/console.log"
-          exit ${PIPESTATUS[0]}
         env:
           TEST_LOG_DIR: ${{ runner.temp }}/test-logs
 
@@ -395,6 +394,14 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
           restore-keys: ${{ runner.os }}-${{ runner.arch }}-dart-pub-
 
+      # ── shared:proto-setup ── keep in sync with single_platform ──
+<%#proto%>
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3.0.0
+
+      - run: dart pub global activate protoc_plugin 25.0.0
+
+<%/proto%>
       # ── shared:pub-get ── keep in sync with single_platform ──
       - run: dart pub get
         env:
@@ -416,7 +423,6 @@ jobs:
           set -o pipefail
           mkdir -p "$TEST_LOG_DIR"
           dart run runtime_ci_tooling:manage_cicd test 2>&1 | tee "$TEST_LOG_DIR/console.log"
-          exit ${PIPESTATUS[0]}
         env:
           TEST_LOG_DIR: ${{ runner.temp }}/test-logs
           PLATFORM_ID: ${{ matrix.platform_id }}
@@ -516,7 +522,7 @@ jobs:
         run: dart run build_runner build --delete-conflicting-outputs
 
 <%/build_runner%>
-      # ── shared:proto-verify ── keep in sync with single_platform / multi_platform analyze ──
+      # ── shared:proto-verify ── keep in sync with single_platform / multi_platform ──
 <%#proto%>
       - name: Verify proto files
         run: dart run runtime_ci_tooling:manage_cicd verify-protos
@@ -524,7 +530,7 @@ jobs:
 <%/proto%>
       - name: Setup Chrome
         id: setup-chrome
-        uses: browser-actions/setup-chrome@v2
+        uses: browser-actions/setup-chrome@4f8e94349a351df0f048634f25fec36c3c91eded # v2.1.1
         with:
           install-dependencies: true
 
@@ -533,7 +539,7 @@ jobs:
 
 <%#web_test_has_paths%>
       - name: Web Test
-        run: dart test -p chrome --concurrency=<%web_test_concurrency%> <%web_test_paths%>
+        run: dart test -p chrome --concurrency=<%web_test_concurrency%> -- <%web_test_paths%>
         env:
           CHROME_EXECUTABLE: ${{ steps.setup-chrome.outputs.chrome-path }}
 <%/web_test_has_paths%>
@@ -545,7 +551,7 @@ jobs:
 <%/web_test_has_paths%>
 
       - name: Upload web test artifacts on failure
-        if: failure()
+        if: failure() && hashFiles('**/test-results/**') != ''
         uses: actions/upload-artifact@v4
         with:
           name: web-test-artifacts

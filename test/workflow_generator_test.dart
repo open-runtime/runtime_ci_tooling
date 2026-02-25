@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:test/test.dart';
+import 'package:yaml/yaml.dart';
 
 import 'package:runtime_ci_tooling/src/cli/utils/workflow_generator.dart';
 
@@ -270,6 +271,34 @@ void main() {
         );
         expect(errors.where((e) => e.contains('secrets')), isEmpty);
       });
+
+      test('secrets key with hyphen produces error (unsafe identifier)', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(secrets: {'API-KEY': 'SOME_SECRET'}),
+        );
+        expect(errors, anyElement(contains('safe identifier')));
+      });
+
+      test('secrets key starting with digit produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(secrets: {'1API_KEY': 'SOME_SECRET'}),
+        );
+        expect(errors, anyElement(contains('safe identifier')));
+      });
+
+      test('secrets value with hyphen produces error (unsafe secret name)', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(secrets: {'API_KEY': 'SOME-SECRET'}),
+        );
+        expect(errors, anyElement(contains('safe secret name')));
+      });
+
+      test('secrets key and value with underscore pass', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(secrets: {'API_KEY': 'MY_SECRET_NAME'}),
+        );
+        expect(errors.where((e) => e.contains('secrets')), isEmpty);
+      });
     });
 
     // ---- personal_access_token_secret ----
@@ -301,6 +330,30 @@ void main() {
           isEmpty,
         );
       });
+
+      test('pat with hyphen produces error (unsafe identifier)', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(pat: 'MY-PAT'),
+        );
+        expect(errors, anyElement(contains('safe identifier')));
+      });
+
+      test('pat with special chars produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(pat: r'MY_PAT$'),
+        );
+        expect(errors, anyElement(contains('safe identifier')));
+      });
+
+      test('pat GITHUB_TOKEN passes', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(pat: 'GITHUB_TOKEN'),
+        );
+        expect(
+          errors.where((e) => e.contains('personal_access_token_secret')),
+          isEmpty,
+        );
+      });
     });
 
     // ---- line_length ----
@@ -327,6 +380,54 @@ void main() {
       test('null line_length is fine (optional)', () {
         final errors = WorkflowGenerator.validate(_validConfig());
         expect(errors.where((e) => e.contains('line_length')), isEmpty);
+      });
+
+      test('string line_length "abc" produces error (must be numeric)', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(lineLength: 'abc'),
+        );
+        expect(errors, anyElement(contains('must be numeric')));
+      });
+
+      test('string line_length with leading/trailing whitespace produces error',
+          () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(lineLength: ' 120 '),
+        );
+        expect(errors, anyElement(contains('whitespace')));
+      });
+
+      test('string line_length with embedded newline produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(lineLength: '12\n0'),
+        );
+        expect(errors, anyElement(contains('newlines or control')));
+      });
+
+      test('string line_length "0" produces error (out of range)', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(lineLength: '0'),
+        );
+        expect(errors, anyElement(contains('between 1 and 10000')));
+      });
+
+      test('string line_length "10001" produces error (out of range)', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(lineLength: '10001'),
+        );
+        expect(errors, anyElement(contains('between 1 and 10000')));
+      });
+
+      test('int line_length 0 produces error (out of range)', () {
+        final errors = WorkflowGenerator.validate(_validConfig(lineLength: 0));
+        expect(errors, anyElement(contains('between 1 and 10000')));
+      });
+
+      test('int line_length 10001 produces error (out of range)', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(lineLength: 10001),
+        );
+        expect(errors, anyElement(contains('between 1 and 10000')));
       });
     });
 
@@ -369,6 +470,17 @@ void main() {
           ),
         );
         expect(errors, anyElement(contains('name must be a non-empty string')));
+      });
+
+      test('sub_packages with name containing unsupported characters produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': 'foo bar', 'path': 'packages/foo'},
+            ],
+          ),
+        );
+        expect(errors, anyElement(contains('name contains unsupported characters')));
       });
 
       test('sub_packages with missing path produces error', () {
@@ -444,6 +556,28 @@ void main() {
           ),
         );
         expect(errors, anyElement(contains('must be a relative repo path')));
+      });
+
+      test('sub_packages path "." (repo root) produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': 'foo', 'path': '.'},
+            ],
+          ),
+        );
+        expect(errors, anyElement(contains('must not be repo root')));
+      });
+
+      test('sub_packages path starting with "-" produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': 'foo', 'path': '--help'},
+            ],
+          ),
+        );
+        expect(errors, anyElement(contains('must not start with "-"')));
       });
 
       test('sub_packages path with backslashes produces error', () {
@@ -580,9 +714,53 @@ void main() {
         expect(errors, anyElement(contains('must be a non-empty string')));
       });
 
+      test('runner_overrides value with surrounding whitespace produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(runnerOverrides: {'ubuntu': ' custom-runner '}),
+        );
+        expect(errors, anyElement(contains('leading/trailing whitespace')));
+      });
+
       test('valid runner_overrides passes', () {
         final errors = WorkflowGenerator.validate(
           _validConfig(runnerOverrides: {'ubuntu': 'custom-runner-label'}),
+        );
+        expect(errors.where((e) => e.contains('runner_overrides')), isEmpty);
+      });
+
+      test('runner_overrides value with newline produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(runnerOverrides: {'ubuntu': 'runner\nlabel'}),
+        );
+        expect(errors, anyElement(contains('newlines, control chars')));
+      });
+
+      test('runner_overrides value with tab produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(runnerOverrides: {'ubuntu': 'runner\tlabel'}),
+        );
+        expect(errors, anyElement(contains('newlines, control chars')));
+      });
+
+      test('runner_overrides value with YAML-injection char produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(runnerOverrides: {'ubuntu': 'runner:label'}),
+        );
+        expect(errors, anyElement(contains('unsafe YAML chars')));
+      });
+
+      test('runner_overrides value with dollar sign produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(runnerOverrides: {'ubuntu': r'runner$label'}),
+        );
+        expect(errors, anyElement(contains('unsafe YAML chars')));
+      });
+
+      test('runner_overrides value with hyphen and dot passes', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            runnerOverrides: {'ubuntu': 'runtime-ubuntu-24.04-x64-256gb'},
+          ),
         );
         expect(errors.where((e) => e.contains('runner_overrides')), isEmpty);
       });
@@ -750,6 +928,17 @@ void main() {
         },
       );
 
+      test('web_test.paths with single quote produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': ["test/web/foo'bar_test.dart"],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('unsupported characters')));
+      });
+
       test('web_test.paths duplicate (after normalization) produces error', () {
         final errors = WorkflowGenerator.validate(
           _validConfig(
@@ -804,6 +993,28 @@ void main() {
           ),
         );
         expect(errors, anyElement(contains('must be a relative repo path')));
+      });
+
+      test('web_test.paths "." (repo root) produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': ['.'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('must not be repo root')));
+      });
+
+      test('web_test.paths starting with "-" produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': ['--help'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('must not start with "-"')));
       });
 
       test('web_test.paths with newline produces error', () {
@@ -1044,7 +1255,7 @@ void main() {
       final errors = WorkflowGenerator.validate(<String, dynamic>{
         // missing dart_sdk, missing features
       });
-      expect(errors.length, greaterThanOrEqualTo(2));
+      expect(errors.length, equals(2));
       expect(errors, anyElement(contains('dart_sdk')));
       expect(errors, anyElement(contains('features')));
     });
@@ -1150,16 +1361,27 @@ void main() {
     Map<String, dynamic> _minimalValidConfig({
       bool webTest = false,
       Map<String, dynamic>? webTestConfig,
+      Map<String, dynamic>? featureOverrides,
+      List<String>? platforms,
     }) {
+      final features = <String, dynamic>{
+        'proto': false,
+        'lfs': false,
+        'format_check': false,
+        'analysis_cache': false,
+        'managed_analyze': false,
+        'managed_test': false,
+        'build_runner': false,
+        'web_test': webTest,
+      };
+      if (featureOverrides != null) {
+        features.addAll(featureOverrides);
+      }
+      features['web_test'] = webTest;
       return _validConfig(
         dartSdk: '3.9.2',
-        features: {
-          'proto': false,
-          'lfs': false,
-          'format_check': false,
-          'web_test': webTest,
-        },
-        platforms: ['ubuntu'],
+        features: features,
+        platforms: platforms ?? ['ubuntu'],
         webTest: webTestConfig,
       );
     }
@@ -1283,6 +1505,7 @@ void main() {
       final rendered = gen.render();
       expect(rendered, contains("'test/web/foo_test.dart'"));
       expect(rendered, contains('--concurrency=2'));
+      expect(rendered, contains('-- \'test/web/foo_test.dart\''));
     });
 
     test(
@@ -1299,5 +1522,160 @@ void main() {
         expect(rendered, contains('--concurrency=32'));
       },
     );
+
+    test('rendered output parses as valid YAML with jobs map', () {
+      final gen = WorkflowGenerator(
+        ciConfig: _minimalValidConfig(),
+        toolingVersion: '0.0.0-test',
+      );
+      final rendered = gen.render();
+      final parsed = loadYaml(rendered) as YamlMap;
+      final jobs = parsed['jobs'] as YamlMap;
+      expect(jobs.containsKey('pre-check'), isTrue);
+    });
+
+    test('feature flags render expected snippets', () {
+      final cases = <Map<String, String>>[
+        {'feature': 'proto', 'snippet': 'Install protoc'},
+        {'feature': 'lfs', 'snippet': 'lfs: true'},
+        {'feature': 'format_check', 'snippet': 'auto-format:'},
+        {'feature': 'analysis_cache', 'snippet': 'Cache Dart analysis'},
+        {'feature': 'managed_analyze', 'snippet': 'runtime_ci_tooling:manage_cicd analyze'},
+        {'feature': 'managed_test', 'snippet': 'runtime_ci_tooling:manage_cicd test'},
+        {'feature': 'build_runner', 'snippet': 'Run build_runner'},
+      ];
+
+      for (final c in cases) {
+        final feature = c['feature']!;
+        final snippet = c['snippet']!;
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(featureOverrides: {feature: true}),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        expect(rendered, contains(snippet), reason: 'Feature "$feature" should render "$snippet".');
+      }
+    });
+
+    test('build_runner=false omits build_runner step', () {
+      final gen = WorkflowGenerator(
+        ciConfig: _minimalValidConfig(featureOverrides: {'build_runner': false}),
+        toolingVersion: '0.0.0-test',
+      );
+      final rendered = gen.render();
+      expect(rendered, isNot(contains('Run build_runner')));
+    });
+
+    test('multi-platform render emits analyze + matrix test jobs', () {
+      final gen = WorkflowGenerator(
+        ciConfig: _minimalValidConfig(platforms: ['ubuntu', 'macos']),
+        toolingVersion: '0.0.0-test',
+      );
+      final rendered = gen.render();
+      final parsed = loadYaml(rendered) as YamlMap;
+      final jobs = parsed['jobs'] as YamlMap;
+
+      expect(jobs.containsKey('analyze'), isTrue);
+      expect(jobs.containsKey('test'), isTrue);
+      expect(jobs.containsKey('analyze-and-test'), isFalse);
+
+      final testJob = jobs['test'] as YamlMap;
+      final strategy = testJob['strategy'] as YamlMap;
+      final matrix = strategy['matrix'] as YamlMap;
+      final include = matrix['include'] as YamlList;
+      expect(include.length, equals(2));
+    });
+
+    // ---- render(existingContent) / _preserveUserSections ----
+    group('render(existingContent) preserves user sections', () {
+      test('user section content is preserved when existingContent has custom lines in a user block', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(),
+          toolingVersion: '0.0.0-test',
+        );
+        final base = gen.render();
+        // Append a user block with content so extraction finds it (first occurrence is empty)
+        const customBlock = '''
+# --- BEGIN USER: pre-test ---
+      - name: Custom pre-test step
+        run: echo "user-added"
+# --- END USER: pre-test ---
+''';
+        final existing = base + customBlock;
+        final rendered = gen.render(existingContent: existing);
+        expect(rendered, contains('Custom pre-test step'));
+        expect(rendered, contains('user-added'));
+        expect(rendered, contains('# --- BEGIN USER: pre-test ---'));
+        expect(rendered, contains('# --- END USER: pre-test ---'));
+      });
+
+      test('CRLF normalization: existing content with \\r\\n still preserves sections', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(),
+          toolingVersion: '0.0.0-test',
+        );
+        final base = gen.render();
+        const customContent = '\r\n      - run: echo "crlf-test"\r\n';
+        final existing = base.replaceFirst(
+          '# --- BEGIN USER: pre-test ---\n# --- END USER: pre-test ---',
+          '# --- BEGIN USER: pre-test ---$customContent# --- END USER: pre-test ---',
+        );
+        final rendered = gen.render(existingContent: existing);
+        expect(rendered, contains('crlf-test'));
+        expect(rendered, contains('# --- BEGIN USER: pre-test ---'));
+      });
+
+      test('multiple user sections preserve independently', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(),
+          toolingVersion: '0.0.0-test',
+        );
+        final base = gen.render();
+        var existing = base;
+        existing = existing.replaceFirst(
+          '# --- BEGIN USER: pre-test ---\n# --- END USER: pre-test ---',
+          '# --- BEGIN USER: pre-test ---\n      - run: echo pre\n# --- END USER: pre-test ---',
+        );
+        existing = existing.replaceFirst(
+          '# --- BEGIN USER: post-test ---\n# --- END USER: post-test ---',
+          '# --- BEGIN USER: post-test ---\n      - run: echo post\n# --- END USER: post-test ---',
+        );
+        existing = existing.replaceFirst(
+          '# --- BEGIN USER: extra-jobs ---\n# --- END USER: extra-jobs ---',
+          '# --- BEGIN USER: extra-jobs ---\n  custom-job:\n    runs-on: ubuntu-latest\n# --- END USER: extra-jobs ---',
+        );
+        final rendered = gen.render(existingContent: existing);
+        expect(rendered, contains('echo pre'));
+        expect(rendered, contains('echo post'));
+        expect(rendered, contains('custom-job:'));
+        expect(rendered, contains('runs-on: ubuntu-latest'));
+      });
+
+      test('empty/whitespace-only existing user section does not overwrite rendered section', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(),
+          toolingVersion: '0.0.0-test',
+        );
+        final base = gen.render();
+        // Existing has pre-test with only whitespace; post-test has real content
+        final existing = base
+            .replaceFirst(
+              '# --- BEGIN USER: pre-test ---\n# --- END USER: pre-test ---',
+              '# --- BEGIN USER: pre-test ---\n   \n  \t  \n# --- END USER: pre-test ---',
+            )
+            .replaceFirst(
+              '# --- BEGIN USER: post-test ---\n# --- END USER: post-test ---',
+              '# --- BEGIN USER: post-test ---\n      - run: echo kept\n# --- END USER: post-test ---',
+            );
+        final rendered = gen.render(existingContent: existing);
+        // pre-test: whitespace-only was skipped, so rendered keeps empty placeholder
+        expect(
+          rendered,
+          contains('# --- BEGIN USER: pre-test ---\n# --- END USER: pre-test ---'),
+        );
+        // post-test: real content was preserved
+        expect(rendered, contains('echo kept'));
+      });
+    });
   });
 }

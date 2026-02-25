@@ -57,6 +57,27 @@ const Set<String> _knownFeatureKeys = {
 
 const Set<String> _knownWebTestKeys = {'concurrency', 'paths'};
 
+/// Safe identifier for env vars and GitHub secrets (e.g. API_KEY, GITHUB_TOKEN).
+/// Must start with letter or underscore, then alphanumeric/underscore only.
+bool _isSafeSecretIdentifier(String s) {
+  return RegExp(r'^[A-Za-z_][A-Za-z0-9_]*$').hasMatch(s);
+}
+
+/// Runner label must not contain newlines, control chars, or YAML-injection chars.
+/// Allows alphanumeric, underscore, hyphen, dot (e.g. ubuntu-latest, runtime-ubuntu-24.04-x64).
+bool _isSafeRunnerLabel(String s) {
+  if (s.contains(RegExp(r'[\r\n\t\x00-\x1f]'))) return false;
+  if (RegExp('[{}:\[\]#@|>&*"\'\\\$]').hasMatch(s)) return false;
+  return RegExp(r'^[A-Za-z0-9_.-]+$').hasMatch(s);
+}
+
+/// Sub-package names are rendered into YAML and shell-facing messages.
+/// Keep them to a conservative character set.
+bool _isSafeSubPackageName(String s) {
+  if (s.contains(RegExp(r'[\r\n\t\x00-\x1f]'))) return false;
+  return RegExp(r'^[A-Za-z0-9_.-]+$').hasMatch(s);
+}
+
 /// Renders CI workflow YAML from a Mustache skeleton template and config.json.
 ///
 /// The skeleton uses `<% %>` delimiters (set via `{{=<% %>=}}` at the top)
@@ -182,8 +203,8 @@ class WorkflowGenerator {
 
     return {
       'tooling_version': toolingVersion,
-      'dart_sdk': ciConfig['dart_sdk'] ?? '3.9.2',
-      'line_length': '${ciConfig['line_length'] ?? 120}',
+      'dart_sdk': ciConfig['dart_sdk'] as String,
+      'line_length': _resolveLineLength(ciConfig['line_length']),
       'pat_secret': ciConfig['personal_access_token_secret'] as String? ?? 'GITHUB_TOKEN',
 
       // Feature flags
@@ -209,7 +230,7 @@ class WorkflowGenerator {
       'sub_packages': subPackages
           .whereType<Map<String, dynamic>>()
           .where((sp) => sp['name'] != null && sp['path'] != null)
-          .map((sp) => {'name': sp['name'], 'path': sp['path']})
+          .map((sp) => {'name': (sp['name'] as String).trim(), 'path': (sp['path'] as String).trim()})
           .toList(),
 
       // Platform support
@@ -229,6 +250,15 @@ class WorkflowGenerator {
       }
     }
     return '1';
+  }
+
+  static String _resolveLineLength(dynamic raw) {
+    if (raw is int) return '$raw';
+    if (raw is String) {
+      final parsed = int.tryParse(raw.trim());
+      if (parsed != null) return '$parsed';
+    }
+    return '120';
   }
 
   /// Shared filter: extracts valid, normalized web test paths from config.
@@ -346,14 +376,53 @@ class WorkflowGenerator {
     final secrets = ciConfig['secrets'];
     if (secrets != null && secrets is! Map) {
       errors.add('ci.secrets must be an object, got ${secrets.runtimeType}');
+    } else if (secrets is Map) {
+      for (final entry in secrets.entries) {
+        final key = entry.key;
+        final value = entry.value;
+        if (key is! String) {
+          errors.add('ci.secrets keys must be strings, got ${key.runtimeType}');
+          continue;
+        }
+        if (!_isSafeSecretIdentifier(key)) {
+          errors.add('ci.secrets key "$key" must be a safe identifier (e.g. API_KEY, GITHUB_TOKEN)');
+        }
+        if (value is String) {
+          if (!_isSafeSecretIdentifier(value)) {
+            errors.add('ci.secrets["$key"] value "$value" must be a safe secret name (e.g. MY_SECRET)');
+          }
+        }
+      }
     }
     final pat = ciConfig['personal_access_token_secret'];
     if (pat != null && (pat is! String || pat.isEmpty)) {
       errors.add('ci.personal_access_token_secret must be a non-empty string');
+    } else if (pat is String && !_isSafeSecretIdentifier(pat)) {
+      errors.add('ci.personal_access_token_secret "$pat" must be a safe identifier (e.g. GITHUB_TOKEN)');
     }
     final lineLength = ciConfig['line_length'];
     if (lineLength != null && lineLength is! int && lineLength is! String) {
       errors.add('ci.line_length must be a number or string, got ${lineLength.runtimeType}');
+    } else if (lineLength is int) {
+      if (lineLength < 1 || lineLength > 10000) {
+        errors.add('ci.line_length must be between 1 and 10000, got $lineLength');
+      }
+    } else if (lineLength is String) {
+      final trimmed = lineLength.trim();
+      if (trimmed.isEmpty) {
+        errors.add('ci.line_length string must not be empty or whitespace-only');
+      } else if (trimmed != lineLength) {
+        errors.add('ci.line_length must not have leading/trailing whitespace');
+      } else if (lineLength.contains(RegExp(r'[\r\n\t\x00-\x1f]'))) {
+        errors.add('ci.line_length must not contain newlines or control characters');
+      } else {
+        final parsed = int.tryParse(lineLength);
+        if (parsed == null) {
+          errors.add('ci.line_length string must be numeric, got "$lineLength"');
+        } else if (parsed < 1 || parsed > 10000) {
+          errors.add('ci.line_length must be between 1 and 10000, got $lineLength');
+        }
+      }
     }
     final platforms = ciConfig['platforms'];
     if (platforms != null) {
@@ -389,6 +458,10 @@ class WorkflowGenerator {
           final pathValue = sp['path'];
           if (name is! String || name.trim().isEmpty) {
             errors.add('ci.sub_packages[].name must be a non-empty string');
+          } else if (name != name.trim()) {
+            errors.add('ci.sub_packages[].name must not have leading/trailing whitespace');
+          } else if (!_isSafeSubPackageName(name)) {
+            errors.add('ci.sub_packages[].name contains unsupported characters: "$name"');
           } else if (!seenNames.add(name)) {
             errors.add('ci.sub_packages contains duplicate name "$name"');
           }
@@ -417,6 +490,16 @@ class WorkflowGenerator {
           final normalized = p.posix.normalize(pathValue);
           if (normalized.startsWith('..') || normalized.contains('/../')) {
             errors.add('ci.sub_packages["${name is String ? name : '?'}"].path must not traverse outside the repo');
+            continue;
+          }
+          if (normalized == '.') {
+            errors.add('ci.sub_packages["${name is String ? name : '?'}"].path must not be repo root (".")');
+            continue;
+          }
+          if (normalized.startsWith('-')) {
+            errors.add(
+              'ci.sub_packages["${name is String ? name : '?'}"].path must not start with "-" (reserved for CLI options)',
+            );
             continue;
           }
           if (RegExp(r'[^A-Za-z0-9_./-]').hasMatch(pathValue)) {
@@ -449,6 +532,10 @@ class WorkflowGenerator {
           }
           if (value is! String || value.trim().isEmpty) {
             errors.add('ci.runner_overrides["$key"] must be a non-empty string');
+          } else if (value != value.trim()) {
+            errors.add('ci.runner_overrides["$key"] must not have leading/trailing whitespace');
+          } else if (!_isSafeRunnerLabel(value.trim())) {
+            errors.add('ci.runner_overrides["$key"] must not contain newlines, control chars, or unsafe YAML chars');
           }
         }
       }
@@ -506,6 +593,14 @@ class WorkflowGenerator {
               final normalized = p.posix.normalize(pathValue);
               if (normalized.startsWith('..') || normalized.contains('/../')) {
                 errors.add('ci.web_test.paths[$i] must not traverse outside the repo');
+                continue;
+              }
+              if (normalized == '.') {
+                errors.add('ci.web_test.paths[$i] must not be repo root (".")');
+                continue;
+              }
+              if (normalized.startsWith('-')) {
+                errors.add('ci.web_test.paths[$i] must not start with "-" (reserved for CLI options)');
                 continue;
               }
               if (RegExp(r'[^A-Za-z0-9_./-]').hasMatch(pathValue)) {

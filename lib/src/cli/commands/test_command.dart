@@ -9,6 +9,7 @@ import '../../triage/utils/config.dart';
 import '../utils/logger.dart';
 import '../utils/repo_utils.dart';
 import '../utils/step_summary.dart';
+import '../utils/test_results_util.dart';
 import '../utils/sub_package_utils.dart';
 
 /// Run `dart test` on the root package and all configured sub-packages with
@@ -44,11 +45,15 @@ class TestCommand extends Command<void> {
     final failures = <String>[];
 
     // Determine log directory: TEST_LOG_DIR (CI) or .dart_tool/test-logs/ (local)
-    final logDir = Platform.environment['TEST_LOG_DIR'] ?? p.join(repoRoot, '.dart_tool', 'test-logs');
+    late final String logDir;
     try {
-      Directory(logDir).createSync(recursive: true);
+      logDir = RepoUtils.resolveTestLogDir(repoRoot);
+      RepoUtils.ensureSafeDirectory(logDir);
+    } on StateError catch (e) {
+      Logger.error('$e');
+      exit(1);
     } on FileSystemException catch (e) {
-      Logger.error('Cannot create log directory $logDir: $e');
+      Logger.error('Cannot use log directory: $e');
       exit(1);
     }
     Logger.info('Log directory: $logDir');
@@ -118,19 +123,19 @@ class TestCommand extends Command<void> {
 
       // Write console output to log files
       try {
-        File(p.join(logDir, 'dart_stdout.log')).writeAsStringSync(stdoutBuf.toString());
+        RepoUtils.writeFileSafely(p.join(logDir, 'dart_stdout.log'), stdoutBuf.toString());
         if (stderrBuf.isNotEmpty) {
-          File(p.join(logDir, 'dart_stderr.log')).writeAsStringSync(stderrBuf.toString());
+          RepoUtils.writeFileSafely(p.join(logDir, 'dart_stderr.log'), stderrBuf.toString());
         }
       } on FileSystemException catch (e) {
         Logger.warn('Could not write log files: $e');
       }
 
       // Parse the JSON results file for structured test data
-      final results = StepSummary.parseTestResultsJson(jsonPath);
+      final results = TestResultsUtil.parseTestResultsJson(jsonPath);
 
       // Generate and write the rich job summary
-      StepSummary.writeTestJobSummary(results, exitCode);
+      TestResultsUtil.writeTestJobSummary(results, exitCode);
 
       if (exitCode != 0) {
         Logger.error('Root tests failed with exit code $exitCode');
@@ -211,7 +216,7 @@ class TestCommand extends Command<void> {
 
     if (failures.isNotEmpty) {
       Logger.error('Tests failed for ${failures.length} package(s): ${failures.join(', ')}');
-      final failureBullets = failures.map((name) => '- `$name`').join('\n');
+      final failureBullets = failures.map((name) => '- `${StepSummary.escapeHtml(name)}`').join('\n');
       StepSummary.write('\n## Sub-package Test Failures\n\n$failureBullets\n');
       exit(1);
     }

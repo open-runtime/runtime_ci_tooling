@@ -173,6 +173,15 @@ class TriageConfig {
         .toList();
   }
 
+  /// Optional allowlist of organizations considered for cross-repo workflows.
+  List<String> get crossRepoOrgs => _strList(['cross_repo', 'orgs'], []);
+
+  /// Whether automatic cross-repo discovery is enabled.
+  bool get crossRepoDiscoveryEnabled => _bool(['cross_repo', 'discovery', 'enabled'], true);
+
+  /// Organizations used for auto-discovery; falls back to [crossRepoOrgs].
+  List<String> get crossRepoDiscoverySearchOrgs => _strList(['cross_repo', 'discovery', 'search_orgs'], crossRepoOrgs);
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Labels (REQUIRED -- no hardcoded package-specific area labels)
   // ═══════════════════════════════════════════════════════════════════════════

@@ -5,6 +5,7 @@ import 'dart:io';
 
 import '../triage/utils/run_context.dart';
 import '../triage/utils/config.dart';
+import 'commands/test_command.dart';
 import 'options/manage_cicd_options.dart';
 import 'utils/step_summary.dart';
 
@@ -431,7 +432,7 @@ Future<void> _runExplore(String repoRoot) async {
     _error('Ensure runtime_ci_tooling is properly installed (dart pub get).');
     exit(1);
   }
-  final prompt = _runSync('dart run $promptScriptPath "$prevTag" "$newVersion"', repoRoot);
+  final prompt = _runSync('dart run $promptScriptPath ${_shellEscape(prevTag)} ${_shellEscape(newVersion)}', repoRoot);
   if (prompt.isEmpty) {
     _error('Prompt generator produced empty output. Check $promptScriptPath');
     exit(1);
@@ -451,7 +452,7 @@ Future<void> _runExplore(String repoRoot) async {
     'sh',
     [
       '-c',
-      'cat $promptPath | gemini '
+      'cat ${_shellEscape(promptPath)} | gemini '
           '-o json --yolo '
           '-m $kGeminiProModel '
           "--allowed-tools 'run_shell_command(git),run_shell_command(gh)'",
@@ -586,7 +587,7 @@ Future<void> _runCompose(String repoRoot) async {
     _error('Prompt script not found: $composerScript');
     exit(1);
   }
-  final prompt = _runSync('dart run $composerScript "$prevTag" "$newVersion"', repoRoot);
+  final prompt = _runSync('dart run $composerScript ${_shellEscape(prevTag)} ${_shellEscape(newVersion)}', repoRoot);
   if (prompt.isEmpty) {
     _error('Composer prompt generator produced empty output.');
     exit(1);
@@ -635,11 +636,11 @@ Future<void> _runCompose(String repoRoot) async {
     'sh',
     [
       '-c',
-      'cat $promptPath | gemini '
+      'cat ${_shellEscape(promptPath)} | gemini '
           '-o json --yolo '
           '-m $kGeminiProModel '
           "--allowed-tools 'run_shell_command(git),run_shell_command(gh)' "
-          '${includes.join(" ")}',
+          '${includes.map(_shellEscape).join(" ")}',
     ],
     workingDirectory: repoRoot,
     environment: {...Platform.environment},
@@ -805,7 +806,10 @@ Future<void> _runReleaseNotes(String repoRoot) async {
     _error('Prompt script not found: $rnScript');
     exit(1);
   }
-  final prompt = _runSync('dart run $rnScript "$prevTag" "$newVersion" "$bumpType"', repoRoot);
+  final prompt = _runSync(
+    'dart run $rnScript ${_shellEscape(prevTag)} ${_shellEscape(newVersion)} ${_shellEscape(bumpType)}',
+    repoRoot,
+  );
   if (prompt.isEmpty) {
     _error('Release notes prompt generator produced empty output.');
     exit(1);
@@ -849,12 +853,12 @@ Future<void> _runReleaseNotes(String repoRoot) async {
     'sh',
     [
       '-c',
-      'cat $promptPath | gemini '
+      'cat ${_shellEscape(promptPath)} | gemini '
           '-o json --yolo '
           '-m $kGeminiProModel '
           // Expanded tool access: git, gh, AND shell commands for reading files
           "--allowed-tools 'run_shell_command(git),run_shell_command(gh),run_shell_command(cat),run_shell_command(head),run_shell_command(tail)' "
-          '${includes.join(" ")}',
+          '${includes.map(_shellEscape).join(" ")}',
     ],
     workingDirectory: repoRoot,
     environment: {...Platform.environment},
@@ -977,7 +981,7 @@ List<Map<String, String>> _gatherVerifiedContributors(String repoRoot, String pr
   // Step 1: Get one commit SHA per unique author email in the release range
   final gitResult = Process.runSync('sh', [
     '-c',
-    'git log "$prevTag"..HEAD --format="%H %ae" --no-merges | sort -u -k2,2',
+    'git log ${_shellEscape(prevTag)}..HEAD --format="%H %ae" --no-merges | sort -u -k2,2',
   ], workingDirectory: repoRoot);
 
   if (gitResult.exitCode != 0) {
@@ -1358,7 +1362,7 @@ Future<void> _generateAutodocFile({
   if (libDir.isNotEmpty) promptArgs.add(libDir);
   if (docType == 'migration' && previousHash.isNotEmpty) promptArgs.add(previousHash);
 
-  final prompt = _runSync('dart run $repoRoot/$templatePath ${promptArgs.map((a) => '"$a"').join(' ')}', repoRoot);
+  final prompt = _runSync('dart run $repoRoot/$templatePath ${promptArgs.map(_shellEscape).join(' ')}', repoRoot);
 
   if (prompt.isEmpty) {
     _warn('  [$moduleId] Empty prompt for $docType, skipping');
@@ -1399,7 +1403,10 @@ Do not skip any -- completeness is more important than brevity.
 
   final pass1Result = Process.runSync(
     'sh',
-    ['-c', 'cat ${pass1Prompt.path} | gemini --yolo -m $kGeminiProModel ${includes.join(" ")}'],
+    [
+      '-c',
+      'cat ${_shellEscape(pass1Prompt.path)} | gemini --yolo -m $kGeminiProModel ${includes.map(_shellEscape).join(" ")}',
+    ],
     workingDirectory: repoRoot,
     environment: {...Platform.environment},
   );
@@ -1488,7 +1495,10 @@ Write the corrected file to the same path: $absOutputFile
 
   final pass2Result = Process.runSync(
     'sh',
-    ['-c', 'cat ${pass2Prompt.path} | gemini --yolo -m $kGeminiProModel ${includes.join(" ")}'],
+    [
+      '-c',
+      'cat ${_shellEscape(pass2Prompt.path)} | gemini --yolo -m $kGeminiProModel ${includes.map(_shellEscape).join(" ")}',
+    ],
     workingDirectory: repoRoot,
     environment: {...Platform.environment},
   );
@@ -1514,7 +1524,7 @@ Write the corrected file to the same path: $absOutputFile
 /// Compute SHA256 hash of all source files in the given paths.
 String _computeModuleHash(String repoRoot, List<String> sourcePaths) {
   // Use git to compute a hash of the directory contents
-  final paths = sourcePaths.map((p) => '$repoRoot/$p').join(' ');
+  final paths = sourcePaths.map((p) => _shellEscape('$repoRoot/$p')).join(' ');
   final result = Process.runSync('sh', [
     '-c',
     'find $paths -type f \\( -name "*.proto" -o -name "*.dart" \\) 2>/dev/null | sort | xargs cat 2>/dev/null | sha256sum | cut -d" " -f1',
@@ -1816,8 +1826,11 @@ Future<void> _runDetermineVersion(String repoRoot, List<String> args) async {
       _success('Version bump rationale saved to $kVersionBumpsDir/v$newVersion.md');
     } else {
       // Generate basic rationale
-      final commitCount = _runSync('git rev-list --count "$prevTag"..HEAD 2>/dev/null', repoRoot);
-      final commits = _runSync('git log "$prevTag"..HEAD --oneline --no-merges 2>/dev/null | head -20', repoRoot);
+      final commitCount = _runSync('git rev-list --count ${_shellEscape(prevTag)}..HEAD 2>/dev/null', repoRoot);
+      final commits = _runSync(
+        'git log ${_shellEscape(prevTag)}..HEAD --oneline --no-merges 2>/dev/null | head -20',
+        repoRoot,
+      );
       File(targetPath).writeAsStringSync(
         '# Version Bump: v$newVersion\n\n'
         '**Date**: ${DateTime.now().toUtc().toIso8601String()}\n'
@@ -2152,105 +2165,8 @@ ${_artifactLink()}
 ///
 /// All log files are written to [logDir] (`$TEST_LOG_DIR` in CI, or
 /// `<repoRoot>/.dart_tool/test-logs/` locally).
-Future<void> _runTest(String repoRoot) async {
-  _header('Running Tests');
-
-  // Skip gracefully if no test/ directory exists
-  final testDir = Directory('$repoRoot/test');
-  if (!testDir.existsSync()) {
-    _success('No test/ directory found — skipping tests');
-    _writeStepSummary('## Test Results\n\n**No test/ directory found — skipped.**\n');
-    return;
-  }
-
-  // Determine log directory: TEST_LOG_DIR (CI) or .dart_tool/test-logs/ (local)
-  final logDir = Platform.environment['TEST_LOG_DIR'] ?? '$repoRoot/.dart_tool/test-logs';
-  try {
-    Directory(logDir).createSync(recursive: true);
-  } on FileSystemException catch (e) {
-    _error('Cannot create log directory $logDir: $e');
-    exit(1);
-  }
-
-  final jsonPath = '$logDir/results.json';
-  final expandedPath = '$logDir/expanded.txt';
-
-  // Build test arguments with two file reporters + expanded console output
-  final testArgs = <String>[
-    'test',
-    '--exclude-tags',
-    'gcp,integration',
-    '--chain-stack-traces',
-    '--reporter',
-    'expanded',
-    '--file-reporter',
-    'json:$jsonPath',
-    '--file-reporter',
-    'expanded:$expandedPath',
-  ];
-
-  _info('Log directory: $logDir');
-  _info('Running: dart ${testArgs.join(' ')}');
-
-  // Use Process.start with piped output so we can both stream to console
-  // AND capture the full output for summary generation.
-  final process = await Process.start(Platform.resolvedExecutable, testArgs, workingDirectory: repoRoot);
-
-  // Stream stdout and stderr to console in real-time while capturing
-  final stdoutBuf = StringBuffer();
-  final stderrBuf = StringBuffer();
-
-  final stdoutSub = process.stdout.transform(utf8.decoder).listen((data) {
-    stdout.write(data);
-    stdoutBuf.write(data);
-  });
-  final stderrSub = process.stderr.transform(utf8.decoder).listen((data) {
-    stderr.write(data);
-    stderrBuf.write(data);
-  });
-
-  final stdoutDone = stdoutSub.asFuture<void>();
-  final stderrDone = stderrSub.asFuture<void>();
-
-  // Wait for process to exit (45-min safety timeout)
-  const processTimeout = Duration(minutes: 45);
-  final exitCode = await process.exitCode.timeout(
-    processTimeout,
-    onTimeout: () {
-      _error('Test process exceeded ${processTimeout.inMinutes}-minute timeout — killing.');
-      process.kill(); // No signal arg — cross-platform safe
-      return -1;
-    },
-  );
-  try {
-    await Future.wait([stdoutDone, stderrDone]).timeout(const Duration(seconds: 30));
-  } catch (_) {
-    // Process killed or streams timed out — cancel subscriptions to avoid leaks
-    await stdoutSub.cancel();
-    await stderrSub.cancel();
-  }
-
-  // Parse the JSON results file for structured test data
-  final results = StepSummary.parseTestResultsJson(jsonPath);
-
-  // Write console output to log file as well (supplements shell-level tee)
-  try {
-    File('$logDir/dart_stdout.log').writeAsStringSync(stdoutBuf.toString());
-    if (stderrBuf.isNotEmpty) {
-      File('$logDir/dart_stderr.log').writeAsStringSync(stderrBuf.toString());
-    }
-  } on FileSystemException catch (e) {
-    _warn('Could not write log files: $e');
-  }
-
-  // Generate and write the rich job summary
-  StepSummary.writeTestJobSummary(results, exitCode);
-
-  if (exitCode != 0) {
-    _error('Tests failed (exit code $exitCode)');
-    exit(exitCode);
-  }
-  _success('All tests passed');
+Future<void> _runTest(String _) async {
+  await TestCommand().run();
 }
 
 /// Run dart analyze and fail only on actual errors.
@@ -2379,7 +2295,7 @@ Future<void> _runDocumentation(String repoRoot) async {
     _error('Prompt script not found: $docScript');
     exit(1);
   }
-  final prompt = _runSync('dart run $docScript "$prevTag" "$newVersion"', repoRoot);
+  final prompt = _runSync('dart run $docScript ${_shellEscape(prevTag)} ${_shellEscape(newVersion)}', repoRoot);
   if (prompt.isEmpty) {
     _error('Documentation prompt generator produced empty output.');
     exit(1);
@@ -2407,11 +2323,11 @@ Future<void> _runDocumentation(String repoRoot) async {
     'sh',
     [
       '-c',
-      'cat $promptPath | gemini '
+      'cat ${_shellEscape(promptPath)} | gemini '
           '-o json --yolo '
           '-m $kGeminiProModel '
           "--allowed-tools 'run_shell_command(git),run_shell_command(gh),run_shell_command(cat),run_shell_command(head)' "
-          '${includes.join(" ")}',
+          '${includes.map(_shellEscape).join(" ")}',
     ],
     workingDirectory: repoRoot,
     environment: {...Platform.environment},
@@ -2832,8 +2748,11 @@ String _detectNextVersion(String repoRoot, String prevTag) {
   var patch = int.tryParse(parts[2]) ?? 0;
 
   // ── Pass 1: Fast regex heuristic (fallback if Gemini unavailable) ──
-  final commits = _runSync('git log "$prevTag"..HEAD --pretty=format:"%s%n%b" 2>/dev/null', repoRoot);
-  final commitSubjects = _runSync('git log "$prevTag"..HEAD --pretty=format:"%s" --no-merges 2>/dev/null', repoRoot);
+  final commits = _runSync('git log ${_shellEscape(prevTag)}..HEAD --pretty=format:"%s%n%b" 2>/dev/null', repoRoot);
+  final commitSubjects = _runSync(
+    'git log ${_shellEscape(prevTag)}..HEAD --pretty=format:"%s" --no-merges 2>/dev/null',
+    repoRoot,
+  );
 
   var bump = 'patch';
   if (RegExp(r'(BREAKING CHANGE|^[a-z]+(\(.+\))?!:)', multiLine: true).hasMatch(commits)) {
@@ -2855,9 +2774,12 @@ String _detectNextVersion(String repoRoot, String prevTag) {
 
   // ── Pass 2: Gemini analysis (authoritative, overrides regex if available) ──
   if (_commandExists('gemini') && Platform.environment['GEMINI_API_KEY'] != null) {
-    final commitCount = _runSync('git rev-list --count "$prevTag"..HEAD 2>/dev/null', repoRoot);
-    final changedFiles = _runSync('git diff --name-only "$prevTag"..HEAD 2>/dev/null | head -30', repoRoot);
-    final diffStat = _runSync('git diff --stat "$prevTag"..HEAD 2>/dev/null | tail -5', repoRoot);
+    final commitCount = _runSync('git rev-list --count ${_shellEscape(prevTag)}..HEAD 2>/dev/null', repoRoot);
+    final changedFiles = _runSync(
+      'git diff --name-only ${_shellEscape(prevTag)}..HEAD 2>/dev/null | head -30',
+      repoRoot,
+    );
+    final diffStat = _runSync('git diff --stat ${_shellEscape(prevTag)}..HEAD 2>/dev/null | tail -5', repoRoot);
     final existingTags = _runSync("git tag -l 'v*' --sort=-version:refname | head -10", repoRoot);
     final commitSummary = commits.split('\n').take(50).join('\n');
 
@@ -2904,7 +2826,7 @@ String _detectNextVersion(String repoRoot, String prevTag) {
     final promptPath = '${versionAnalysisDir.path}/prompt.txt';
     File(promptPath).writeAsStringSync(prompt);
     final geminiResult = _runSync(
-      'cat $promptPath | gemini '
+      'cat ${_shellEscape(promptPath)} | gemini '
       '-o json --yolo '
       '-m $kGeminiProModel '
       "--allowed-tools 'run_shell_command(git),run_shell_command(gh)' "
@@ -3096,7 +3018,7 @@ String _buildReleaseCommitMessage({
   }
 
   // Commit range
-  final commitCount = _runSync('git rev-list --count "$prevTag"..HEAD 2>/dev/null', repoRoot);
+  final commitCount = _runSync('git rev-list --count ${_shellEscape(prevTag)}..HEAD 2>/dev/null', repoRoot);
   buf.writeln('---');
   buf.writeln('Automated release by CI/CD pipeline (Gemini CLI + GitHub Actions)');
   buf.writeln('Commits since $prevTag: $commitCount');
@@ -3113,6 +3035,17 @@ bool _commandExists(String command) {
   } catch (_) {
     return false;
   }
+}
+
+/// Escapes a string for safe interpolation into a shell command.
+///
+/// Uses POSIX single-quote style: the value is wrapped in single quotes, and
+/// any single quotes within are escaped as `'"'"'` (end quote, literal quote,
+/// start quote). This prevents shell injection when user-controlled values
+/// (prevTag, newVersion, bumpType, promptArgs, paths, etc.) are interpolated
+/// into _runSync or Process.runSync shell commands.
+String _shellEscape(String s) {
+  return "'${s.replaceAll("'", "'\"'\"'")}'";
 }
 
 String _runSync(String command, String workingDirectory) {

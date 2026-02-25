@@ -275,7 +275,11 @@ if (isGitInstalled) {
   - `compareLink(String prevTag, String newTag, [String? label])`: `static String`
   - `ghLink(String label, String path)`: `static String`
   - `releaseLink(String tag)`: `static String`
+  - `escapeHtml(String input)`: `static String`
   - `collapsible(String title, String content, {bool open = false})`: `static String`
+- **TestResultsUtil**
+  - `parseTestResultsJson(String jsonPath)`: `static TestResults`
+  - `writeTestJobSummary(TestResults results, int exitCode)`: `static void`
 - **TemplateResolver**
   - `resolvePackageRoot()`: `static String`
   - `resolveTemplatesDir()`: `static String`
