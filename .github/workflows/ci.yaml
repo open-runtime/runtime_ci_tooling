@@ -190,11 +190,12 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          mkdir -p "$RUNNER_TEMP/test-logs"
-          dart run runtime_ci_tooling:manage_cicd test 2>&1 | tee "$RUNNER_TEMP/test-logs/console.log"
+          mkdir -p "$TEST_LOG_DIR"
+          dart run runtime_ci_tooling:manage_cicd test 2>&1 | tee "$TEST_LOG_DIR/console.log"
           exit ${PIPESTATUS[0]}
         env:
           TEST_LOG_DIR: ${{ runner.temp }}/test-logs
+          PLATFORM_ID: ${{ matrix.platform_id }}
 
       - name: Upload test logs
         if: always()

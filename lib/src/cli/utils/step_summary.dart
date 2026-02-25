@@ -33,13 +33,22 @@ class TestResults {
 
 /// Step summary utilities for GitHub Actions.
 abstract final class StepSummary {
+  /// Maximum safe size for $GITHUB_STEP_SUMMARY (1 MiB minus 4 KiB buffer).
+  static const int _maxSummaryBytes = (1024 * 1024) - (4 * 1024);
+
   /// Write a markdown summary to $GITHUB_STEP_SUMMARY (visible in Actions UI).
   /// No-op when running locally (env var not set).
+  /// Skips appending if the file would exceed the 1 MiB GitHub limit.
   static void write(String markdown) {
     final summaryFile = Platform.environment['GITHUB_STEP_SUMMARY'];
-    if (summaryFile != null) {
-      File(summaryFile).writeAsStringSync(markdown, mode: FileMode.append);
+    if (summaryFile == null) return;
+    final file = File(summaryFile);
+    final currentSize = file.existsSync() ? file.lengthSync() : 0;
+    if (currentSize + markdown.length > _maxSummaryBytes) {
+      Logger.warn('Step summary approaching 1 MiB limit — skipping append');
+      return;
     }
+    file.writeAsStringSync(markdown, mode: FileMode.append);
   }
 
   /// Build a link to the current workflow run's artifacts page.
@@ -78,12 +87,18 @@ abstract final class StepSummary {
   static String collapsible(String title, String content, {bool open = false}) {
     if (content.trim().isEmpty) return '';
     final openAttr = open ? ' open' : '';
-    return '\n<details$openAttr>\n<summary>$title</summary>\n\n$content\n\n</details>\n';
+    final safeTitle = escapeHtml(title);
+    return '\n<details$openAttr>\n<summary>$safeTitle</summary>\n\n$content\n\n</details>\n';
   }
 
   /// Escape HTML special characters for safe embedding in GitHub markdown.
   static String escapeHtml(String input) {
-    return input.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+    return input
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
   }
 
   /// Parse the NDJSON file produced by `dart test --file-reporter json:...`.

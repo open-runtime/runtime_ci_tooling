@@ -2165,7 +2165,12 @@ Future<void> _runTest(String repoRoot) async {
 
   // Determine log directory: TEST_LOG_DIR (CI) or .dart_tool/test-logs/ (local)
   final logDir = Platform.environment['TEST_LOG_DIR'] ?? '$repoRoot/.dart_tool/test-logs';
-  Directory(logDir).createSync(recursive: true);
+  try {
+    Directory(logDir).createSync(recursive: true);
+  } on FileSystemException catch (e) {
+    _error('Cannot create log directory $logDir: $e');
+    exit(1);
+  }
 
   final jsonPath = '$logDir/results.json';
   final expandedPath = '$logDir/expanded.txt';
@@ -2195,15 +2200,17 @@ Future<void> _runTest(String repoRoot) async {
   final stdoutBuf = StringBuffer();
   final stderrBuf = StringBuffer();
 
-  final stdoutDone = process.stdout.transform(utf8.decoder).listen((data) {
+  final stdoutSub = process.stdout.transform(utf8.decoder).listen((data) {
     stdout.write(data);
     stdoutBuf.write(data);
-  }).asFuture<void>();
-
-  final stderrDone = process.stderr.transform(utf8.decoder).listen((data) {
+  });
+  final stderrSub = process.stderr.transform(utf8.decoder).listen((data) {
     stderr.write(data);
     stderrBuf.write(data);
-  }).asFuture<void>();
+  });
+
+  final stdoutDone = stdoutSub.asFuture<void>();
+  final stderrDone = stderrSub.asFuture<void>();
 
   // Wait for process to exit (45-min safety timeout)
   const processTimeout = Duration(minutes: 45);
@@ -2218,16 +2225,22 @@ Future<void> _runTest(String repoRoot) async {
   try {
     await Future.wait([stdoutDone, stderrDone]).timeout(const Duration(seconds: 30));
   } catch (_) {
-    // Ignore stream errors (e.g. process killed before streams drained)
+    // Process killed or streams timed out — cancel subscriptions to avoid leaks
+    await stdoutSub.cancel();
+    await stderrSub.cancel();
   }
 
   // Parse the JSON results file for structured test data
   final results = StepSummary.parseTestResultsJson(jsonPath);
 
   // Write console output to log file as well (supplements shell-level tee)
-  File('$logDir/dart_stdout.log').writeAsStringSync(stdoutBuf.toString());
-  if (stderrBuf.isNotEmpty) {
-    File('$logDir/dart_stderr.log').writeAsStringSync(stderrBuf.toString());
+  try {
+    File('$logDir/dart_stdout.log').writeAsStringSync(stdoutBuf.toString());
+    if (stderrBuf.isNotEmpty) {
+      File('$logDir/dart_stderr.log').writeAsStringSync(stderrBuf.toString());
+    }
+  } on FileSystemException catch (e) {
+    _warn('Could not write log files: $e');
   }
 
   // Generate and write the rich job summary

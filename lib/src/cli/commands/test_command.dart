@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
+import 'package:path/path.dart' as p;
 
 import '../../triage/utils/config.dart';
 import '../utils/logger.dart';
@@ -43,15 +44,20 @@ class TestCommand extends Command<void> {
     final failures = <String>[];
 
     // Determine log directory: TEST_LOG_DIR (CI) or .dart_tool/test-logs/ (local)
-    final logDir = Platform.environment['TEST_LOG_DIR'] ?? '$repoRoot/.dart_tool/test-logs';
-    Directory(logDir).createSync(recursive: true);
+    final logDir = Platform.environment['TEST_LOG_DIR'] ?? p.join(repoRoot, '.dart_tool', 'test-logs');
+    try {
+      Directory(logDir).createSync(recursive: true);
+    } on FileSystemException catch (e) {
+      Logger.error('Cannot create log directory $logDir: $e');
+      exit(1);
+    }
     Logger.info('Log directory: $logDir');
 
-    final jsonPath = '$logDir/results.json';
-    final expandedPath = '$logDir/expanded.txt';
+    final jsonPath = p.join(logDir, 'results.json');
+    final expandedPath = p.join(logDir, 'expanded.txt');
 
     // Skip gracefully if no test/ directory exists
-    final testDir = Directory('$repoRoot/test');
+    final testDir = Directory(p.join(repoRoot, 'test'));
     if (!testDir.existsSync()) {
       Logger.success('No test/ directory found — skipping root tests');
       StepSummary.write('## Test Results\n\n**No test/ directory found — skipped.**\n');
@@ -80,15 +86,17 @@ class TestCommand extends Command<void> {
       final stdoutBuf = StringBuffer();
       final stderrBuf = StringBuffer();
 
-      final stdoutDone = process.stdout.transform(utf8.decoder).listen((data) {
+      final stdoutSub = process.stdout.transform(utf8.decoder).listen((data) {
         stdout.write(data);
         stdoutBuf.write(data);
-      }).asFuture<void>();
-
-      final stderrDone = process.stderr.transform(utf8.decoder).listen((data) {
+      });
+      final stderrSub = process.stderr.transform(utf8.decoder).listen((data) {
         stderr.write(data);
         stderrBuf.write(data);
-      }).asFuture<void>();
+      });
+
+      final stdoutDone = stdoutSub.asFuture<void>();
+      final stderrDone = stderrSub.asFuture<void>();
 
       // Process-level timeout: kill the test process if it exceeds 45 minutes.
       final exitCode = await process.exitCode.timeout(
@@ -103,13 +111,19 @@ class TestCommand extends Command<void> {
       try {
         await Future.wait([stdoutDone, stderrDone]).timeout(const Duration(seconds: 30));
       } catch (_) {
-        // Ignore stream errors (e.g. process killed before streams drained)
+        // Process killed or streams timed out — cancel subscriptions to avoid leaks
+        await stdoutSub.cancel();
+        await stderrSub.cancel();
       }
 
       // Write console output to log files
-      File('$logDir/dart_stdout.log').writeAsStringSync(stdoutBuf.toString());
-      if (stderrBuf.isNotEmpty) {
-        File('$logDir/dart_stderr.log').writeAsStringSync(stderrBuf.toString());
+      try {
+        File(p.join(logDir, 'dart_stdout.log')).writeAsStringSync(stdoutBuf.toString());
+        if (stderrBuf.isNotEmpty) {
+          File(p.join(logDir, 'dart_stderr.log')).writeAsStringSync(stderrBuf.toString());
+        }
+      } on FileSystemException catch (e) {
+        Logger.warn('Could not write log files: $e');
       }
 
       // Parse the JSON results file for structured test data
@@ -133,7 +147,7 @@ class TestCommand extends Command<void> {
     for (final sp in subPackages) {
       final name = sp['name'] as String;
       final path = sp['path'] as String;
-      final dir = '$repoRoot/$path';
+      final dir = p.join(repoRoot, path);
 
       Logger.header('Testing sub-package: $name ($path)');
 
@@ -142,14 +156,14 @@ class TestCommand extends Command<void> {
         continue;
       }
 
-      if (!File('$dir/pubspec.yaml').existsSync()) {
+      if (!File(p.join(dir, 'pubspec.yaml')).existsSync()) {
         Logger.error('  No pubspec.yaml in $dir — cannot test');
         failures.add(name);
         continue;
       }
 
       // Skip sub-packages with no test/ directory
-      final spTestDir = Directory('$dir/test');
+      final spTestDir = Directory(p.join(dir, 'test'));
       if (!spTestDir.existsSync()) {
         Logger.info('  No test/ directory in $name — skipping');
         continue;
