@@ -31,6 +31,19 @@ Map<String, dynamic> _validConfig({
   };
 }
 
+String _readToolingVersionFromPubspec() {
+  final pubspec = File('pubspec.yaml');
+  if (!pubspec.existsSync()) {
+    throw StateError('pubspec.yaml not found in current working directory');
+  }
+  final content = pubspec.readAsStringSync();
+  final match = RegExp(r'^version:\s*([^\s]+)\s*$', multiLine: true).firstMatch(content);
+  if (match == null) {
+    throw StateError('Could not parse version from pubspec.yaml');
+  }
+  return match.group(1)!;
+}
+
 void main() {
   // ===========================================================================
   // P0: validate() tests
@@ -1370,6 +1383,30 @@ void main() {
       expect(steps.length, greaterThanOrEqualTo(2));
       final firstStep = steps[0] as YamlMap;
       expect('${firstStep['uses']}', contains('actions/checkout'));
+    });
+
+    test('rendered workflow stays in sync with committed .github/workflows/ci.yaml', () {
+      final ciConfig = WorkflowGenerator.loadCiConfig(Directory.current.path);
+      expect(ciConfig, isNotNull, reason: 'Repository CI config must be present');
+
+      final goldenPath = '.github/workflows/ci.yaml';
+      final goldenFile = File(goldenPath);
+      expect(goldenFile.existsSync(), isTrue, reason: 'Committed workflow golden must exist');
+
+      final existingContent = goldenFile.readAsStringSync();
+      final toolingVersion = _readToolingVersionFromPubspec();
+      final rendered = WorkflowGenerator(
+        ciConfig: ciConfig!,
+        toolingVersion: toolingVersion,
+      ).render(existingContent: existingContent);
+
+      String normalize(String input) => '${input.replaceAll('\r\n', '\n').trimRight()}\n';
+
+      expect(
+        normalize(rendered),
+        equals(normalize(existingContent)),
+        reason: 'Generated workflow drifted from committed file. Re-run workflow generation and commit updated output.',
+      );
     });
 
     test('managed_test: upload step uses success() || failure() not cancelled', () {
