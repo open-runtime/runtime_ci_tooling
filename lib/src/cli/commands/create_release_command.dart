@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
+import 'package:path/path.dart' as p;
 import 'package:pub_semver/pub_semver.dart';
 
 import '../../triage/utils/config.dart';
@@ -70,7 +71,12 @@ class CreateReleaseCommand extends Command<void> {
 
     // Step 1: Copy artifacts if provided
     if (artifactsDir != null) {
-      final artDir = Directory('$repoRoot/$artifactsDir');
+      final artifactsPath = p.normalize(p.join(repoRoot, artifactsDir));
+      if (!(artifactsPath == repoRoot || p.isWithin(repoRoot, artifactsPath))) {
+        Logger.error('--artifacts-dir must resolve within the repository root');
+        exit(1);
+      }
+      final artDir = Directory(artifactsPath);
       if (artDir.existsSync()) {
         for (final name in ['CHANGELOG.md', 'README.md']) {
           final src = File('${artDir.path}/$name');
@@ -236,8 +242,13 @@ class CreateReleaseCommand extends Command<void> {
 
     // Step 4: Commit all changes
     Logger.info('Configuring git identity for release commit');
-    CiProcessRunner.exec('git', ['config', 'user.name', 'github-actions[bot]'], cwd: repoRoot, verbose: global.verbose);
-    CiProcessRunner.exec(
+    await CiProcessRunner.exec(
+      'git',
+      ['config', 'user.name', 'github-actions[bot]'],
+      cwd: repoRoot,
+      verbose: global.verbose,
+    );
+    await CiProcessRunner.exec(
       'git',
       ['config', 'user.email', 'github-actions[bot]@users.noreply.github.com'],
       cwd: repoRoot,
@@ -264,7 +275,7 @@ class CreateReleaseCommand extends Command<void> {
     for (final path in filesToAdd) {
       final fullPath = '$repoRoot/$path';
       if (File(fullPath).existsSync() || Directory(fullPath).existsSync()) {
-        CiProcessRunner.exec('git', ['add', path], cwd: repoRoot, verbose: global.verbose);
+        await CiProcessRunner.exec('git', ['add', path], cwd: repoRoot, verbose: global.verbose);
       }
     }
 
@@ -281,7 +292,7 @@ class CreateReleaseCommand extends Command<void> {
       // Use a temp file for the commit message to avoid shell escaping issues
       final commitMsgFile = File('$repoRoot/.git/RELEASE_COMMIT_MSG');
       commitMsgFile.writeAsStringSync(commitMsg);
-      CiProcessRunner.exec(
+      await CiProcessRunner.exec(
         'git',
         ['commit', '-F', commitMsgFile.path],
         cwd: repoRoot,
@@ -295,7 +306,7 @@ class CreateReleaseCommand extends Command<void> {
       final remoteRepo = Platform.environment['GITHUB_REPOSITORY'] ?? effectiveRepo;
       if (ghToken != null && remoteRepo.isNotEmpty) {
         Logger.info('Setting authenticated remote URL for push');
-        CiProcessRunner.exec(
+        await CiProcessRunner.exec(
           'git',
           ['remote', 'set-url', 'origin', 'https://x-access-token:$ghToken@github.com/$remoteRepo.git'],
           cwd: repoRoot,
@@ -311,15 +322,27 @@ class CreateReleaseCommand extends Command<void> {
       if (pushResult.exitCode != 0) {
         Logger.warn('Direct push failed (non-fast-forward); fetching and merging remote changes...');
         if (global.verbose) Logger.info('  push stderr: ${(pushResult.stderr as String).trim()}');
-        CiProcessRunner.exec('git', ['fetch', 'origin', 'main'], cwd: repoRoot, fatal: true, verbose: global.verbose);
-        CiProcessRunner.exec(
+        await CiProcessRunner.exec(
+          'git',
+          ['fetch', 'origin', 'main'],
+          cwd: repoRoot,
+          fatal: true,
+          verbose: global.verbose,
+        );
+        await CiProcessRunner.exec(
           'git',
           ['merge', 'origin/main', '--no-edit'],
           cwd: repoRoot,
           fatal: true,
           verbose: global.verbose,
         );
-        CiProcessRunner.exec('git', ['push', 'origin', 'main'], cwd: repoRoot, fatal: true, verbose: global.verbose);
+        await CiProcessRunner.exec(
+          'git',
+          ['push', 'origin', 'main'],
+          cwd: repoRoot,
+          fatal: true,
+          verbose: global.verbose,
+        );
       }
       Logger.success('Committed and pushed changes');
     } else {
@@ -333,14 +356,14 @@ class CreateReleaseCommand extends Command<void> {
       Logger.error('Tag $tag already exists. Cannot create release.');
       exit(1);
     }
-    CiProcessRunner.exec(
+    await CiProcessRunner.exec(
       'git',
       ['tag', '-a', tag, '-m', 'Release v$newVersion'],
       cwd: repoRoot,
       fatal: true,
       verbose: global.verbose,
     );
-    CiProcessRunner.exec('git', ['push', 'origin', tag], cwd: repoRoot, fatal: true, verbose: global.verbose);
+    await CiProcessRunner.exec('git', ['push', 'origin', tag], cwd: repoRoot, fatal: true, verbose: global.verbose);
     Logger.success('Created tag: $tag');
 
     // Step 5b: Create per-package tags for sub-packages with tag_pattern
@@ -356,14 +379,20 @@ class CreateReleaseCommand extends Command<void> {
         continue;
       }
       try {
-        CiProcessRunner.exec(
+        await CiProcessRunner.exec(
           'git',
           ['tag', '-a', pkgTag, '-m', '${pkg['name']} v$newVersion'],
           cwd: repoRoot,
           fatal: true,
           verbose: global.verbose,
         );
-        CiProcessRunner.exec('git', ['push', 'origin', pkgTag], cwd: repoRoot, fatal: true, verbose: global.verbose);
+        await CiProcessRunner.exec(
+          'git',
+          ['push', 'origin', pkgTag],
+          cwd: repoRoot,
+          fatal: true,
+          verbose: global.verbose,
+        );
         pkgTagsCreated.add(pkgTag);
       } catch (e) {
         Logger.error('Failed to create per-package tag $pkgTag: $e');
@@ -400,7 +429,7 @@ class CreateReleaseCommand extends Command<void> {
     final ghArgs = ['release', 'create', tag, '--title', 'v$newVersion', '--notes', releaseBody];
     if (effectiveRepo.isNotEmpty) ghArgs.addAll(['--repo', effectiveRepo]);
 
-    CiProcessRunner.exec('gh', ghArgs, cwd: repoRoot, verbose: global.verbose);
+    await CiProcessRunner.exec('gh', ghArgs, cwd: repoRoot, verbose: global.verbose);
     Logger.success('Created GitHub Release: $tag');
 
     // Build rich summary

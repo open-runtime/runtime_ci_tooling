@@ -36,17 +36,17 @@ abstract final class ToolInstallers {
   static Future<void> installNodeJs() async {
     if (Platform.isMacOS) {
       Logger.info('Installing Node.js via Homebrew...');
-      CiProcessRunner.exec('brew', ['install', 'node']);
+      await CiProcessRunner.exec('brew', ['install', 'node']);
     } else if (Platform.isLinux) {
       Logger.info('Installing Node.js via apt...');
-      CiProcessRunner.exec('sudo', ['apt', 'install', '-y', 'nodejs', 'npm']);
+      await CiProcessRunner.exec('sudo', ['apt', 'install', '-y', 'nodejs', 'npm']);
     } else if (Platform.isWindows) {
       if (CiProcessRunner.commandExists('winget')) {
         Logger.info('Installing Node.js via winget...');
-        CiProcessRunner.exec('winget', ['install', 'OpenJS.NodeJS']);
+        await CiProcessRunner.exec('winget', ['install', 'OpenJS.NodeJS']);
       } else if (CiProcessRunner.commandExists('choco')) {
         Logger.info('Installing Node.js via Chocolatey...');
-        CiProcessRunner.exec('choco', ['install', 'nodejs', '-y']);
+        await CiProcessRunner.exec('choco', ['install', 'nodejs', '-y']);
       } else {
         Logger.error('Install Node.js manually: https://nodejs.org/');
       }
@@ -59,16 +59,16 @@ abstract final class ToolInstallers {
       return;
     }
     Logger.info('Installing Gemini CLI via npm...');
-    CiProcessRunner.exec('npm', ['install', '-g', '@google/gemini-cli@latest']);
+    await CiProcessRunner.exec('npm', ['install', '-g', '@google/gemini-cli@latest']);
   }
 
   static Future<void> installGitHubCli() async {
     if (Platform.isMacOS) {
       Logger.info('Installing GitHub CLI via Homebrew...');
-      CiProcessRunner.exec('brew', ['install', 'gh']);
+      await CiProcessRunner.exec('brew', ['install', 'gh']);
     } else if (Platform.isLinux) {
       Logger.info('Installing GitHub CLI via apt...');
-      CiProcessRunner.exec('sh', [
+      await CiProcessRunner.exec('sh', [
         '-c',
         'type -p curl >/dev/null || sudo apt install curl -y && '
             'curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | '
@@ -79,32 +79,32 @@ abstract final class ToolInstallers {
       ]);
     } else if (Platform.isWindows) {
       if (CiProcessRunner.commandExists('winget')) {
-        CiProcessRunner.exec('winget', ['install', 'GitHub.cli']);
+        await CiProcessRunner.exec('winget', ['install', 'GitHub.cli']);
       } else if (CiProcessRunner.commandExists('choco')) {
-        CiProcessRunner.exec('choco', ['install', 'gh', '-y']);
+        await CiProcessRunner.exec('choco', ['install', 'gh', '-y']);
       }
     }
   }
 
   static Future<void> installJq() async {
     if (Platform.isMacOS) {
-      CiProcessRunner.exec('brew', ['install', 'jq']);
+      await CiProcessRunner.exec('brew', ['install', 'jq']);
     } else if (Platform.isLinux) {
-      CiProcessRunner.exec('sudo', ['apt', 'install', '-y', 'jq']);
+      await CiProcessRunner.exec('sudo', ['apt', 'install', '-y', 'jq']);
     } else if (Platform.isWindows) {
       if (CiProcessRunner.commandExists('winget')) {
-        CiProcessRunner.exec('winget', ['install', 'jqlang.jq']);
+        await CiProcessRunner.exec('winget', ['install', 'jqlang.jq']);
       } else if (CiProcessRunner.commandExists('choco')) {
-        CiProcessRunner.exec('choco', ['install', 'jq', '-y']);
+        await CiProcessRunner.exec('choco', ['install', 'jq', '-y']);
       }
     }
   }
 
   static Future<void> installTree() async {
     if (Platform.isMacOS) {
-      CiProcessRunner.exec('brew', ['install', 'tree']);
+      await CiProcessRunner.exec('brew', ['install', 'tree']);
     } else if (Platform.isLinux) {
-      CiProcessRunner.exec('sudo', ['apt', 'install', '-y', 'tree']);
+      await CiProcessRunner.exec('sudo', ['apt', 'install', '-y', 'tree']);
     } else if (Platform.isWindows) {
       Logger.info('tree is built-in on Windows (limited). For full tree: choco install tree');
     }

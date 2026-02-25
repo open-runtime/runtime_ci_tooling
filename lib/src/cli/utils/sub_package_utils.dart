@@ -28,18 +28,20 @@ abstract final class SubPackageUtils {
     if (ciConfig == null) return [];
     final raw = ciConfig['sub_packages'] as List?;
     if (raw == null || raw.isEmpty) return [];
-    return raw
-        .whereType<Map<String, dynamic>>()
-        .where((sp) => sp['name'] != null && sp['path'] != null)
-        .map(
-          (sp) => {
-            ...sp,
-            // Normalize: strip trailing slashes to avoid double-slash paths
-            // in downstream consumers (git commands, Markdown, etc.).
-            'path': (sp['path'] as String).replaceAll(RegExp(r'/+$'), ''),
-          },
-        )
-        .toList();
+    final seenNames = <String>{};
+    final seenPaths = <String>{};
+    final result = <Map<String, dynamic>>[];
+    for (final item in raw) {
+      if (item is! Map<String, dynamic>) continue;
+      if (item['name'] == null || item['path'] == null) continue;
+      final err = WorkflowGenerator.validateSubPackageEntry(item, seenNames, seenPaths);
+      if (err != null) {
+        Logger.warn('Skipping invalid sub-package "${item['name']}": $err');
+        continue;
+      }
+      result.add({...item, 'path': (item['path'] as String).replaceAll(RegExp(r'/+$'), '')});
+    }
+    return result;
   }
 
   /// Build a per-package diff summary suitable for appending to a Gemini prompt.

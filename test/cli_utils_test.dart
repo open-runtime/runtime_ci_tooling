@@ -1,10 +1,13 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart' hide TestFailure;
 
+import 'package:runtime_ci_tooling/src/cli/utils/process_runner.dart';
 import 'package:runtime_ci_tooling/src/cli/utils/repo_utils.dart';
 import 'package:runtime_ci_tooling/src/cli/utils/step_summary.dart';
+import 'package:runtime_ci_tooling/src/cli/utils/sub_package_utils.dart';
 import 'package:runtime_ci_tooling/src/cli/utils/test_results_util.dart';
 
 bool _canCreateSymlink() {
@@ -43,7 +46,10 @@ void main() {
     });
 
     test('returns default path when TEST_LOG_DIR is unset', () {
-      final resolved = RepoUtils.resolveTestLogDir(repoRoot, environment: const <String, String>{});
+      final resolved = RepoUtils.resolveTestLogDir(
+        repoRoot,
+        environment: const <String, String>{},
+      );
       expect(resolved, equals(p.join(repoRoot, '.dart_tool', 'test-logs')));
     });
 
@@ -67,8 +73,10 @@ void main() {
 
     test('throws when TEST_LOG_DIR is relative', () {
       expect(
-        () =>
-            RepoUtils.resolveTestLogDir(repoRoot, environment: const <String, String>{'TEST_LOG_DIR': 'relative/path'}),
+        () => RepoUtils.resolveTestLogDir(
+          repoRoot,
+          environment: const <String, String>{'TEST_LOG_DIR': 'relative/path'},
+        ),
         throwsA(isA<StateError>()),
       );
     });
@@ -77,7 +85,10 @@ void main() {
       final runnerTemp = p.join(repoRoot, 'runner-temp');
       final outside = p.join(repoRoot, 'outside', 'logs');
       expect(
-        () => RepoUtils.resolveTestLogDir(repoRoot, environment: {'RUNNER_TEMP': runnerTemp, 'TEST_LOG_DIR': outside}),
+        () => RepoUtils.resolveTestLogDir(
+          repoRoot,
+          environment: {'RUNNER_TEMP': runnerTemp, 'TEST_LOG_DIR': outside},
+        ),
         throwsA(isA<StateError>()),
       );
     });
@@ -126,19 +137,35 @@ void main() {
       expect(File(filePath).readAsStringSync(), equals('hello world'));
     });
 
-    test('ensureSafeDirectory rejects symlink-backed directories', skip: !symlinksSupported, () {
-      final targetDir = Directory(p.join(tempDir.path, 'target'))..createSync(recursive: true);
-      final linkDirPath = p.join(tempDir.path, 'linked');
-      Link(linkDirPath).createSync(targetDir.path);
-      expect(() => RepoUtils.ensureSafeDirectory(linkDirPath), throwsA(isA<FileSystemException>()));
-    });
+    test(
+      'ensureSafeDirectory rejects symlink-backed directories',
+      skip: !symlinksSupported,
+      () {
+        final targetDir = Directory(p.join(tempDir.path, 'target'))
+          ..createSync(recursive: true);
+        final linkDirPath = p.join(tempDir.path, 'linked');
+        Link(linkDirPath).createSync(targetDir.path);
+        expect(
+          () => RepoUtils.ensureSafeDirectory(linkDirPath),
+          throwsA(isA<FileSystemException>()),
+        );
+      },
+    );
 
-    test('writeFileSafely rejects symlink file targets', skip: !symlinksSupported, () {
-      final targetFile = File(p.join(tempDir.path, 'target.txt'))..writeAsStringSync('base');
-      final linkPath = p.join(tempDir.path, 'linked.txt');
-      Link(linkPath).createSync(targetFile.path);
-      expect(() => RepoUtils.writeFileSafely(linkPath, 'new content'), throwsA(isA<FileSystemException>()));
-    });
+    test(
+      'writeFileSafely rejects symlink file targets',
+      skip: !symlinksSupported,
+      () {
+        final targetFile = File(p.join(tempDir.path, 'target.txt'))
+          ..writeAsStringSync('base');
+        final linkPath = p.join(tempDir.path, 'linked.txt');
+        Link(linkPath).createSync(targetFile.path);
+        expect(
+          () => RepoUtils.writeFileSafely(linkPath, 'new content'),
+          throwsA(isA<FileSystemException>()),
+        );
+      },
+    );
   });
 
   group('TestResultsUtil.parseTestResultsJson', () {
@@ -186,16 +213,21 @@ void main() {
       expect(results.failures, isEmpty);
     });
 
-    test('returns unparsed results when file has valid JSON but no structured events', () {
-      final jsonPath = p.join(tempDir.path, 'no_events.json');
-      File(jsonPath).writeAsStringSync('{"type":"unknown","data":1}\n{"other":"value"}\n');
-      final results = TestResultsUtil.parseTestResultsJson(jsonPath);
-      expect(results.parsed, isFalse);
-      expect(results.passed, equals(0));
-      expect(results.failed, equals(0));
-      expect(results.skipped, equals(0));
-      expect(results.failures, isEmpty);
-    });
+    test(
+      'returns unparsed results when file has valid JSON but no structured events',
+      () {
+        final jsonPath = p.join(tempDir.path, 'no_events.json');
+        File(
+          jsonPath,
+        ).writeAsStringSync('{"type":"unknown","data":1}\n{"other":"value"}\n');
+        final results = TestResultsUtil.parseTestResultsJson(jsonPath);
+        expect(results.parsed, isFalse);
+        expect(results.passed, equals(0));
+        expect(results.failed, equals(0));
+        expect(results.skipped, equals(0));
+        expect(results.failures, isEmpty);
+      },
+    );
 
     test('parses pass/fail/skipped counts and failure details', () {
       final jsonPath = p.join(tempDir.path, 'results.json');
@@ -307,7 +339,12 @@ void main() {
   });
 
   group('TestResultsUtil.writeTestJobSummary', () {
-    TestResults _parsed({required int passed, required int failed, required int skipped, int durationMs = 500}) {
+    TestResults _parsed({
+      required int passed,
+      required int failed,
+      required int skipped,
+      int durationMs = 500,
+    }) {
       final results = TestResults()
         ..parsed = true
         ..passed = passed
@@ -317,39 +354,50 @@ void main() {
       return results;
     }
 
-    test('emits NOTE when parsed results are successful and exit code is 0', () {
-      String? summary;
-      final results = _parsed(passed: 3, failed: 0, skipped: 1);
+    test(
+      'emits NOTE when parsed results are successful and exit code is 0',
+      () {
+        String? summary;
+        final results = _parsed(passed: 3, failed: 0, skipped: 1);
 
-      TestResultsUtil.writeTestJobSummary(
-        results,
-        0,
-        platformId: 'linux-x64',
-        writeSummary: (markdown) => summary = markdown,
-      );
+        TestResultsUtil.writeTestJobSummary(
+          results,
+          0,
+          platformId: 'linux-x64',
+          writeSummary: (markdown) => summary = markdown,
+        );
 
-      expect(summary, isNotNull);
-      expect(summary!, contains('## Test Results — linux-x64'));
-      expect(summary!, contains('> [!NOTE]'));
-      expect(summary!, contains('All 4 tests passed'));
-    });
+        expect(summary, isNotNull);
+        expect(summary!, contains('## Test Results — linux-x64'));
+        expect(summary!, contains('> [!NOTE]'));
+        expect(summary!, contains('All 4 tests passed'));
+      },
+    );
 
-    test('emits CAUTION when exit code is non-zero even if failed count is zero', () {
-      String? summary;
-      final results = _parsed(passed: 2, failed: 0, skipped: 0);
+    test(
+      'emits CAUTION when exit code is non-zero even if failed count is zero',
+      () {
+        String? summary;
+        final results = _parsed(passed: 2, failed: 0, skipped: 0);
 
-      TestResultsUtil.writeTestJobSummary(
-        results,
-        1,
-        platformId: 'linux <x64>',
-        writeSummary: (markdown) => summary = markdown,
-      );
+        TestResultsUtil.writeTestJobSummary(
+          results,
+          1,
+          platformId: 'linux <x64>',
+          writeSummary: (markdown) => summary = markdown,
+        );
 
-      expect(summary, isNotNull);
-      expect(summary!, contains('## Test Results — linux &lt;x64&gt;'));
-      expect(summary!, contains('> [!CAUTION]'));
-      expect(summary!, contains('Tests exited with code 1 despite no structured test failures.'));
-    });
+        expect(summary, isNotNull);
+        expect(summary!, contains('## Test Results — linux &lt;x64&gt;'));
+        expect(summary!, contains('> [!CAUTION]'));
+        expect(
+          summary!,
+          contains(
+            'Tests exited with code 1 despite no structured test failures.',
+          ),
+        );
+      },
+    );
 
     test('emits CAUTION for unparsed results with non-zero exit code', () {
       String? summary;
@@ -364,7 +412,12 @@ void main() {
 
       expect(summary, isNotNull);
       expect(summary!, contains('> [!CAUTION]'));
-      expect(summary!, contains('Tests failed (exit code 7) — no structured results available.'));
+      expect(
+        summary!,
+        contains(
+          'Tests failed (exit code 7) — no structured results available.',
+        ),
+      );
     });
 
     test('emits NOTE for unparsed results with zero exit code', () {
@@ -380,14 +433,25 @@ void main() {
 
       expect(summary, isNotNull);
       expect(summary!, contains('> [!NOTE]'));
-      expect(summary!, contains('Tests passed (exit code 0) — no structured results available.'));
+      expect(
+        summary!,
+        contains(
+          'Tests passed (exit code 0) — no structured results available.',
+        ),
+      );
     });
 
     test('emits CAUTION when parsed results contain failures', () {
       String? summary;
       final results = _parsed(passed: 1, failed: 1, skipped: 0);
       results.failures.add(
-        TestFailure(name: 'failing test', error: 'boom', stackTrace: 'trace', printOutput: '', durationMs: 12),
+        TestFailure(
+          name: 'failing test',
+          error: 'boom',
+          stackTrace: 'trace',
+          printOutput: '',
+          durationMs: 12,
+        ),
       );
 
       TestResultsUtil.writeTestJobSummary(
@@ -427,7 +491,12 @@ void main() {
       );
 
       expect(summary, isNotNull);
-      expect(summary!, contains('_...and 5 more failures. See test logs artifact for full details._'));
+      expect(
+        summary!,
+        contains(
+          '_...and 5 more failures. See test logs artifact for full details._',
+        ),
+      );
       expect(summary!, isNot(contains('failing test 24')));
     });
 
@@ -500,7 +569,10 @@ void main() {
         File(summaryPath).writeAsStringSync('x' * (maxBytes - 2));
         expect(File(summaryPath).lengthSync(), equals(maxBytes - 2));
 
-        StepSummary.write('語', environment: {'GITHUB_STEP_SUMMARY': summaryPath});
+        StepSummary.write(
+          '語',
+          environment: {'GITHUB_STEP_SUMMARY': summaryPath},
+        );
         // Should skip append (would exceed); file size unchanged
         expect(File(summaryPath).lengthSync(), equals(maxBytes - 2));
       } finally {
@@ -521,5 +593,158 @@ void main() {
       expect(out, contains('<details>'));
       expect(out, contains('</details>'));
     });
+  });
+
+  group('SubPackageUtils.loadSubPackages', () {
+    late Directory tempDir;
+
+    setUp(() {
+      tempDir = Directory.systemTemp.createTempSync('sub_pkg_load_');
+    });
+
+    tearDown(() {
+      if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+    });
+
+    void _writeConfig(Map<String, dynamic> ci) {
+      final configDir = Directory('${tempDir.path}/.runtime_ci')..createSync();
+      File(
+        '${configDir.path}/config.json',
+      ).writeAsStringSync(json.encode({'ci': ci}));
+    }
+
+    test('returns empty when no sub_packages', () {
+      _writeConfig({'dart_sdk': '3.9.2', 'features': {}});
+      expect(SubPackageUtils.loadSubPackages(tempDir.path), isEmpty);
+    });
+
+    test('valid sub-packages pass through', () {
+      _writeConfig({
+        'dart_sdk': '3.9.2',
+        'features': {},
+        'sub_packages': [
+          {'name': 'core', 'path': 'packages/core'},
+          {'name': 'api', 'path': 'packages/api'},
+        ],
+      });
+      final result = SubPackageUtils.loadSubPackages(tempDir.path);
+      expect(result.length, equals(2));
+      expect(result[0]['name'], equals('core'));
+      expect(result[0]['path'], equals('packages/core'));
+      expect(result[1]['name'], equals('api'));
+      expect(result[1]['path'], equals('packages/api'));
+    });
+
+    test('skips invalid name (unsupported chars)', () {
+      _writeConfig({
+        'dart_sdk': '3.9.2',
+        'features': {},
+        'sub_packages': [
+          {'name': 'foo bar', 'path': 'packages/foo'},
+        ],
+      });
+      final result = SubPackageUtils.loadSubPackages(tempDir.path);
+      expect(result, isEmpty);
+    });
+
+    test('skips invalid path (traversal)', () {
+      _writeConfig({
+        'dart_sdk': '3.9.2',
+        'features': {},
+        'sub_packages': [
+          {'name': 'evil', 'path': '../../../etc/passwd'},
+        ],
+      });
+      final result = SubPackageUtils.loadSubPackages(tempDir.path);
+      expect(result, isEmpty);
+    });
+
+    test('skips invalid path (absolute)', () {
+      _writeConfig({
+        'dart_sdk': '3.9.2',
+        'features': {},
+        'sub_packages': [
+          {'name': 'foo', 'path': '/usr/local'},
+        ],
+      });
+      final result = SubPackageUtils.loadSubPackages(tempDir.path);
+      expect(result, isEmpty);
+    });
+
+    test('skips invalid path (leading dash)', () {
+      _writeConfig({
+        'dart_sdk': '3.9.2',
+        'features': {},
+        'sub_packages': [
+          {'name': 'foo', 'path': '--help'},
+        ],
+      });
+      final result = SubPackageUtils.loadSubPackages(tempDir.path);
+      expect(result, isEmpty);
+    });
+
+    test('valid entries pass when mixed with invalid', () {
+      _writeConfig({
+        'dart_sdk': '3.9.2',
+        'features': {},
+        'sub_packages': [
+          {'name': 'bad', 'path': '../../../etc'},
+          {'name': 'good', 'path': 'packages/good'},
+        ],
+      });
+      final result = SubPackageUtils.loadSubPackages(tempDir.path);
+      expect(result.length, equals(1));
+      expect(result[0]['name'], equals('good'));
+      expect(result[0]['path'], equals('packages/good'));
+    });
+  });
+
+  group('CiProcessRunner.exec', () {
+    test('fatal path exits with process exit code after flushing stdout/stderr',
+        () async {
+      final scriptPath = p.join(
+        p.current,
+        'test',
+        'scripts',
+        'fatal_exit_probe.dart',
+      );
+      final result = Process.runSync(
+        Platform.resolvedExecutable,
+        ['run', scriptPath],
+        runInShell: false,
+      );
+      final expectedCode = Platform.isWindows ? 7 : 1;
+      expect(result.exitCode, equals(expectedCode),
+          reason: 'fatal exec should exit with failing command exit code');
+    });
+  });
+
+  group('CiProcessRunner.runWithTimeout', () {
+    test('completes normally when process finishes within timeout', () async {
+      final result = await CiProcessRunner.runWithTimeout(
+        Platform.resolvedExecutable,
+        ['--version'],
+        timeout: const Duration(seconds: 10),
+      );
+      expect(result.exitCode, equals(0));
+      expect(result.stdout, contains('Dart'));
+    });
+
+    test(
+      'returns timeout result and kills process when timeout exceeded',
+      () async {
+        final executable = Platform.isWindows ? 'ping' : 'sleep';
+        final args = Platform.isWindows ? ['127.0.0.1', '-n', '60'] : ['60'];
+        final result = await CiProcessRunner.runWithTimeout(
+          executable,
+          args,
+          timeout: const Duration(milliseconds: 500),
+          timeoutExitCode: 124,
+          timeoutMessage: 'Timed out',
+        );
+        expect(result.exitCode, equals(124));
+        expect(result.stderr, equals('Timed out'));
+      },
+    );
   });
 }

@@ -94,6 +94,39 @@ class WorkflowGenerator {
 
   WorkflowGenerator({required this.ciConfig, required this.toolingVersion});
 
+  /// Validates a single sub-package entry. Returns null if valid, otherwise error message.
+  /// Mutates [seenNames] and [seenPaths] only when valid. Used by [SubPackageUtils.loadSubPackages].
+  static String? validateSubPackageEntry(Map<String, dynamic> sp, Set<String> seenNames, Set<String> seenPaths) {
+    final name = sp['name'];
+    final pathValue = sp['path'];
+
+    if (name is! String || name.trim().isEmpty) return 'name must be a non-empty string';
+    if (name != name.trim()) return 'name must not have leading/trailing whitespace';
+    if (!_isSafeSubPackageName(name)) return 'name contains unsupported characters: "$name"';
+
+    if (pathValue is! String || pathValue.trim().isEmpty) return 'path must be a non-empty string';
+    if (pathValue != pathValue.trim()) return 'path must not have leading/trailing whitespace';
+    if (pathValue.contains(RegExp(r'[\r\n\t]'))) return 'path must not contain newlines/tabs';
+    if (p.isAbsolute(pathValue) || pathValue.startsWith('~')) {
+      return 'path must be a relative repo path';
+    }
+    if (pathValue.contains('\\')) return 'path must use forward slashes (/)';
+    final normalized = p.posix.normalize(pathValue);
+    if (normalized.startsWith('..') || normalized.contains('/../')) {
+      return 'path must not traverse outside the repo';
+    }
+    if (normalized == '.') return 'path must not be repo root (".")';
+    if (normalized.startsWith('-')) {
+      return 'path must not start with "-" (reserved for CLI options)';
+    }
+    if (RegExp(r'[^A-Za-z0-9_./-]').hasMatch(pathValue)) {
+      return 'path contains unsupported characters: "$pathValue"';
+    }
+    if (!seenNames.add(name)) return 'duplicate name "$name"';
+    if (!seenPaths.add(normalized)) return 'duplicate path "$normalized"';
+    return null;
+  }
+
   /// Returns the web_test config map if present and valid; otherwise null.
   static Map<String, dynamic>? _getWebTestConfig(Map<String, dynamic> ciConfig) {
     final raw = ciConfig['web_test'];
