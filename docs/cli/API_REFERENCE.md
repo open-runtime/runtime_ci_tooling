@@ -292,7 +292,7 @@ if (isGitInstalled) {
   - Parsed aggregate test results.
   - Fields: `passed`, `failed`, `skipped`, `totalDurationMs`, `failures`, `parsed`.
 - **TestResultsUtil**
-  - `parseTestResultsJson(String jsonPath)`: `static TestResults`
+  - `parseTestResultsJson(String jsonPath)`: `static Future<TestResults>`
   - `writeTestJobSummary(TestResults results, int exitCode, {String? platformId, void Function(String markdown)? writeSummary})`: `static void`
 - **Utf8BoundedBuffer**
   - `Utf8BoundedBuffer({required int maxBytes, required String truncationSuffix})`

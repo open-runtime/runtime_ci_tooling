@@ -39,7 +39,10 @@ const int _maxStoredPrintChars = 6000;
 /// Test-results parsing and step-summary writing for CI.
 abstract final class TestResultsUtil {
   /// Parse the NDJSON file produced by `dart test --file-reporter json:...`.
-  static TestResults parseTestResultsJson(String jsonPath) {
+  ///
+  /// Uses streaming line-by-line parsing to avoid loading very large result
+  /// files fully into memory.
+  static Future<TestResults> parseTestResultsJson(String jsonPath) async {
     final results = TestResults();
     final file = File(jsonPath);
     if (!file.existsSync()) {
@@ -56,95 +59,101 @@ abstract final class TestResultsUtil {
     const _maxMalformedWarnings = 5;
     var malformedCount = 0;
 
-    final lines = file.readAsLinesSync();
-    for (final line in lines) {
-      if (line.trim().isEmpty) continue;
-      try {
-        final event = jsonDecode(line) as Map<String, dynamic>;
-        final type = event['type'] as String?;
+    try {
+      final lines = file.openRead().transform(const Utf8Decoder(allowMalformed: true)).transform(const LineSplitter());
 
-        switch (type) {
-          case 'testStart':
-            final test = event['test'] as Map<String, dynamic>?;
-            if (test == null) break;
-            final id = test['id'] as int?;
-            if (id == null) break;
-            testNames[id] = test['name'] as String? ?? 'unknown';
-            testStartTimes[id] = event['time'] as int? ?? 0;
-            results.parsed = true;
+      await for (final line in lines) {
+        if (line.trim().isEmpty) continue;
+        try {
+          final event = jsonDecode(line) as Map<String, dynamic>;
+          final type = event['type'] as String?;
 
-          case 'testDone':
-            final id = event['testID'] as int?;
-            if (id == null) break;
-            final resultStr = event['result'] as String?;
-            final hidden = event['hidden'] as bool? ?? false;
-            final skipped = event['skipped'] as bool? ?? false;
+          switch (type) {
+            case 'testStart':
+              final test = event['test'] as Map<String, dynamic>?;
+              if (test == null) break;
+              final id = test['id'] as int?;
+              if (id == null) break;
+              testNames[id] = test['name'] as String? ?? 'unknown';
+              testStartTimes[id] = event['time'] as int? ?? 0;
+              results.parsed = true;
 
-            if (hidden) break;
+            case 'testDone':
+              final id = event['testID'] as int?;
+              if (id == null) break;
+              final resultStr = event['result'] as String?;
+              final hidden = event['hidden'] as bool? ?? false;
+              final skipped = event['skipped'] as bool? ?? false;
 
-            results.parsed = true;
-            if (skipped) {
-              results.skipped++;
-            } else if (resultStr == 'success') {
-              results.passed++;
-            } else if (resultStr == 'failure' || resultStr == 'error') {
-              results.failed++;
-              if (results.failures.length < 50) {
-                final startTime = testStartTimes[id] ?? 0;
-                final endTime = event['time'] as int? ?? 0;
-                final rawError = testErrors[id]?.toString() ?? '';
-                final rawStack = testStackTraces[id]?.toString() ?? '';
-                final rawPrint = testPrints[id]?.toString() ?? '';
-                results.failures.add(
-                  TestFailure(
-                    name: testNames[id] ?? 'unknown',
-                    error: rawError.length > _maxStoredErrorChars
-                        ? '${rawError.substring(0, _maxStoredErrorChars)}\n... (truncated)'
-                        : rawError,
-                    stackTrace: rawStack.length > _maxStoredStackTraceChars
-                        ? '${rawStack.substring(0, _maxStoredStackTraceChars)}\n... (truncated)'
-                        : rawStack,
-                    printOutput: rawPrint.length > _maxStoredPrintChars
-                        ? '${rawPrint.substring(0, _maxStoredPrintChars)}\n... (truncated)'
-                        : rawPrint,
-                    durationMs: endTime - startTime,
-                  ),
-                );
+              if (hidden) break;
+
+              results.parsed = true;
+              if (skipped) {
+                results.skipped++;
+              } else if (resultStr == 'success') {
+                results.passed++;
+              } else if (resultStr == 'failure' || resultStr == 'error') {
+                results.failed++;
+                if (results.failures.length < 50) {
+                  final startTime = testStartTimes[id] ?? 0;
+                  final endTime = event['time'] as int? ?? 0;
+                  final rawError = testErrors[id]?.toString() ?? '';
+                  final rawStack = testStackTraces[id]?.toString() ?? '';
+                  final rawPrint = testPrints[id]?.toString() ?? '';
+                  results.failures.add(
+                    TestFailure(
+                      name: testNames[id] ?? 'unknown',
+                      error: rawError.length > _maxStoredErrorChars
+                          ? '${rawError.substring(0, _maxStoredErrorChars)}\n... (truncated)'
+                          : rawError,
+                      stackTrace: rawStack.length > _maxStoredStackTraceChars
+                          ? '${rawStack.substring(0, _maxStoredStackTraceChars)}\n... (truncated)'
+                          : rawStack,
+                      printOutput: rawPrint.length > _maxStoredPrintChars
+                          ? '${rawPrint.substring(0, _maxStoredPrintChars)}\n... (truncated)'
+                          : rawPrint,
+                      durationMs: endTime - startTime,
+                    ),
+                  );
+                }
               }
-            }
 
-          case 'error':
-            results.parsed = true;
-            final id = event['testID'] as int?;
-            if (id == null) break;
-            testErrors.putIfAbsent(id, () => StringBuffer());
-            if (testErrors[id]!.isNotEmpty) testErrors[id]!.write('\n---\n');
-            testErrors[id]!.write(event['error'] as String? ?? '');
-            testStackTraces.putIfAbsent(id, () => StringBuffer());
-            if (testStackTraces[id]!.isNotEmpty) testStackTraces[id]!.write('\n---\n');
-            testStackTraces[id]!.write(event['stackTrace'] as String? ?? '');
+            case 'error':
+              results.parsed = true;
+              final id = event['testID'] as int?;
+              if (id == null) break;
+              testErrors.putIfAbsent(id, () => StringBuffer());
+              if (testErrors[id]!.isNotEmpty) testErrors[id]!.write('\n---\n');
+              testErrors[id]!.write(event['error'] as String? ?? '');
+              testStackTraces.putIfAbsent(id, () => StringBuffer());
+              if (testStackTraces[id]!.isNotEmpty) testStackTraces[id]!.write('\n---\n');
+              testStackTraces[id]!.write(event['stackTrace'] as String? ?? '');
 
-          case 'print':
-            results.parsed = true;
-            final id = event['testID'] as int?;
-            if (id == null) break;
-            final message = event['message'] as String? ?? '';
-            testPrints.putIfAbsent(id, () => StringBuffer());
-            testPrints[id]!.writeln(message);
+            case 'print':
+              results.parsed = true;
+              final id = event['testID'] as int?;
+              if (id == null) break;
+              final message = event['message'] as String? ?? '';
+              testPrints.putIfAbsent(id, () => StringBuffer());
+              testPrints[id]!.writeln(message);
 
-          case 'done':
-            results.parsed = true;
-            final time = event['time'] as int? ?? 0;
-            results.totalDurationMs = time;
-        }
-      } catch (e) {
-        malformedCount++;
-        if (malformedCount <= _maxMalformedWarnings) {
-          Logger.warn('Skipping malformed JSON line: $e');
-        } else if (malformedCount == _maxMalformedWarnings + 1) {
-          Logger.warn('Skipping malformed JSON lines (circuit breaker — suppressing further warnings)');
+            case 'done':
+              results.parsed = true;
+              final time = event['time'] as int? ?? 0;
+              results.totalDurationMs = time;
+          }
+        } catch (e) {
+          malformedCount++;
+          if (malformedCount <= _maxMalformedWarnings) {
+            Logger.warn('Skipping malformed JSON line: $e');
+          } else if (malformedCount == _maxMalformedWarnings + 1) {
+            Logger.warn('Skipping malformed JSON lines (circuit breaker — suppressing further warnings)');
+          }
         }
       }
+    } on FileSystemException catch (e) {
+      Logger.warn('Failed reading JSON results file at $jsonPath: $e');
+      return results;
     }
 
     if (malformedCount > _maxMalformedWarnings) {

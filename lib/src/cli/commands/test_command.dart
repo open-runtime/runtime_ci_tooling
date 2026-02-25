@@ -14,6 +14,8 @@ import '../utils/test_results_util.dart';
 import '../utils/sub_package_utils.dart';
 import '../utils/utf8_bounded_buffer.dart';
 
+typedef _ExitHandler = Future<Never> Function(int code);
+
 /// Run `dart test` on the root package and all configured sub-packages with
 /// full output capture (two-layer strategy).
 ///
@@ -49,14 +51,18 @@ class TestCommand extends Command<void> {
 
   /// Run tests with an explicit [repoRoot], preserving the contract from
   /// manage_cicd when invoked as `manage_cicd test` (CWD may differ from root).
-  static Future<void> runWithRoot(String repoRoot) async {
+  static Future<void> runWithRoot(
+    String repoRoot, {
+    Duration processTimeout = const Duration(minutes: 45),
+    Duration pubGetTimeout = const Duration(minutes: 5),
+    _ExitHandler exitHandler = exitWithCode,
+  }) async {
     Logger.header('Running dart test');
 
-    const processTimeout = Duration(minutes: 45);
     final failures = <String>[];
 
     // Determine log directory: TEST_LOG_DIR (CI) or .dart_tool/test-logs/ (local)
-    final logDir = await _resolveLogDirOrExit(repoRoot);
+    final logDir = await _resolveLogDirOrExit(repoRoot, exitHandler);
     Logger.info('Log directory: $logDir');
 
     final jsonPath = p.join(logDir, 'results.json');
@@ -141,7 +147,7 @@ class TestCommand extends Command<void> {
       }
 
       // Parse the JSON results file for structured test data
-      final results = TestResultsUtil.parseTestResultsJson(jsonPath);
+      final results = await TestResultsUtil.parseTestResultsJson(jsonPath);
 
       // Generate and write the rich job summary
       TestResultsUtil.writeTestJobSummary(results, exitCode);
@@ -186,7 +192,6 @@ class TestCommand extends Command<void> {
       // Ensure dependencies are resolved (sub-packages have independent
       // pubspec.yaml files that the root `dart pub get` may not cover).
       // Use Process.start so we can kill on timeout (Process.run would hang).
-      const pubGetTimeout = Duration(minutes: 5);
       final pubGetResult = await _runPubGetWithTimeout(
         dir,
         pubGetTimeout,
@@ -278,7 +283,7 @@ class TestCommand extends Command<void> {
         Logger.warn('Could not write sub-package log files: $e');
       }
 
-      final spResults = TestResultsUtil.parseTestResultsJson(spJsonPath);
+      final spResults = await TestResultsUtil.parseTestResultsJson(spJsonPath);
       TestResultsUtil.writeTestJobSummary(spResults, spExitCode, platformId: name);
 
       if (spExitCode != 0) {
@@ -293,7 +298,7 @@ class TestCommand extends Command<void> {
       Logger.error('Tests failed for ${failures.length} package(s): ${failures.join(', ')}');
       final failureBullets = failures.map((name) => '- `${StepSummary.escapeHtml(name)}`').join('\n');
       StepSummary.write('\n## Sub-package Test Failures\n\n$failureBullets\n');
-      await exitWithCode(1);
+      await exitHandler(1);
     }
 
     Logger.success('All tests passed');
@@ -375,17 +380,17 @@ class TestCommand extends Command<void> {
     return -1;
   }
 
-  static Future<String> _resolveLogDirOrExit(String repoRoot) async {
+  static Future<String> _resolveLogDirOrExit(String repoRoot, _ExitHandler exitHandler) async {
     try {
       final logDir = RepoUtils.resolveTestLogDir(repoRoot);
       RepoUtils.ensureSafeDirectory(logDir);
       return logDir;
     } on StateError catch (e) {
       Logger.error('$e');
-      await exitWithCode(1);
+      await exitHandler(1);
     } on FileSystemException catch (e) {
       Logger.error('Cannot use log directory: $e');
-      await exitWithCode(1);
+      await exitHandler(1);
     }
   }
 }
