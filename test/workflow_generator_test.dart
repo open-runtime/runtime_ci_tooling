@@ -1725,6 +1725,318 @@ void main() {
         // post-test: real content was preserved
         expect(rendered, contains('echo kept'));
       });
+
+      test('unknown section name in existing content is silently ignored', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(),
+          toolingVersion: '0.0.0-test',
+        );
+        final base = gen.render();
+        // Add a user section that doesn't exist in the skeleton
+        final existing = '$base\n# --- BEGIN USER: nonexistent ---\n  custom: stuff\n# --- END USER: nonexistent ---\n';
+        final rendered = gen.render(existingContent: existing);
+        // The unknown section content should not appear in the rendered output
+        // (there's no matching placeholder to insert it into)
+        expect(rendered, isNot(contains('custom: stuff')));
+        // Known sections still render correctly
+        expect(rendered, contains('# --- BEGIN USER: pre-test ---'));
+      });
+
+      test('malformed section markers (missing END) are ignored', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(),
+          toolingVersion: '0.0.0-test',
+        );
+        final base = gen.render();
+        // Inject a BEGIN without matching END — regex won't match, so it's ignored
+        final existing = base.replaceFirst(
+          '# --- BEGIN USER: pre-test ---\n# --- END USER: pre-test ---',
+          '# --- BEGIN USER: pre-test ---\n      - run: echo orphan\n',
+        );
+        final rendered = gen.render(existingContent: existing);
+        // The orphaned content won't be extracted (regex requires matched pair)
+        expect(rendered, isNot(contains('echo orphan')));
+      });
+
+      test('mismatched section names (BEGIN X / END Y) are ignored', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(),
+          toolingVersion: '0.0.0-test',
+        );
+        final base = gen.render();
+        final existing = base.replaceFirst(
+          '# --- BEGIN USER: pre-test ---\n# --- END USER: pre-test ---',
+          '# --- BEGIN USER: pre-test ---\n      - run: echo mismatch\n# --- END USER: post-test ---',
+        );
+        final rendered = gen.render(existingContent: existing);
+        // Mismatched names: regex backreference \1 won't match, so nothing extracted
+        expect(rendered, isNot(contains('echo mismatch')));
+      });
+
+      test('section content with regex-special characters is preserved verbatim', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(),
+          toolingVersion: '0.0.0-test',
+        );
+        final base = gen.render();
+        // Content with regex special chars: $, (), *, +, ?, |, ^, {, }
+        const specialContent = r'      - run: echo "${{ matrix.os }}" && test [[ "$(whoami)" == "ci" ]]';
+        final existing = base.replaceFirst(
+          '# --- BEGIN USER: pre-test ---\n# --- END USER: pre-test ---',
+          '# --- BEGIN USER: pre-test ---\n$specialContent\n# --- END USER: pre-test ---',
+        );
+        final rendered = gen.render(existingContent: existing);
+        expect(rendered, contains(specialContent));
+      });
+
+      test('null existingContent produces same output as no existingContent', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(),
+          toolingVersion: '0.0.0-test',
+        );
+        final withoutExisting = gen.render();
+        final withNull = gen.render(existingContent: null);
+        expect(withNull, equals(withoutExisting));
+      });
+
+      test('existingContent with no user sections produces same output as fresh render', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(),
+          toolingVersion: '0.0.0-test',
+        );
+        final fresh = gen.render();
+        // Use a completely unrelated string as existing content
+        final rendered = gen.render(existingContent: 'name: SomeOtherWorkflow\non: push');
+        expect(rendered, equals(fresh));
+      });
+    });
+
+    // ---- render() feature flag combinations ----
+    group('feature flag combinations', () {
+      test('format_check + web_test: web-test needs includes auto-format', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(
+            webTest: true,
+            featureOverrides: {'format_check': true},
+          ),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        final parsed = loadYaml(rendered) as YamlMap;
+        final webTestJob = parsed['jobs']['web-test'] as YamlMap;
+        final needs = (webTestJob['needs'] as YamlList).toList();
+        expect(needs, contains('pre-check'));
+        expect(needs, contains('auto-format'));
+      });
+
+      test('web_test without format_check: web-test needs omits auto-format', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(webTest: true),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        final parsed = loadYaml(rendered) as YamlMap;
+        final webTestJob = parsed['jobs']['web-test'] as YamlMap;
+        final needs = (webTestJob['needs'] as YamlList).toList();
+        expect(needs, contains('pre-check'));
+        expect(needs, isNot(contains('auto-format')));
+      });
+
+      test('build_runner + web_test: web-test job contains build_runner step', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(
+            webTest: true,
+            featureOverrides: {'build_runner': true},
+          ),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        // Find the web-test job section and check it contains build_runner
+        final webTestStart = rendered.indexOf('web-test:');
+        expect(webTestStart, isNot(-1));
+        final afterWebTest = rendered.substring(webTestStart);
+        expect(afterWebTest, contains('Run build_runner'));
+      });
+
+      test('proto + web_test: web-test job contains proto steps', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(
+            webTest: true,
+            featureOverrides: {'proto': true},
+          ),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        final webTestStart = rendered.indexOf('web-test:');
+        expect(webTestStart, isNot(-1));
+        final afterWebTest = rendered.substring(webTestStart);
+        expect(afterWebTest, contains('Install protoc'));
+        expect(afterWebTest, contains('Verify proto files'));
+      });
+
+      test('multi-platform + web_test: web-test depends on analyze (not test)', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(
+            webTest: true,
+            platforms: ['ubuntu', 'macos'],
+          ),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        final parsed = loadYaml(rendered) as YamlMap;
+        final webTestJob = parsed['jobs']['web-test'] as YamlMap;
+        final needs = (webTestJob['needs'] as YamlList).toList();
+        expect(needs, contains('analyze'));
+        expect(needs, isNot(contains('test')));
+        expect(needs, isNot(contains('analyze-and-test')));
+      });
+
+      test('single-platform + web_test: web-test does not depend on analyze-and-test', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(
+            webTest: true,
+            platforms: ['ubuntu'],
+          ),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        final parsed = loadYaml(rendered) as YamlMap;
+        final webTestJob = parsed['jobs']['web-test'] as YamlMap;
+        final needs = (webTestJob['needs'] as YamlList).toList();
+        expect(needs, contains('pre-check'));
+        expect(needs, isNot(contains('analyze-and-test')));
+      });
+
+      test('secrets render in web-test job env block', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(webTest: true)
+            ..['secrets'] = {'API_KEY': 'MY_SECRET'},
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        final webTestStart = rendered.indexOf('web-test:');
+        expect(webTestStart, isNot(-1));
+        final afterWebTest = rendered.substring(webTestStart);
+        expect(afterWebTest, contains('API_KEY'));
+        expect(afterWebTest, contains('MY_SECRET'));
+      });
+
+      test('lfs + web_test: web-test checkout has lfs: true', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(
+            webTest: true,
+            featureOverrides: {'lfs': true},
+          ),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        final webTestStart = rendered.indexOf('web-test:');
+        expect(webTestStart, isNot(-1));
+        final afterWebTest = rendered.substring(webTestStart);
+        expect(afterWebTest, contains('lfs: true'));
+      });
+
+      test('managed_test in multi-platform: test job uses managed test command', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(
+            featureOverrides: {'managed_test': true},
+            platforms: ['ubuntu', 'macos'],
+          ),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        final parsed = loadYaml(rendered) as YamlMap;
+        final testJob = parsed['jobs']['test'] as YamlMap;
+        final steps = (testJob['steps'] as YamlList).toList();
+        final testStep = steps.firstWhere(
+          (s) => s is YamlMap && s['name'] == 'Test',
+          orElse: () => null,
+        );
+        expect(testStep, isNotNull);
+        expect((testStep as YamlMap)['run'], contains('manage_cicd test'));
+      });
+
+      test('all features enabled renders valid YAML', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(
+            webTest: true,
+            webTestConfig: {'concurrency': 4, 'paths': ['test/web/']},
+            featureOverrides: {
+              'proto': true,
+              'lfs': true,
+              'format_check': true,
+              'analysis_cache': true,
+              'managed_analyze': true,
+              'managed_test': true,
+              'build_runner': true,
+            },
+            platforms: ['ubuntu', 'macos'],
+          )..['secrets'] = {'API_KEY': 'MY_SECRET'},
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        // Must parse as valid YAML
+        final parsed = loadYaml(rendered) as YamlMap;
+        final jobs = parsed['jobs'] as YamlMap;
+        expect(jobs.containsKey('pre-check'), isTrue);
+        expect(jobs.containsKey('auto-format'), isTrue);
+        expect(jobs.containsKey('analyze'), isTrue);
+        expect(jobs.containsKey('test'), isTrue);
+        expect(jobs.containsKey('web-test'), isTrue);
+        // web-test should have Chrome setup
+        final webTestSteps = (jobs['web-test']['steps'] as YamlList).toList();
+        final chromeStep = webTestSteps.firstWhere(
+          (s) => s is YamlMap && s['name'] == 'Setup Chrome',
+          orElse: () => null,
+        );
+        expect(chromeStep, isNotNull);
+      });
+
+      test('no features enabled (all false) renders minimal valid YAML', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        final parsed = loadYaml(rendered) as YamlMap;
+        final jobs = parsed['jobs'] as YamlMap;
+        expect(jobs.containsKey('pre-check'), isTrue);
+        expect(jobs.containsKey('analyze-and-test'), isTrue);
+        expect(jobs.containsKey('auto-format'), isFalse);
+        expect(jobs.containsKey('web-test'), isFalse);
+        // Should NOT contain feature-gated content
+        expect(rendered, isNot(contains('Install protoc')));
+        expect(rendered, isNot(contains('lfs: true')));
+        expect(rendered, isNot(contains('auto-format')));
+        expect(rendered, isNot(contains('Run build_runner')));
+      });
+
+      test('sub_packages render in single-platform job', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig()
+            ..['sub_packages'] = [
+              {'name': 'core', 'path': 'packages/core'},
+              {'name': 'api', 'path': 'packages/api'},
+            ],
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        expect(rendered, contains('Analyze (core)'));
+        expect(rendered, contains('Analyze (api)'));
+        expect(rendered, contains('working-directory: packages/core'));
+        expect(rendered, contains('working-directory: packages/api'));
+      });
+
+      test('runner_overrides change runs-on in single-platform', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig()..['runner_overrides'] = {'ubuntu': 'my-custom-runner'},
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        final parsed = loadYaml(rendered) as YamlMap;
+        final job = parsed['jobs']['analyze-and-test'] as YamlMap;
+        expect(job['runs-on'], equals('my-custom-runner'));
+      });
     });
   });
 }
