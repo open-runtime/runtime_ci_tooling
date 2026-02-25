@@ -44,8 +44,7 @@ abstract final class StepSummary {
 
   /// Build a link to the current workflow run's artifacts page.
   static String artifactLink([String label = 'View all artifacts']) {
-    final server =
-        Platform.environment['GITHUB_SERVER_URL'] ?? 'https://github.com';
+    final server = Platform.environment['GITHUB_SERVER_URL'] ?? 'https://github.com';
     final repo = Platform.environment['GITHUB_REPOSITORY'];
     final runId = Platform.environment['GITHUB_RUN_ID'];
     if (repo == null || runId == null) return '';
@@ -54,33 +53,24 @@ abstract final class StepSummary {
 
   /// Build a GitHub compare link between two refs.
   static String compareLink(String prevTag, String newTag, [String? label]) {
-    final server =
-        Platform.environment['GITHUB_SERVER_URL'] ?? 'https://github.com';
-    final repo =
-        Platform.environment['GITHUB_REPOSITORY'] ??
-        '${config.repoOwner}/${config.repoName}';
+    final server = Platform.environment['GITHUB_SERVER_URL'] ?? 'https://github.com';
+    final repo = Platform.environment['GITHUB_REPOSITORY'] ?? '${config.repoOwner}/${config.repoName}';
     final text = label ?? '$prevTag...$newTag';
     return '[$text]($server/$repo/compare/$prevTag...$newTag)';
   }
 
   /// Build a link to a file/path in the repository.
   static String ghLink(String label, String path) {
-    final server =
-        Platform.environment['GITHUB_SERVER_URL'] ?? 'https://github.com';
-    final repo =
-        Platform.environment['GITHUB_REPOSITORY'] ??
-        '${config.repoOwner}/${config.repoName}';
+    final server = Platform.environment['GITHUB_SERVER_URL'] ?? 'https://github.com';
+    final repo = Platform.environment['GITHUB_REPOSITORY'] ?? '${config.repoOwner}/${config.repoName}';
     final sha = Platform.environment['GITHUB_SHA'] ?? 'main';
     return '[$label]($server/$repo/blob/$sha/$path)';
   }
 
   /// Build a link to a GitHub Release by tag.
   static String releaseLink(String tag) {
-    final server =
-        Platform.environment['GITHUB_SERVER_URL'] ?? 'https://github.com';
-    final repo =
-        Platform.environment['GITHUB_REPOSITORY'] ??
-        '${config.repoOwner}/${config.repoName}';
+    final server = Platform.environment['GITHUB_SERVER_URL'] ?? 'https://github.com';
+    final repo = Platform.environment['GITHUB_REPOSITORY'] ?? '${config.repoOwner}/${config.repoName}';
     return '[v$tag]($server/$repo/releases/tag/$tag)';
   }
 
@@ -93,11 +83,7 @@ abstract final class StepSummary {
 
   /// Escape HTML special characters for safe embedding in GitHub markdown.
   static String escapeHtml(String input) {
-    return input
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;');
+    return input.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
   }
 
   /// Parse the NDJSON file produced by `dart test --file-reporter json:...`.
@@ -168,8 +154,7 @@ abstract final class StepSummary {
             if (testErrors[id]!.isNotEmpty) testErrors[id]!.write('\n---\n');
             testErrors[id]!.write(event['error'] as String? ?? '');
             testStackTraces.putIfAbsent(id, () => StringBuffer());
-            if (testStackTraces[id]!.isNotEmpty)
-              testStackTraces[id]!.write('\n---\n');
+            if (testStackTraces[id]!.isNotEmpty) testStackTraces[id]!.write('\n---\n');
             testStackTraces[id]!.write(event['stackTrace'] as String? ?? '');
 
           case 'print':
@@ -196,9 +181,7 @@ abstract final class StepSummary {
     final buf = StringBuffer();
 
     final platformId =
-        Platform.environment['PLATFORM_ID'] ??
-        Platform.environment['RUNNER_NAME'] ??
-        Platform.operatingSystem;
+        Platform.environment['PLATFORM_ID'] ?? Platform.environment['RUNNER_NAME'] ?? Platform.operatingSystem;
 
     buf.writeln('## Test Results — ${escapeHtml(platformId)}');
     buf.writeln();
@@ -207,9 +190,7 @@ abstract final class StepSummary {
       final status = exitCode == 0 ? 'passed' : 'failed';
       final icon = exitCode == 0 ? 'NOTE' : 'CAUTION';
       buf.writeln('> [!$icon]');
-      buf.writeln(
-        '> Tests $status (exit code $exitCode) — no structured results available.',
-      );
+      buf.writeln('> Tests $status (exit code $exitCode) — no structured results available.');
       buf.writeln();
       buf.writeln('Check the expanded output in test logs for details.');
       buf.writeln();
@@ -247,15 +228,11 @@ abstract final class StepSummary {
       for (final f in displayFailures) {
         final durStr = f.durationMs > 0 ? ' (${f.durationMs}ms)' : '';
         buf.writeln('<details>');
-        buf.writeln(
-          '<summary><strong>:x: ${escapeHtml(f.name)}</strong>$durStr</summary>',
-        );
+        buf.writeln('<summary><strong>:x: ${escapeHtml(f.name)}</strong>$durStr</summary>');
         buf.writeln();
 
         if (f.error.isNotEmpty) {
-          final error = f.error.length > 2000
-              ? '${f.error.substring(0, 2000)}\n... (truncated)'
-              : f.error;
+          final error = f.error.length > 2000 ? '${f.error.substring(0, 2000)}\n... (truncated)' : f.error;
           buf.writeln('**Error:**');
           final fence = _codeFence(error);
           buf.writeln(fence);
@@ -279,9 +256,7 @@ abstract final class StepSummary {
         if (f.printOutput.isNotEmpty) {
           final trimmed = f.printOutput.trimRight();
           final lineCount = trimmed.split('\n').length;
-          final printPreview = trimmed.length > 1500
-              ? '${trimmed.substring(0, 1500)}\n... (truncated)'
-              : trimmed;
+          final printPreview = trimmed.length > 1500 ? '${trimmed.substring(0, 1500)}\n... (truncated)' : trimmed;
           buf.writeln('**Captured Output ($lineCount lines):**');
           final fence = _codeFence(printPreview);
           buf.writeln(fence);
@@ -295,9 +270,7 @@ abstract final class StepSummary {
       }
 
       if (results.failures.length > 20) {
-        buf.writeln(
-          '_...and ${results.failures.length - 20} more failures. See test logs artifact for full details._',
-        );
+        buf.writeln('_...and ${results.failures.length - 20} more failures. See test logs artifact for full details._');
         buf.writeln();
       }
     }

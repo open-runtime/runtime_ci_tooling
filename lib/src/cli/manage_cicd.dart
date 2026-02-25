@@ -86,25 +86,19 @@ String _resolveToolingPackageRoot() {
     final configFile = File('${dir.path}/.dart_tool/package_config.json');
     if (configFile.existsSync()) {
       try {
-        final configJson =
-            json.decode(configFile.readAsStringSync()) as Map<String, dynamic>;
+        final configJson = json.decode(configFile.readAsStringSync()) as Map<String, dynamic>;
         final packages = configJson['packages'] as List<dynamic>? ?? [];
         for (final pkg in packages) {
-          if (pkg is Map<String, dynamic> &&
-              pkg['name'] == 'runtime_ci_tooling') {
+          if (pkg is Map<String, dynamic> && pkg['name'] == 'runtime_ci_tooling') {
             final rootUri = pkg['rootUri'] as String? ?? '';
             if (rootUri.startsWith('file://')) {
               return Uri.parse(rootUri).toFilePath();
             }
             // Relative URI -- resolve against the .dart_tool/ directory
-            final resolved = Uri.parse(
-              '${dir.path}/.dart_tool/',
-            ).resolve(rootUri);
+            final resolved = Uri.parse('${dir.path}/.dart_tool/').resolve(rootUri);
             final resolvedPath = resolved.toFilePath();
             // Strip trailing slash
-            return resolvedPath.endsWith('/')
-                ? resolvedPath.substring(0, resolvedPath.length - 1)
-                : resolvedPath;
+            return resolvedPath.endsWith('/') ? resolvedPath.substring(0, resolvedPath.length - 1) : resolvedPath;
           }
         }
       } catch (_) {}
@@ -120,9 +114,7 @@ String _resolveToolingPackageRoot() {
   }
 
   // Fallback: assume scripts/prompts/ (legacy location in consuming repos)
-  _warn(
-    'Could not resolve runtime_ci_tooling package root. Prompt scripts may not be found.',
-  );
+  _warn('Could not resolve runtime_ci_tooling package root. Prompt scripts may not be found.');
   return Directory.current.path;
 }
 
@@ -201,9 +193,7 @@ void main(List<String> args) async {
   if (repoRoot == null) {
     _error('Could not find ${config.repoName} repo root.');
     _error('Run this script from inside the repository.');
-    _error(
-      'If this is a new project, run "init" first to create .runtime_ci/config.json.',
-    );
+    _error('If this is a new project, run "init" first to create .runtime_ci/config.json.');
     exit(1);
   }
 
@@ -298,19 +288,14 @@ Future<void> _runSetup(String repoRoot) async {
   if (geminiKey != null && geminiKey.isNotEmpty) {
     _success('GEMINI_API_KEY is set');
   } else {
-    _warn(
-      'GEMINI_API_KEY is not set. Set it via: export GEMINI_API_KEY=<your-key>',
-    );
+    _warn('GEMINI_API_KEY is not set. Set it via: export GEMINI_API_KEY=<your-key>');
   }
 
-  final ghToken =
-      Platform.environment['GH_TOKEN'] ?? Platform.environment['GITHUB_TOKEN'];
+  final ghToken = Platform.environment['GH_TOKEN'] ?? Platform.environment['GITHUB_TOKEN'];
   if (ghToken != null && ghToken.isNotEmpty) {
     _success('GitHub token is set');
   } else {
-    _info(
-      'No GH_TOKEN/GITHUB_TOKEN set. Run "gh auth login" for GitHub CLI auth.',
-    );
+    _info('No GH_TOKEN/GITHUB_TOKEN set. Run "gh auth login" for GitHub CLI auth.');
   }
 
   // Install Dart dependencies
@@ -366,10 +351,7 @@ Future<void> _runValidate(String repoRoot) async {
       }
     } else if (file.endsWith('.dart')) {
       // Validate Dart files compile
-      final result = Process.runSync('dart', [
-        'analyze',
-        path,
-      ], workingDirectory: repoRoot);
+      final result = Process.runSync('dart', ['analyze', path], workingDirectory: repoRoot);
       if (result.exitCode == 0) {
         _success('Valid Dart: $file');
       } else {
@@ -429,9 +411,7 @@ Future<void> _runExplore(String repoRoot) async {
   _header('Stage 1: Explorer Agent (Gemini 3 Pro Preview)');
 
   if (!_geminiAvailable(warnOnly: true)) {
-    _warn(
-      'Skipping explore stage (Gemini unavailable). No changelog data will be generated.',
-    );
+    _warn('Skipping explore stage (Gemini unavailable). No changelog data will be generated.');
     return;
   }
 
@@ -451,10 +431,7 @@ Future<void> _runExplore(String repoRoot) async {
     _error('Ensure runtime_ci_tooling is properly installed (dart pub get).');
     exit(1);
   }
-  final prompt = _runSync(
-    'dart run $promptScriptPath "$prevTag" "$newVersion"',
-    repoRoot,
-  );
+  final prompt = _runSync('dart run $promptScriptPath "$prevTag" "$newVersion"', repoRoot);
   if (prompt.isEmpty) {
     _error('Prompt generator produced empty output. Check $promptScriptPath');
     exit(1);
@@ -462,9 +439,7 @@ Future<void> _runExplore(String repoRoot) async {
   ctx.savePrompt('explore', prompt);
 
   if (_dryRun) {
-    _info(
-      '[DRY-RUN] Would run Gemini CLI with explorer prompt (${prompt.length} chars)',
-    );
+    _info('[DRY-RUN] Would run Gemini CLI with explorer prompt (${prompt.length} chars)');
     return;
   }
 
@@ -528,11 +503,7 @@ Future<void> _runExplore(String repoRoot) async {
   // the workflow artifact upload step.
   _info('');
   _info('Validating Stage 1 artifacts...');
-  final artifactNames = [
-    'commit_analysis.json',
-    'pr_data.json',
-    'breaking_changes.json',
-  ];
+  final artifactNames = ['commit_analysis.json', 'pr_data.json', 'breaking_changes.json'];
   for (final name in artifactNames) {
     // Check RunContext path first, then hardcoded fallback
     final ctxPath = '${ctx.runDir}/explore/$name';
@@ -615,10 +586,7 @@ Future<void> _runCompose(String repoRoot) async {
     _error('Prompt script not found: $composerScript');
     exit(1);
   }
-  final prompt = _runSync(
-    'dart run $composerScript "$prevTag" "$newVersion"',
-    repoRoot,
-  );
+  final prompt = _runSync('dart run $composerScript "$prevTag" "$newVersion"', repoRoot);
   if (prompt.isEmpty) {
     _error('Composer prompt generator produced empty output.');
     exit(1);
@@ -626,9 +594,7 @@ Future<void> _runCompose(String repoRoot) async {
   ctx.savePrompt('compose', prompt);
 
   if (_dryRun) {
-    _info(
-      '[DRY-RUN] Would run Gemini CLI with composer prompt (${prompt.length} chars)',
-    );
+    _info('[DRY-RUN] Would run Gemini CLI with composer prompt (${prompt.length} chars)');
     return;
   }
 
@@ -637,11 +603,7 @@ Future<void> _runCompose(String repoRoot) async {
   // Build the @ includes for file context.
   // Stage 1 artifacts may be at /tmp/ (CI download) or .runtime_ci/runs/explore/ (local).
   final includes = <String>[];
-  final artifactNames = [
-    'commit_analysis.json',
-    'pr_data.json',
-    'breaking_changes.json',
-  ];
+  final artifactNames = ['commit_analysis.json', 'pr_data.json', 'breaking_changes.json'];
   for (final name in artifactNames) {
     if (File('/tmp/$name').existsSync()) {
       includes.add('@/tmp/$name');
@@ -689,8 +651,7 @@ Future<void> _runCompose(String repoRoot) async {
 
   if (result.exitCode != 0) {
     _warn('Gemini CLI exited with code ${result.exitCode}');
-    if (composeStderr.isNotEmpty)
-      _warn('  stderr: ${composeStderr.split('\n').first}');
+    if (composeStderr.isNotEmpty) _warn('  stderr: ${composeStderr.split('\n').first}');
   }
 
   if (rawCompose.isNotEmpty) {
@@ -731,9 +692,7 @@ Future<void> _runCompose(String repoRoot) async {
     try {
       final bytes = File('$repoRoot/CHANGELOG.md').readAsBytesSync();
       changelogContent = String.fromCharCodes(bytes.where((b) => b < 128));
-      _info(
-        'Read CHANGELOG.md with ASCII fallback (${changelogContent.length} chars)',
-      );
+      _info('Read CHANGELOG.md with ASCII fallback (${changelogContent.length} chars)');
     } catch (_) {
       changelogContent = '';
     }
@@ -788,8 +747,7 @@ Future<void> _runReleaseNotes(String repoRoot) async {
     _warn('Skipping release notes (Gemini unavailable).');
     // Create minimal fallback
     final newVersion = _versionOverride ?? 'unknown';
-    final fallback =
-        '# ${config.repoName} v$newVersion\n\nSee CHANGELOG.md for details.';
+    final fallback = '# ${config.repoName} v$newVersion\n\nSee CHANGELOG.md for details.';
     File('/tmp/release_notes_body.md').writeAsStringSync(fallback);
     return;
   }
@@ -799,10 +757,7 @@ Future<void> _runReleaseNotes(String repoRoot) async {
   final newVersion = _versionOverride ?? _detectNextVersion(repoRoot, prevTag);
 
   // Derive bump type
-  final currentVersion = _runSync(
-    "awk '/^version:/{print \$2}' pubspec.yaml",
-    repoRoot,
-  );
+  final currentVersion = _runSync("awk '/^version:/{print \$2}' pubspec.yaml", repoRoot);
   final currentParts = currentVersion.split('.');
   final newParts = newVersion.split('.');
   String bumpType = 'minor';
@@ -825,23 +780,17 @@ Future<void> _runReleaseNotes(String repoRoot) async {
   final releaseNotesDir = Directory('$repoRoot/$kReleaseNotesDir/v$newVersion');
   releaseNotesDir.createSync(recursive: true);
   final verifiedContributors = _gatherVerifiedContributors(repoRoot, prevTag);
-  File('${releaseNotesDir.path}/contributors.json').writeAsStringSync(
-    const JsonEncoder.withIndent('  ').convert(verifiedContributors),
-  );
-  _info(
-    'Verified contributors: ${verifiedContributors.map((c) => '@${c['username']}').join(', ')}',
-  );
+  File(
+    '${releaseNotesDir.path}/contributors.json',
+  ).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(verifiedContributors));
+  _info('Verified contributors: ${verifiedContributors.map((c) => '@${c['username']}').join(', ')}');
 
   // ── Load issue manifest for verified issue data ──
   List<dynamic> verifiedIssues = [];
-  for (final path in [
-    '/tmp/issue_manifest.json',
-    '$repoRoot/$kCicdRunsDir/triage/issue_manifest.json',
-  ]) {
+  for (final path in ['/tmp/issue_manifest.json', '$repoRoot/$kCicdRunsDir/triage/issue_manifest.json']) {
     if (File(path).existsSync()) {
       try {
-        final manifest =
-            json.decode(File(path).readAsStringSync()) as Map<String, dynamic>;
+        final manifest = json.decode(File(path).readAsStringSync()) as Map<String, dynamic>;
         verifiedIssues = (manifest['github_issues'] as List?) ?? [];
       } catch (_) {}
       break;
@@ -856,10 +805,7 @@ Future<void> _runReleaseNotes(String repoRoot) async {
     _error('Prompt script not found: $rnScript');
     exit(1);
   }
-  final prompt = _runSync(
-    'dart run $rnScript "$prevTag" "$newVersion" "$bumpType"',
-    repoRoot,
-  );
+  final prompt = _runSync('dart run $rnScript "$prevTag" "$newVersion" "$bumpType"', repoRoot);
   if (prompt.isEmpty) {
     _error('Release notes prompt generator produced empty output.');
     exit(1);
@@ -867,9 +813,7 @@ Future<void> _runReleaseNotes(String repoRoot) async {
   ctx.savePrompt('release-notes', prompt);
 
   if (_dryRun) {
-    _info(
-      '[DRY-RUN] Would run Gemini CLI for release notes (${prompt.length} chars)',
-    );
+    _info('[DRY-RUN] Would run Gemini CLI for release notes (${prompt.length} chars)');
     return;
   }
 
@@ -877,11 +821,7 @@ Future<void> _runReleaseNotes(String repoRoot) async {
 
   // Build @ includes -- give Gemini all available context
   final includes = <String>[];
-  final artifactNames = [
-    'commit_analysis.json',
-    'pr_data.json',
-    'breaking_changes.json',
-  ];
+  final artifactNames = ['commit_analysis.json', 'pr_data.json', 'breaking_changes.json'];
   for (final name in artifactNames) {
     if (File('/tmp/$name').existsSync()) {
       includes.add('@/tmp/$name');
@@ -923,8 +863,7 @@ Future<void> _runReleaseNotes(String repoRoot) async {
   if (result.exitCode != 0) {
     _warn('Gemini CLI failed for release notes: ${result.stderr}');
     // Create fallback
-    final fallback =
-        '# ${config.repoName} v$newVersion\n\nSee CHANGELOG.md for details.';
+    final fallback = '# ${config.repoName} v$newVersion\n\nSee CHANGELOG.md for details.';
     File('/tmp/release_notes_body.md').writeAsStringSync(fallback);
     ctx.finalize(exitCode: result.exitCode);
     return;
@@ -961,9 +900,7 @@ Future<void> _runReleaseNotes(String repoRoot) async {
       content,
       verifiedContributors: verifiedContributors,
       verifiedIssues: verifiedIssues,
-      repoSlug:
-          Platform.environment['GITHUB_REPOSITORY'] ??
-          '${config.repoOwner}/${config.repoName}',
+      repoSlug: Platform.environment['GITHUB_REPOSITORY'] ?? '${config.repoOwner}/${config.repoName}',
       repoRoot: repoRoot,
     );
     _success('Post-processed release notes: ${content.length} chars');
@@ -983,9 +920,7 @@ Future<void> _runReleaseNotes(String repoRoot) async {
 
   if (migrationFile.existsSync()) {
     _success('Migration guide: ${migrationFile.lengthSync()} bytes');
-    File(
-      '/tmp/migration_guide.md',
-    ).writeAsStringSync(migrationFile.readAsStringSync());
+    File('/tmp/migration_guide.md').writeAsStringSync(migrationFile.readAsStringSync());
   } else if (bumpType == 'major') {
     _warn('Major release but no migration guide generated');
   }
@@ -999,18 +934,10 @@ Future<void> _runReleaseNotes(String repoRoot) async {
   }
 
   // Build rich step summary
-  final rnContent = releaseNotesFile.existsSync()
-      ? releaseNotesFile.readAsStringSync()
-      : '(not generated)';
-  final migContent = migrationFile.existsSync()
-      ? migrationFile.readAsStringSync()
-      : '';
-  final linkedContent = linkedIssuesFile.existsSync()
-      ? linkedIssuesFile.readAsStringSync()
-      : '';
-  final hlContent = highlightsFile.existsSync()
-      ? highlightsFile.readAsStringSync()
-      : '';
+  final rnContent = releaseNotesFile.existsSync() ? releaseNotesFile.readAsStringSync() : '(not generated)';
+  final migContent = migrationFile.existsSync() ? migrationFile.readAsStringSync() : '';
+  final linkedContent = linkedIssuesFile.existsSync() ? linkedIssuesFile.readAsStringSync() : '';
+  final hlContent = highlightsFile.existsSync() ? highlightsFile.readAsStringSync() : '';
 
   _writeStepSummary('''
 ## Stage 3: Release Notes Author Complete
@@ -1044,13 +971,8 @@ ${_artifactLink()}
 /// 1. Only contributors who actually committed in THIS release are listed
 /// 2. GitHub usernames are verified (not guessed from display names)
 /// 3. Bots are excluded
-List<Map<String, String>> _gatherVerifiedContributors(
-  String repoRoot,
-  String prevTag,
-) {
-  final repo =
-      Platform.environment['GITHUB_REPOSITORY'] ??
-      '${config.repoOwner}/${config.repoName}';
+List<Map<String, String>> _gatherVerifiedContributors(String repoRoot, String prevTag) {
+  final repo = Platform.environment['GITHUB_REPOSITORY'] ?? '${config.repoOwner}/${config.repoName}';
 
   // Step 1: Get one commit SHA per unique author email in the release range
   final gitResult = Process.runSync('sh', [
@@ -1063,10 +985,7 @@ List<Map<String, String>> _gatherVerifiedContributors(
     return [];
   }
 
-  final lines = (gitResult.stdout as String)
-      .trim()
-      .split('\n')
-      .where((l) => l.isNotEmpty);
+  final lines = (gitResult.stdout as String).trim().split('\n').where((l) => l.isNotEmpty);
   final contributors = <Map<String, String>>[];
   final seenLogins = <String>{};
 
@@ -1077,9 +996,7 @@ List<Map<String, String>> _gatherVerifiedContributors(
     final email = parts[1];
 
     // Skip bot emails
-    if (email.contains('[bot]') ||
-        email.contains('noreply.github.com') && email.contains('bot'))
-      continue;
+    if (email.contains('[bot]') || email.contains('noreply.github.com') && email.contains('bot')) continue;
 
     // Step 2: Resolve SHA to verified GitHub login via commits API
     try {
@@ -1092,9 +1009,7 @@ List<Map<String, String>> _gatherVerifiedContributors(
 
       if (ghResult.exitCode == 0) {
         final login = (ghResult.stdout as String).trim();
-        if (login.isNotEmpty &&
-            !login.contains('[bot]') &&
-            !seenLogins.contains(login)) {
+        if (login.isNotEmpty && !login.contains('[bot]') && !seenLogins.contains(login)) {
           seenLogins.add(login);
           contributors.add({'username': login});
         }
@@ -1105,9 +1020,7 @@ List<Map<String, String>> _gatherVerifiedContributors(
   }
 
   if (contributors.isEmpty) {
-    _warn(
-      'No contributors resolved from GitHub API, falling back to git names',
-    );
+    _warn('No contributors resolved from GitHub API, falling back to git names');
     // Fallback: use git display names without usernames
     final names = (gitResult.stdout as String)
         .trim()
@@ -1115,9 +1028,7 @@ List<Map<String, String>> _gatherVerifiedContributors(
         .where((l) => l.isNotEmpty && !l.contains('[bot]'))
         .map((l) => l.split(' ').length > 1 ? l.split(' ')[1] : l)
         .toSet()
-        .map<Map<String, String>>(
-          (email) => {'username': email.split('@').first},
-        )
+        .map<Map<String, String>>((email) => {'username': email.split('@').first})
         .toList();
     return names;
   }
@@ -1145,9 +1056,7 @@ String _postProcessReleaseNotes(
   contributorsSection.writeln('## Contributors');
   contributorsSection.writeln();
   if (verifiedContributors.isNotEmpty) {
-    contributorsSection.writeln(
-      'Thanks to everyone who contributed to this release:',
-    );
+    contributorsSection.writeln('Thanks to everyone who contributed to this release:');
     for (final c in verifiedContributors) {
       final username = c['username'] ?? '';
       if (username.isNotEmpty) {
@@ -1188,25 +1097,16 @@ String _postProcessReleaseNotes(
 
   // ── Validate issue references throughout the document ──
   // Find all (#N) patterns and validate they exist
-  final issueRefs = RegExp(
-    r'\(#(\d+)\)',
-  ).allMatches(result).map((m) => int.parse(m.group(1)!)).toSet();
+  final issueRefs = RegExp(r'\(#(\d+)\)').allMatches(result).map((m) => int.parse(m.group(1)!)).toSet();
   if (issueRefs.isNotEmpty) {
-    final validIssues = verifiedIssues
-        .map((i) => i['number'] as int? ?? 0)
-        .toSet();
+    final validIssues = verifiedIssues.map((i) => i['number'] as int? ?? 0).toSet();
     final fabricated = issueRefs.difference(validIssues);
 
     if (fabricated.isNotEmpty) {
-      _warn(
-        'Stripping ${fabricated.length} fabricated issue references: ${fabricated.map((n) => "#$n").join(", ")}',
-      );
+      _warn('Stripping ${fabricated.length} fabricated issue references: ${fabricated.map((n) => "#$n").join(", ")}');
       for (final issueNum in fabricated) {
         // Remove the link but keep descriptive text: "[#N](url) — desc" → "desc"
-        result = result.replaceAll(
-          RegExp(r'- \[#' + issueNum.toString() + r'\]\([^)]*\)[^\n]*\n'),
-          '',
-        );
+        result = result.replaceAll(RegExp(r'- \[#' + issueNum.toString() + r'\]\([^)]*\)[^\n]*\n'), '');
         // Remove inline (#N) references
         result = result.replaceAll('(#$issueNum)', '');
       }
@@ -1216,11 +1116,7 @@ String _postProcessReleaseNotes(
   return result;
 }
 
-String _buildFallbackReleaseNotes(
-  String repoRoot,
-  String version,
-  String prevTag,
-) {
+String _buildFallbackReleaseNotes(String repoRoot, String version, String prevTag) {
   final buf = StringBuffer();
   buf.writeln('# ${config.repoName} v$version');
   buf.writeln();
@@ -1296,9 +1192,7 @@ Future<void> _runAutodoc(String repoRoot, List<String> args) async {
     if (File(configPath).existsSync()) {
       _success('autodoc.json exists at $configPath');
     } else {
-      _error(
-        'autodoc.json not found. Create it at $kRuntimeCiDir/autodoc.json',
-      );
+      _error('autodoc.json not found. Create it at $kRuntimeCiDir/autodoc.json');
     }
     return;
   }
@@ -1346,9 +1240,7 @@ Future<void> _runAutodoc(String repoRoot, List<String> args) async {
     final generateTypes = (module['generate'] as List).cast<String>();
     final libDir = libPaths.isNotEmpty ? '$repoRoot/${libPaths.first}' : '';
 
-    _info(
-      '  $id ($name): ${force ? "forced" : "changed"} -> generating ${generateTypes.join(", ")}',
-    );
+    _info('  $id ($name): ${force ? "forced" : "changed"} -> generating ${generateTypes.join(", ")}');
 
     if (dryRun) {
       updatedModules.add(id);
@@ -1390,9 +1282,7 @@ Future<void> _runAutodoc(String repoRoot, List<String> args) async {
 
   if (dryRun) {
     _info('');
-    _info(
-      '[DRY-RUN] Would generate docs for ${updatedModules.length} modules, skipped $skippedCount unchanged',
-    );
+    _info('[DRY-RUN] Would generate docs for ${updatedModules.length} modules, skipped $skippedCount unchanged');
     for (final id in updatedModules) {
       _info('  - $id');
     }
@@ -1406,9 +1296,7 @@ Future<void> _runAutodoc(String repoRoot, List<String> args) async {
 
   // Execute in parallel batches
   _info('');
-  _info(
-    'Running ${tasks.length} Gemini doc generation tasks (max $maxConcurrent parallel)...',
-  );
+  _info('Running ${tasks.length} Gemini doc generation tasks (max $maxConcurrent parallel)...');
 
   // Simple batching: process maxConcurrent at a time
   for (var i = 0; i < tasks.length; i += maxConcurrent) {
@@ -1417,13 +1305,9 @@ Future<void> _runAutodoc(String repoRoot, List<String> args) async {
   }
 
   // Save updated config with new hashes
-  File(
-    configPath,
-  ).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(config));
+  File(configPath).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(config));
 
-  _success(
-    'Generated docs for ${updatedModules.length} modules, skipped $skippedCount unchanged.',
-  );
+  _success('Generated docs for ${updatedModules.length} modules, skipped $skippedCount unchanged.');
   _info('Updated hashes saved to $kRuntimeCiDir/autodoc.json');
 
   _writeStepSummary('''
@@ -1472,13 +1356,9 @@ Future<void> _generateAutodocFile({
   // Generate prompt from template
   final promptArgs = [moduleName, sourceDir];
   if (libDir.isNotEmpty) promptArgs.add(libDir);
-  if (docType == 'migration' && previousHash.isNotEmpty)
-    promptArgs.add(previousHash);
+  if (docType == 'migration' && previousHash.isNotEmpty) promptArgs.add(previousHash);
 
-  final prompt = _runSync(
-    'dart run $repoRoot/$templatePath ${promptArgs.map((a) => '"$a"').join(' ')}',
-    repoRoot,
-  );
+  final prompt = _runSync('dart run $repoRoot/$templatePath ${promptArgs.map((a) => '"$a"').join(' ')}', repoRoot);
 
   if (prompt.isEmpty) {
     _warn('  [$moduleId] Empty prompt for $docType, skipping');
@@ -1519,10 +1399,7 @@ Do not skip any -- completeness is more important than brevity.
 
   final pass1Result = Process.runSync(
     'sh',
-    [
-      '-c',
-      'cat ${pass1Prompt.path} | gemini --yolo -m $kGeminiProModel ${includes.join(" ")}',
-    ],
+    ['-c', 'cat ${pass1Prompt.path} | gemini --yolo -m $kGeminiProModel ${includes.join(" ")}'],
     workingDirectory: repoRoot,
     environment: {...Platform.environment},
   );
@@ -1530,9 +1407,7 @@ Do not skip any -- completeness is more important than brevity.
   if (pass1Prompt.existsSync()) pass1Prompt.deleteSync();
 
   if (pass1Result.exitCode != 0) {
-    _warn(
-      '  [$moduleId] Pass 1 failed: ${(pass1Result.stderr as String).trim()}',
-    );
+    _warn('  [$moduleId] Pass 1 failed: ${(pass1Result.stderr as String).trim()}');
     return;
   }
 
@@ -1613,10 +1488,7 @@ Write the corrected file to the same path: $absOutputFile
 
   final pass2Result = Process.runSync(
     'sh',
-    [
-      '-c',
-      'cat ${pass2Prompt.path} | gemini --yolo -m $kGeminiProModel ${includes.join(" ")}',
-    ],
+    ['-c', 'cat ${pass2Prompt.path} | gemini --yolo -m $kGeminiProModel ${includes.join(" ")}'],
     workingDirectory: repoRoot,
     environment: {...Platform.environment},
   );
@@ -1624,9 +1496,7 @@ Write the corrected file to the same path: $absOutputFile
   if (pass2Prompt.existsSync()) pass2Prompt.deleteSync();
 
   if (pass2Result.exitCode != 0) {
-    _warn(
-      '  [$moduleId] Pass 2 failed (keeping Pass 1 output): ${(pass2Result.stderr as String).trim()}',
-    );
+    _warn('  [$moduleId] Pass 2 failed (keeping Pass 1 output): ${(pass2Result.stderr as String).trim()}');
   }
 
   // Verify final output
@@ -1634,9 +1504,7 @@ Write the corrected file to the same path: $absOutputFile
     final finalSize = outputFile.lengthSync();
     final delta = finalSize - pass1Size;
     final deltaStr = delta >= 0 ? '+$delta' : '$delta';
-    _success(
-      '  [$moduleId] $outputFileName: $finalSize bytes ($deltaStr from review)',
-    );
+    _success('  [$moduleId] $outputFileName: $finalSize bytes ($deltaStr from review)');
     return;
   }
 
@@ -1682,9 +1550,7 @@ Future<void> _runTriageCli(String repoRoot, List<String> triageArgs) async {
   if (_dryRun) forwardedArgs.add('--dry-run');
   if (_verbose) forwardedArgs.add('--verbose');
 
-  _info(
-    'Delegating to triage CLI: dart run runtime_ci_tooling:triage_cli ${forwardedArgs.join(" ")}',
-  );
+  _info('Delegating to triage CLI: dart run runtime_ci_tooling:triage_cli ${forwardedArgs.join(" ")}');
 
   final result = await Process.run(
     'dart',
@@ -1731,27 +1597,20 @@ Future<void> _runVersion(String repoRoot) async {
 
   final prevTag = _prevTagOverride ?? _detectPrevTag(repoRoot);
   final newVersion = _versionOverride ?? _detectNextVersion(repoRoot, prevTag);
-  final currentVersion = _runSync(
-    "awk '/^version:/{print \$2}' pubspec.yaml",
-    repoRoot,
-  );
+  final currentVersion = _runSync("awk '/^version:/{print \$2}' pubspec.yaml", repoRoot);
 
   _info('Current version (pubspec.yaml): $currentVersion');
   _info('Previous tag: $prevTag');
   _info('Next version: $newVersion');
 
   // Save version bump rationale if Gemini produced one
-  final rationaleFile = File(
-    '$repoRoot/$kCicdRunsDir/version_analysis/version_bump_rationale.md',
-  );
+  final rationaleFile = File('$repoRoot/$kCicdRunsDir/version_analysis/version_bump_rationale.md');
   if (rationaleFile.existsSync()) {
     final bumpDir = Directory('$repoRoot/$kVersionBumpsDir');
     bumpDir.createSync(recursive: true);
     final targetPath = '${bumpDir.path}/v$newVersion.md';
     rationaleFile.copySync(targetPath);
-    _success(
-      'Version bump rationale saved to $kVersionBumpsDir/v$newVersion.md',
-    );
+    _success('Version bump rationale saved to $kVersionBumpsDir/v$newVersion.md');
   }
 }
 
@@ -1764,8 +1623,7 @@ Future<void> _runConfigureMcp(String repoRoot) async {
 
   Map<String, dynamic> settings;
   try {
-    settings =
-        json.decode(settingsFile.readAsStringSync()) as Map<String, dynamic>;
+    settings = json.decode(settingsFile.readAsStringSync()) as Map<String, dynamic>;
   } catch (e) {
     _error('Could not read .gemini/settings.json: $e');
     exit(1);
@@ -1776,22 +1634,13 @@ Future<void> _runConfigureMcp(String repoRoot) async {
 
   // GitHub MCP Server
   final ghToken =
-      Platform.environment['GH_TOKEN'] ??
-      Platform.environment['GITHUB_TOKEN'] ??
-      Platform.environment['GITHUB_PAT'];
+      Platform.environment['GH_TOKEN'] ?? Platform.environment['GITHUB_TOKEN'] ?? Platform.environment['GITHUB_PAT'];
 
   if (ghToken != null && ghToken.isNotEmpty) {
     _info('Configuring GitHub MCP server...');
     mcpServers['github'] = {
       'command': 'docker',
-      'args': [
-        'run',
-        '-i',
-        '--rm',
-        '-e',
-        'GITHUB_PERSONAL_ACCESS_TOKEN',
-        'ghcr.io/github/github-mcp-server',
-      ],
+      'args': ['run', '-i', '--rm', '-e', 'GITHUB_PERSONAL_ACCESS_TOKEN', 'ghcr.io/github/github-mcp-server'],
       'env': {'GITHUB_PERSONAL_ACCESS_TOKEN': ghToken},
       'includeTools': [
         'get_issue',
@@ -1822,18 +1671,14 @@ Future<void> _runConfigureMcp(String repoRoot) async {
     };
     _success('GitHub MCP server configured');
   } else {
-    _warn(
-      'No GitHub token found. Set GH_TOKEN or GITHUB_PAT to configure GitHub MCP.',
-    );
+    _warn('No GitHub token found. Set GH_TOKEN or GITHUB_PAT to configure GitHub MCP.');
     _info('  export GH_TOKEN=<your-github-personal-access-token>');
   }
 
   // Sentry MCP Server (remote, no local install needed)
   _info('Configuring Sentry MCP server (remote)...');
   mcpServers['sentry'] = {'url': 'https://mcp.sentry.dev/mcp'};
-  _success(
-    'Sentry MCP server configured (uses OAuth -- browser auth on first use)',
-  );
+  _success('Sentry MCP server configured (uses OAuth -- browser auth on first use)');
 
   // Write updated settings
   settings['mcpServers'] = mcpServers;
@@ -1844,9 +1689,7 @@ Future<void> _runConfigureMcp(String repoRoot) async {
     return;
   }
 
-  settingsFile.writeAsStringSync(
-    '${const JsonEncoder.withIndent('  ').convert(settings)}\n',
-  );
+  settingsFile.writeAsStringSync('${const JsonEncoder.withIndent('  ').convert(settings)}\n');
   _success('Updated .gemini/settings.json with MCP servers');
 
   _info('');
@@ -1875,10 +1718,7 @@ Future<void> _runStatus(String repoRoot) async {
   _info('Required tools:');
   for (final tool in [...kRequiredTools, ...kOptionalTools]) {
     if (_commandExists(tool)) {
-      final version = _runSync(
-        '$tool --version 2>/dev/null || echo "installed"',
-        repoRoot,
-      );
+      final version = _runSync('$tool --version 2>/dev/null || echo "installed"', repoRoot);
       _success('  $tool: $version');
     } else {
       _error('  $tool: NOT INSTALLED');
@@ -1889,29 +1729,22 @@ Future<void> _runStatus(String repoRoot) async {
   _info('');
   _info('Environment:');
   final geminiKey = Platform.environment['GEMINI_API_KEY'];
-  _info(
-    '  GEMINI_API_KEY: ${geminiKey != null ? "set (${geminiKey.length} chars)" : "NOT SET"}',
-  );
-  final ghToken =
-      Platform.environment['GH_TOKEN'] ?? Platform.environment['GITHUB_TOKEN'];
+  _info('  GEMINI_API_KEY: ${geminiKey != null ? "set (${geminiKey.length} chars)" : "NOT SET"}');
+  final ghToken = Platform.environment['GH_TOKEN'] ?? Platform.environment['GITHUB_TOKEN'];
   _info('  GitHub token: ${ghToken != null ? "set" : "NOT SET"}');
 
   // Check MCP servers
   _info('');
   _info('MCP servers:');
   try {
-    final settings = json.decode(
-      File('$repoRoot/.gemini/settings.json').readAsStringSync(),
-    );
+    final settings = json.decode(File('$repoRoot/.gemini/settings.json').readAsStringSync());
     final mcpServers = settings['mcpServers'] as Map<String, dynamic>?;
     if (mcpServers != null && mcpServers.isNotEmpty) {
       for (final server in mcpServers.keys) {
         _success('  $server: configured');
       }
     } else {
-      _info(
-        '  No MCP servers configured. Run: dart run runtime_ci_tooling:manage_cicd configure-mcp',
-      );
+      _info('  No MCP servers configured. Run: dart run runtime_ci_tooling:manage_cicd configure-mcp');
     }
   } catch (_) {
     _info('  Could not read MCP configuration');
@@ -1931,10 +1764,7 @@ Future<void> _runStatus(String repoRoot) async {
 
   // Show version info
   _info('');
-  final currentVersion = _runSync(
-    "awk '/^version:/{print \$2}' pubspec.yaml",
-    repoRoot,
-  );
+  final currentVersion = _runSync("awk '/^version:/{print \$2}' pubspec.yaml", repoRoot);
   final prevTag = _detectPrevTag(repoRoot);
   _info('Package version: $currentVersion');
   _info('Latest tag: $prevTag');
@@ -1955,20 +1785,14 @@ Future<void> _runDetermineVersion(String repoRoot, List<String> args) async {
 
   final prevTag = _prevTagOverride ?? _detectPrevTag(repoRoot);
   final newVersion = _versionOverride ?? _detectNextVersion(repoRoot, prevTag);
-  final currentVersion = _runSync(
-    "awk '/^version:/{print \$2}' pubspec.yaml",
-    repoRoot,
-  );
+  final currentVersion = _runSync("awk '/^version:/{print \$2}' pubspec.yaml", repoRoot);
 
   // Determine if we should release
   var shouldRelease = newVersion != currentVersion;
 
   // Safety net: if the tag already exists, skip release regardless
   if (shouldRelease) {
-    final tagCheck = Process.runSync('git', [
-      'rev-parse',
-      'v$newVersion',
-    ], workingDirectory: repoRoot);
+    final tagCheck = Process.runSync('git', ['rev-parse', 'v$newVersion'], workingDirectory: repoRoot);
     if (tagCheck.exitCode == 0) {
       _warn('Tag v$newVersion already exists. Skipping release.');
       shouldRelease = false;
@@ -1982,28 +1806,18 @@ Future<void> _runDetermineVersion(String repoRoot, List<String> args) async {
 
   // Save version bump rationale if Gemini produced one
   if (shouldRelease) {
-    final rationaleFile = File(
-      '$repoRoot/$kCicdRunsDir/version_analysis/version_bump_rationale.md',
-    );
+    final rationaleFile = File('$repoRoot/$kCicdRunsDir/version_analysis/version_bump_rationale.md');
     final bumpDir = Directory('$repoRoot/$kVersionBumpsDir');
     bumpDir.createSync(recursive: true);
     final targetPath = '${bumpDir.path}/v$newVersion.md';
 
     if (rationaleFile.existsSync()) {
       rationaleFile.copySync(targetPath);
-      _success(
-        'Version bump rationale saved to $kVersionBumpsDir/v$newVersion.md',
-      );
+      _success('Version bump rationale saved to $kVersionBumpsDir/v$newVersion.md');
     } else {
       // Generate basic rationale
-      final commitCount = _runSync(
-        'git rev-list --count "$prevTag"..HEAD 2>/dev/null',
-        repoRoot,
-      );
-      final commits = _runSync(
-        'git log "$prevTag"..HEAD --oneline --no-merges 2>/dev/null | head -20',
-        repoRoot,
-      );
+      final commitCount = _runSync('git rev-list --count "$prevTag"..HEAD 2>/dev/null', repoRoot);
+      final commits = _runSync('git log "$prevTag"..HEAD --oneline --no-merges 2>/dev/null | head -20', repoRoot);
       File(targetPath).writeAsStringSync(
         '# Version Bump: v$newVersion\n\n'
         '**Date**: ${DateTime.now().toUtc().toIso8601String()}\n'
@@ -2011,9 +1825,7 @@ Future<void> _runDetermineVersion(String repoRoot, List<String> args) async {
         '**Commits**: $commitCount\n\n'
         '## Commits\n\n$commits\n',
       );
-      _success(
-        'Basic version rationale saved to $kVersionBumpsDir/v$newVersion.md',
-      );
+      _success('Basic version rationale saved to $kVersionBumpsDir/v$newVersion.md');
     }
   }
 
@@ -2056,9 +1868,7 @@ Future<void> _runDetermineVersion(String repoRoot, List<String> args) async {
   }
 
   // Read version bump rationale for summary
-  final rationaleContent = _readFileOr(
-    '$repoRoot/$kVersionBumpsDir/v$newVersion.md',
-  );
+  final rationaleContent = _readFileOr('$repoRoot/$kVersionBumpsDir/v$newVersion.md');
 
   _writeStepSummary('''
 ## Version Determination
@@ -2117,10 +1927,7 @@ Future<void> _runCreateRelease(String repoRoot, List<String> args) async {
   final pubspecFile = File('$repoRoot/pubspec.yaml');
   final pubspecContent = pubspecFile.readAsStringSync();
   pubspecFile.writeAsStringSync(
-    pubspecContent.replaceFirst(
-      RegExp(r'^version: .*', multiLine: true),
-      'version: $newVersion',
-    ),
+    pubspecContent.replaceFirst(RegExp(r'^version: .*', multiLine: true), 'version: $newVersion'),
   );
   _info('Bumped pubspec.yaml to version $newVersion');
 
@@ -2147,14 +1954,13 @@ Future<void> _runCreateRelease(String repoRoot, List<String> args) async {
     }
   }
 
-  if (foundReleaseNotes != null &&
-      foundReleaseNotes.path != '${releaseDir.path}/release_notes.md') {
+  if (foundReleaseNotes != null && foundReleaseNotes.path != '${releaseDir.path}/release_notes.md') {
     foundReleaseNotes.copySync('${releaseDir.path}/release_notes.md');
     _info('Copied release notes to ${releaseDir.path}/release_notes.md');
   } else if (foundReleaseNotes == null) {
-    File('${releaseDir.path}/release_notes.md').writeAsStringSync(
-      _buildFallbackReleaseNotes(repoRoot, newVersion, prevTag),
-    );
+    File(
+      '${releaseDir.path}/release_notes.md',
+    ).writeAsStringSync(_buildFallbackReleaseNotes(repoRoot, newVersion, prevTag));
     _warn('No Stage 3 release notes found -- generated fallback');
   }
 
@@ -2178,9 +1984,9 @@ Future<void> _runCreateRelease(String repoRoot, List<String> args) async {
   // Copy Stage 3 linked issues if it exists, otherwise create minimal
   final existingLinked = File('${releaseDir.path}/linked_issues.json');
   if (!existingLinked.existsSync()) {
-    File('${releaseDir.path}/linked_issues.json').writeAsStringSync(
-      '{"version":"$newVersion","github_issues":[],"sentry_issues":[],"prs_referenced":[]}',
-    );
+    File(
+      '${releaseDir.path}/linked_issues.json',
+    ).writeAsStringSync('{"version":"$newVersion","github_issues":[],"sentry_issues":[],"prs_referenced":[]}');
   }
 
   // Copy Stage 3 highlights if it exists
@@ -2193,10 +1999,7 @@ Future<void> _runCreateRelease(String repoRoot, List<String> args) async {
   final changelog = File('$repoRoot/CHANGELOG.md');
   if (changelog.existsSync()) {
     final content = changelog.readAsStringSync();
-    final entryMatch = RegExp(
-      '## \\[$newVersion\\].*?(?=## \\[|\\Z)',
-      dotAll: true,
-    ).firstMatch(content);
+    final entryMatch = RegExp('## \\[$newVersion\\].*?(?=## \\[|\\Z)', dotAll: true).firstMatch(content);
     File(
       '${releaseDir.path}/changelog_entry.md',
     ).writeAsStringSync(entryMatch?.group(0)?.trim() ?? '## [$newVersion]\n');
@@ -2204,9 +2007,7 @@ Future<void> _runCreateRelease(String repoRoot, List<String> args) async {
 
   // Contributors: use the single verified source of truth
   final contribs = _gatherVerifiedContributors(repoRoot, prevTag);
-  File(
-    '${releaseDir.path}/contributors.json',
-  ).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(contribs));
+  File('${releaseDir.path}/contributors.json').writeAsStringSync(const JsonEncoder.withIndent('  ').convert(contribs));
 
   _success('Release notes assembled in $kReleaseNotesDir/v$newVersion/');
 
@@ -2218,11 +2019,7 @@ Future<void> _runCreateRelease(String repoRoot, List<String> args) async {
   // Step 4: Commit all changes
   _info('Configuring git identity for release commit');
   _exec('git', ['config', 'user.name', 'github-actions[bot]'], cwd: repoRoot);
-  _exec('git', [
-    'config',
-    'user.email',
-    'github-actions[bot]@users.noreply.github.com',
-  ], cwd: repoRoot);
+  _exec('git', ['config', 'user.email', 'github-actions[bot]@users.noreply.github.com'], cwd: repoRoot);
 
   // Add files individually — git add is all-or-nothing and will fail the
   // entire command if any path doesn't exist (e.g., autodoc.json on first
@@ -2237,8 +2034,7 @@ Future<void> _runCreateRelease(String repoRoot, List<String> args) async {
     '$kRuntimeCiDir/autodoc.json',
   ];
   if (Directory('$repoRoot/docs').existsSync()) filesToAdd.add('docs/');
-  if (Directory('$repoRoot/$kCicdAuditDir').existsSync())
-    filesToAdd.add('$kCicdAuditDir/');
+  if (Directory('$repoRoot/$kCicdAuditDir').existsSync()) filesToAdd.add('$kCicdAuditDir/');
   _info('Staging ${filesToAdd.length} release artifacts for commit');
   for (final path in filesToAdd) {
     final fullPath = '$repoRoot/$path';
@@ -2247,11 +2043,7 @@ Future<void> _runCreateRelease(String repoRoot, List<String> args) async {
     }
   }
 
-  final diffResult = Process.runSync('git', [
-    'diff',
-    '--cached',
-    '--quiet',
-  ], workingDirectory: repoRoot);
+  final diffResult = Process.runSync('git', ['diff', '--cached', '--quiet'], workingDirectory: repoRoot);
   if (diffResult.exitCode != 0) {
     // Build a rich, detailed commit message from available artifacts
     final commitMsg = _buildReleaseCommitMessage(
@@ -2263,20 +2055,12 @@ Future<void> _runCreateRelease(String repoRoot, List<String> args) async {
     // Use a temp file for the commit message to avoid shell escaping issues
     final commitMsgFile = File('$repoRoot/.git/RELEASE_COMMIT_MSG');
     commitMsgFile.writeAsStringSync(commitMsg);
-    _exec(
-      'git',
-      ['commit', '-F', commitMsgFile.path],
-      cwd: repoRoot,
-      fatal: true,
-    );
+    _exec('git', ['commit', '-F', commitMsgFile.path], cwd: repoRoot, fatal: true);
     commitMsgFile.deleteSync();
 
     // Use GH_TOKEN for push authentication (HTTPS remote)
-    final ghToken =
-        Platform.environment['GH_TOKEN'] ??
-        Platform.environment['GITHUB_TOKEN'];
-    final remoteRepo =
-        Platform.environment['GITHUB_REPOSITORY'] ?? effectiveRepo;
+    final ghToken = Platform.environment['GH_TOKEN'] ?? Platform.environment['GITHUB_TOKEN'];
+    final remoteRepo = Platform.environment['GITHUB_REPOSITORY'] ?? effectiveRepo;
     if (ghToken != null && remoteRepo.isNotEmpty) {
       _exec('git', [
         'remote',
@@ -2292,20 +2076,12 @@ Future<void> _runCreateRelease(String repoRoot, List<String> args) async {
   }
 
   // Step 5: Create git tag (verify it doesn't already exist)
-  final tagCheck = Process.runSync('git', [
-    'rev-parse',
-    tag,
-  ], workingDirectory: repoRoot);
+  final tagCheck = Process.runSync('git', ['rev-parse', tag], workingDirectory: repoRoot);
   if (tagCheck.exitCode == 0) {
     _error('Tag $tag already exists. Cannot create release.');
     exit(1);
   }
-  _exec(
-    'git',
-    ['tag', '-a', tag, '-m', 'Release v$newVersion'],
-    cwd: repoRoot,
-    fatal: true,
-  );
+  _exec('git', ['tag', '-a', tag, '-m', 'Release v$newVersion'], cwd: repoRoot, fatal: true);
   _exec('git', ['push', 'origin', tag], cwd: repoRoot, fatal: true);
   _success('Created tag: $tag');
 
@@ -2322,23 +2098,14 @@ Future<void> _runCreateRelease(String repoRoot, List<String> args) async {
   final changelogLink = File('$repoRoot/CHANGELOG.md').existsSync()
       ? ' | [CHANGELOG.md](https://github.com/$effectiveRepo/blob/v$newVersion/CHANGELOG.md)'
       : '';
-  final migrationLink =
-      File('${releaseDir.path}/migration_guide.md').existsSync()
+  final migrationLink = File('${releaseDir.path}/migration_guide.md').existsSync()
       ? ' | [Migration Guide]($kReleaseNotesDir/v$newVersion/migration_guide.md)'
       : '';
   releaseBody +=
       '\n\n---\n[Full Changelog](https://github.com/$effectiveRepo/compare/$prevTag...v$newVersion)'
       '$changelogLink$migrationLink';
 
-  final ghArgs = [
-    'release',
-    'create',
-    tag,
-    '--title',
-    'v$newVersion',
-    '--notes',
-    releaseBody,
-  ];
+  final ghArgs = ['release', 'create', tag, '--title', 'v$newVersion', '--notes', releaseBody];
   if (effectiveRepo.isNotEmpty) ghArgs.addAll(['--repo', effectiveRepo]);
 
   _exec('gh', ghArgs, cwd: repoRoot);
@@ -2392,15 +2159,12 @@ Future<void> _runTest(String repoRoot) async {
   final testDir = Directory('$repoRoot/test');
   if (!testDir.existsSync()) {
     _success('No test/ directory found — skipping tests');
-    _writeStepSummary(
-      '## Test Results\n\n**No test/ directory found — skipped.**\n',
-    );
+    _writeStepSummary('## Test Results\n\n**No test/ directory found — skipped.**\n');
     return;
   }
 
   // Determine log directory: TEST_LOG_DIR (CI) or .dart_tool/test-logs/ (local)
-  final logDir =
-      Platform.environment['TEST_LOG_DIR'] ?? '$repoRoot/.dart_tool/test-logs';
+  final logDir = Platform.environment['TEST_LOG_DIR'] ?? '$repoRoot/.dart_tool/test-logs';
   Directory(logDir).createSync(recursive: true);
 
   final jsonPath = '$logDir/results.json';
@@ -2425,11 +2189,7 @@ Future<void> _runTest(String repoRoot) async {
 
   // Use Process.start with piped output so we can both stream to console
   // AND capture the full output for summary generation.
-  final process = await Process.start(
-    Platform.resolvedExecutable,
-    testArgs,
-    workingDirectory: repoRoot,
-  );
+  final process = await Process.start(Platform.resolvedExecutable, testArgs, workingDirectory: repoRoot);
 
   // Stream stdout and stderr to console in real-time while capturing
   final stdoutBuf = StringBuffer();
@@ -2450,18 +2210,13 @@ Future<void> _runTest(String repoRoot) async {
   final exitCode = await process.exitCode.timeout(
     processTimeout,
     onTimeout: () {
-      _error(
-        'Test process exceeded ${processTimeout.inMinutes}-minute timeout — killing.',
-      );
+      _error('Test process exceeded ${processTimeout.inMinutes}-minute timeout — killing.');
       process.kill(); // No signal arg — cross-platform safe
       return -1;
     },
   );
   try {
-    await Future.wait([
-      stdoutDone,
-      stderrDone,
-    ]).timeout(const Duration(seconds: 30));
+    await Future.wait([stdoutDone, stderrDone]).timeout(const Duration(seconds: 30));
   } catch (_) {
     // Ignore stream errors (e.g. process killed before streams drained)
   }
@@ -2492,26 +2247,15 @@ Future<void> _runTest(String repoRoot) async {
 /// protobuf code, which are expected and must not block CI.
 Future<void> _runAnalyze(String repoRoot) async {
   _header('Running Analysis');
-  final result = await Process.run('dart', [
-    'analyze',
-  ], workingDirectory: repoRoot);
+  final result = await Process.run('dart', ['analyze'], workingDirectory: repoRoot);
   final output = (result.stdout as String);
   stdout.write(output);
   stderr.write(result.stderr);
 
   // Count severity levels in output
-  final errorCount = RegExp(
-    r'^\s*error\s+-\s+',
-    multiLine: true,
-  ).allMatches(output).length;
-  final warningCount = RegExp(
-    r'^\s*warning\s+-\s+',
-    multiLine: true,
-  ).allMatches(output).length;
-  final infoCount = RegExp(
-    r'^\s*info\s+-\s+',
-    multiLine: true,
-  ).allMatches(output).length;
+  final errorCount = RegExp(r'^\s*error\s+-\s+', multiLine: true).allMatches(output).length;
+  final warningCount = RegExp(r'^\s*warning\s+-\s+', multiLine: true).allMatches(output).length;
+  final infoCount = RegExp(r'^\s*info\s+-\s+', multiLine: true).allMatches(output).length;
 
   _info('  Errors: $errorCount, Warnings: $warningCount, Infos: $infoCount');
 
@@ -2572,11 +2316,7 @@ Future<void> _runVerifyProtos(String repoRoot) async {
   final protoDir = Directory('$repoRoot/proto/src');
   var protoCount = 0;
   if (protoDir.existsSync()) {
-    protoCount = protoDir
-        .listSync(recursive: true)
-        .whereType<File>()
-        .where((f) => f.path.endsWith('.proto'))
-        .length;
+    protoCount = protoDir.listSync(recursive: true).whereType<File>().where((f) => f.path.endsWith('.proto')).length;
   }
   _info('Proto source files in proto/src/: $protoCount');
 
@@ -2589,12 +2329,7 @@ Future<void> _runVerifyProtos(String repoRoot) async {
   final libDir = Directory('$repoRoot/lib');
   var generatedCount = 0;
   if (libDir.existsSync()) {
-    final extensions = [
-      '.pb.dart',
-      '.pbenum.dart',
-      '.pbjson.dart',
-      '.pbgrpc.dart',
-    ];
+    final extensions = ['.pb.dart', '.pbenum.dart', '.pbjson.dart', '.pbgrpc.dart'];
     generatedCount = libDir
         .listSync(recursive: true)
         .whereType<File>()
@@ -2608,9 +2343,7 @@ Future<void> _runVerifyProtos(String repoRoot) async {
     exit(1);
   }
 
-  _success(
-    'Proto verification passed: $protoCount sources, $generatedCount generated',
-  );
+  _success('Proto verification passed: $protoCount sources, $generatedCount generated');
 }
 
 /// Run documentation update via Gemini.
@@ -2633,10 +2366,7 @@ Future<void> _runDocumentation(String repoRoot) async {
     _error('Prompt script not found: $docScript');
     exit(1);
   }
-  final prompt = _runSync(
-    'dart run $docScript "$prevTag" "$newVersion"',
-    repoRoot,
-  );
+  final prompt = _runSync('dart run $docScript "$prevTag" "$newVersion"', repoRoot);
   if (prompt.isEmpty) {
     _error('Documentation prompt generator produced empty output.');
     exit(1);
@@ -2644,9 +2374,7 @@ Future<void> _runDocumentation(String repoRoot) async {
   ctx.savePrompt('documentation', prompt);
 
   if (_dryRun) {
-    _info(
-      '[DRY-RUN] Would run Gemini for documentation update (${prompt.length} chars)',
-    );
+    _info('[DRY-RUN] Would run Gemini for documentation update (${prompt.length} chars)');
     return;
   }
 
@@ -2656,9 +2384,7 @@ Future<void> _runDocumentation(String repoRoot) async {
   final includes = <String>[];
   if (File('/tmp/commit_analysis.json').existsSync()) {
     includes.add('@/tmp/commit_analysis.json');
-  } else if (File(
-    '$repoRoot/$kCicdRunsDir/explore/commit_analysis.json',
-  ).existsSync()) {
+  } else if (File('$repoRoot/$kCicdRunsDir/explore/commit_analysis.json').existsSync()) {
     includes.add('@$repoRoot/$kCicdRunsDir/explore/commit_analysis.json');
   }
   includes.add('@README.md');
@@ -2704,33 +2430,17 @@ Future<void> _runPreReleaseTriage(String repoRoot, List<String> args) async {
   if (!_geminiAvailable(warnOnly: true)) {
     _warn('Producing empty issue manifest (Gemini unavailable).');
     final ctx = RunContext.create(repoRoot, 'pre-release-triage');
-    final emptyManifest =
-        '{"version":"$newVersion","github_issues":[],"sentry_issues":[],"cross_repo_issues":[]}';
-    ctx.saveArtifact(
-      'pre-release-triage',
-      'issue_manifest.json',
-      emptyManifest,
-    );
-    _success(
-      'Empty manifest saved to ${ctx.runDir}/pre-release-triage/issue_manifest.json',
-    );
+    final emptyManifest = '{"version":"$newVersion","github_issues":[],"sentry_issues":[],"cross_repo_issues":[]}';
+    ctx.saveArtifact('pre-release-triage', 'issue_manifest.json', emptyManifest);
+    _success('Empty manifest saved to ${ctx.runDir}/pre-release-triage/issue_manifest.json');
     ctx.finalize(exitCode: 0);
     return;
   }
 
-  final triageArgs = [
-    '--pre-release',
-    '--prev-tag',
-    prevTag,
-    '--version',
-    newVersion,
-    '--force',
-  ];
+  final triageArgs = ['--pre-release', '--prev-tag', prevTag, '--version', newVersion, '--force'];
   if (_verbose) triageArgs.add('--verbose');
 
-  _info(
-    'Delegating to triage CLI: dart run runtime_ci_tooling:triage_cli ${triageArgs.join(" ")}',
-  );
+  _info('Delegating to triage CLI: dart run runtime_ci_tooling:triage_cli ${triageArgs.join(" ")}');
 
   final result = await Process.run(
     'dart',
@@ -2780,9 +2490,7 @@ Future<void> _runPostReleaseTriage(String repoRoot, List<String> args) async {
   ];
   if (_verbose) triageArgs.add('--verbose');
 
-  _info(
-    'Delegating to triage CLI: dart run runtime_ci_tooling:triage_cli ${triageArgs.join(" ")}',
-  );
+  _info('Delegating to triage CLI: dart run runtime_ci_tooling:triage_cli ${triageArgs.join(" ")}');
 
   final result = await Process.run(
     'dart',
@@ -2827,9 +2535,7 @@ Future<void> _runArchiveRun(String repoRoot, List<String> args) async {
     runDirPath = RunContext.findLatestRun(repoRoot);
     if (runDirPath == null) {
       _warn('No $kCicdRunsDir/ directory found — nothing to archive.');
-      _info(
-        'This is expected if audit trail artifacts were not transferred between jobs.',
-      );
+      _info('This is expected if audit trail artifacts were not transferred between jobs.');
       return;
     }
     _info('Using latest run: $runDirPath');
@@ -2866,9 +2572,7 @@ Future<void> _runMergeAuditTrails(String repoRoot, List<String> args) async {
     if (args[i] == '--output-dir') outputDir = args[i + 1];
   }
 
-  final incomingPath = incomingDir.startsWith('/')
-      ? incomingDir
-      : '$repoRoot/$incomingDir';
+  final incomingPath = incomingDir.startsWith('/') ? incomingDir : '$repoRoot/$incomingDir';
   final incoming = Directory(incomingPath);
   if (!incoming.existsSync()) {
     _warn('No incoming audit trails found at $incomingDir');
@@ -2884,14 +2588,8 @@ Future<void> _runMergeAuditTrails(String repoRoot, List<String> args) async {
 
   // Create the merged run directory with a unique timestamp
   final now = DateTime.now();
-  final timestamp = now
-      .toIso8601String()
-      .replaceAll(':', '-')
-      .replaceAll('.', '-')
-      .substring(0, 19);
-  final outputPath = outputDir.startsWith('/')
-      ? outputDir
-      : '$repoRoot/$outputDir';
+  final timestamp = now.toIso8601String().replaceAll(':', '-').replaceAll('.', '-').substring(0, 19);
+  final outputPath = outputDir.startsWith('/') ? outputDir : '$repoRoot/$outputDir';
   final mergedRunDir = '$outputPath/run_${timestamp}_merged';
   Directory(mergedRunDir).createSync(recursive: true);
 
@@ -2923,15 +2621,10 @@ Future<void> _runMergeAuditTrails(String repoRoot, List<String> args) async {
               if (fileName == 'meta.json') {
                 // Collect source meta for the merged meta.json
                 try {
-                  final meta =
-                      json.decode(child.readAsStringSync())
-                          as Map<String, dynamic>;
+                  final meta = json.decode(child.readAsStringSync()) as Map<String, dynamic>;
                   sources.add({'artifact': artifactName, ...meta});
                 } catch (_) {
-                  sources.add({
-                    'artifact': artifactName,
-                    'error': 'failed to parse meta.json',
-                  });
+                  sources.add({'artifact': artifactName, 'error': 'failed to parse meta.json'});
                 }
               }
             }
@@ -2957,13 +2650,9 @@ Future<void> _runMergeAuditTrails(String repoRoot, List<String> args) async {
     'platform': Platform.operatingSystem,
     'dart_version': Platform.version.split(' ').first,
   };
-  File('$mergedRunDir/meta.json').writeAsStringSync(
-    '${const JsonEncoder.withIndent('  ').convert(mergedMeta)}\n',
-  );
+  File('$mergedRunDir/meta.json').writeAsStringSync('${const JsonEncoder.withIndent('  ').convert(mergedMeta)}\n');
 
-  _success(
-    'Merged ${artifactDirs.length} audit trail(s) into $mergedRunDir ($totalFiles files)',
-  );
+  _success('Merged ${artifactDirs.length} audit trail(s) into $mergedRunDir ($totalFiles files)');
 }
 
 /// Recursively copy a directory tree.
@@ -3093,9 +2782,7 @@ Future<void> _installTree() async {
   } else if (Platform.isLinux) {
     _exec('sudo', ['apt', 'install', '-y', 'tree']);
   } else if (Platform.isWindows) {
-    _info(
-      'tree is built-in on Windows (limited). For full tree: choco install tree',
-    );
+    _info('tree is built-in on Windows (limited). For full tree: choco install tree');
   }
 }
 
@@ -3104,10 +2791,7 @@ Future<void> _installTree() async {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 String _detectPrevTag(String repoRoot) {
-  final result = _runSync(
-    "git tag -l 'v*' --sort=-version:refname | head -1",
-    repoRoot,
-  );
+  final result = _runSync("git tag -l 'v*' --sort=-version:refname | head -1", repoRoot);
   if (result.isEmpty) {
     // No tags yet -- use the first commit (head -1 to handle multiple roots in monorepos)
     return _runSync('git rev-list --max-parents=0 HEAD | head -1', repoRoot);
@@ -3116,10 +2800,7 @@ String _detectPrevTag(String repoRoot) {
 }
 
 String _detectNextVersion(String repoRoot, String prevTag) {
-  final currentVersion = _runSync(
-    "awk '/^version:/{print \$2}' pubspec.yaml",
-    repoRoot,
-  );
+  final currentVersion = _runSync("awk '/^version:/{print \$2}' pubspec.yaml", repoRoot);
 
   // Derive bump base from prevTag (not pubspec.yaml) to avoid stale-version collisions.
   final tagVersion = prevTag.startsWith('v') ? prevTag.substring(1) : prevTag;
@@ -3138,20 +2819,11 @@ String _detectNextVersion(String repoRoot, String prevTag) {
   var patch = int.tryParse(parts[2]) ?? 0;
 
   // ── Pass 1: Fast regex heuristic (fallback if Gemini unavailable) ──
-  final commits = _runSync(
-    'git log "$prevTag"..HEAD --pretty=format:"%s%n%b" 2>/dev/null',
-    repoRoot,
-  );
-  final commitSubjects = _runSync(
-    'git log "$prevTag"..HEAD --pretty=format:"%s" --no-merges 2>/dev/null',
-    repoRoot,
-  );
+  final commits = _runSync('git log "$prevTag"..HEAD --pretty=format:"%s%n%b" 2>/dev/null', repoRoot);
+  final commitSubjects = _runSync('git log "$prevTag"..HEAD --pretty=format:"%s" --no-merges 2>/dev/null', repoRoot);
 
   var bump = 'patch';
-  if (RegExp(
-    r'(BREAKING CHANGE|^[a-z]+(\(.+\))?!:)',
-    multiLine: true,
-  ).hasMatch(commits)) {
+  if (RegExp(r'(BREAKING CHANGE|^[a-z]+(\(.+\))?!:)', multiLine: true).hasMatch(commits)) {
     bump = 'major';
   } else if (RegExp(r'^feat(\(.+\))?:', multiLine: true).hasMatch(commits)) {
     bump = 'minor';
@@ -3159,11 +2831,7 @@ String _detectNextVersion(String repoRoot, String prevTag) {
       commitSubjects
           .split('\n')
           .every(
-            (line) =>
-                line.trim().isEmpty ||
-                RegExp(
-                  r'^(chore|style|ci|docs|build)(\(.+\))?:',
-                ).hasMatch(line.trim()),
+            (line) => line.trim().isEmpty || RegExp(r'^(chore|style|ci|docs|build)(\(.+\))?:').hasMatch(line.trim()),
           )) {
     // Only pure infra/docs/style/build commits with no code changes → no release.
     // fix:, test:, perf:, and refactor: all default to at least patch.
@@ -3173,30 +2841,15 @@ String _detectNextVersion(String repoRoot, String prevTag) {
   _info('  Regex heuristic: $bump');
 
   // ── Pass 2: Gemini analysis (authoritative, overrides regex if available) ──
-  if (_commandExists('gemini') &&
-      Platform.environment['GEMINI_API_KEY'] != null) {
-    final commitCount = _runSync(
-      'git rev-list --count "$prevTag"..HEAD 2>/dev/null',
-      repoRoot,
-    );
-    final changedFiles = _runSync(
-      'git diff --name-only "$prevTag"..HEAD 2>/dev/null | head -30',
-      repoRoot,
-    );
-    final diffStat = _runSync(
-      'git diff --stat "$prevTag"..HEAD 2>/dev/null | tail -5',
-      repoRoot,
-    );
-    final existingTags = _runSync(
-      "git tag -l 'v*' --sort=-version:refname | head -10",
-      repoRoot,
-    );
+  if (_commandExists('gemini') && Platform.environment['GEMINI_API_KEY'] != null) {
+    final commitCount = _runSync('git rev-list --count "$prevTag"..HEAD 2>/dev/null', repoRoot);
+    final changedFiles = _runSync('git diff --name-only "$prevTag"..HEAD 2>/dev/null | head -30', repoRoot);
+    final diffStat = _runSync('git diff --stat "$prevTag"..HEAD 2>/dev/null | tail -5', repoRoot);
+    final existingTags = _runSync("git tag -l 'v*' --sort=-version:refname | head -10", repoRoot);
     final commitSummary = commits.split('\n').take(50).join('\n');
 
     // Create a version analysis output directory within the CWD (sandbox-safe)
-    final versionAnalysisDir = Directory(
-      '$repoRoot/$kCicdRunsDir/version_analysis',
-    );
+    final versionAnalysisDir = Directory('$repoRoot/$kCicdRunsDir/version_analysis');
     versionAnalysisDir.createSync(recursive: true);
     final bumpJsonPath = '${versionAnalysisDir.path}/version_bump.json';
     final prompt =
@@ -3249,27 +2902,15 @@ String _detectNextVersion(String repoRoot, String prevTag) {
     // Save Gemini response for audit trail (strip MCP/warning prefix)
     if (geminiResult.isNotEmpty) {
       final jsonStart = geminiResult.indexOf('{');
-      final cleaned = jsonStart > 0
-          ? geminiResult.substring(jsonStart)
-          : geminiResult;
-      File(
-        '${versionAnalysisDir.path}/gemini_response.json',
-      ).writeAsStringSync(cleaned);
+      final cleaned = jsonStart > 0 ? geminiResult.substring(jsonStart) : geminiResult;
+      File('${versionAnalysisDir.path}/gemini_response.json').writeAsStringSync(cleaned);
     }
 
     if (geminiResult.isNotEmpty && File(bumpJsonPath).existsSync()) {
       try {
-        final bumpData =
-            json.decode(File(bumpJsonPath).readAsStringSync())
-                as Map<String, dynamic>;
-        final rawBump = (bumpData['bump'] as String?)
-            ?.trim()
-            .toLowerCase()
-            .replaceAll(RegExp(r'[^a-z]'), '');
-        if (rawBump == 'major' ||
-            rawBump == 'minor' ||
-            rawBump == 'patch' ||
-            rawBump == 'none') {
+        final bumpData = json.decode(File(bumpJsonPath).readAsStringSync()) as Map<String, dynamic>;
+        final rawBump = (bumpData['bump'] as String?)?.trim().toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
+        if (rawBump == 'major' || rawBump == 'minor' || rawBump == 'patch' || rawBump == 'none') {
           _info('  Gemini analysis: $rawBump (overriding regex: $bump)');
           bump = rawBump!;
         } else {
@@ -3308,9 +2949,7 @@ String _detectNextVersion(String repoRoot, String prevTag) {
 
   // Guard: ensure version never goes backward from what pubspec.yaml already has
   if (_compareVersions(nextVersion, currentVersion) < 0) {
-    _warn(
-      'Version regression detected: $nextVersion < $currentVersion. Using $currentVersion.',
-    );
+    _warn('Version regression detected: $nextVersion < $currentVersion. Using $currentVersion.');
     return currentVersion;
   }
 
@@ -3392,19 +3031,13 @@ String _buildReleaseCommitMessage({
       buf.writeln('## Changelog');
       buf.writeln();
       // Trim to first 2000 chars to keep commit message reasonable
-      buf.writeln(
-        entry.length > 2000 ? '${entry.substring(0, 2000)}...' : entry,
-      );
+      buf.writeln(entry.length > 2000 ? '${entry.substring(0, 2000)}...' : entry);
       buf.writeln();
     }
   }
 
   // Staged file summary
-  final stagedResult = Process.runSync('git', [
-    'diff',
-    '--cached',
-    '--stat',
-  ], workingDirectory: repoRoot);
+  final stagedResult = Process.runSync('git', ['diff', '--cached', '--stat'], workingDirectory: repoRoot);
   final stagedStat = (stagedResult.stdout as String).trim();
   if (stagedStat.isNotEmpty) {
     buf.writeln('## Files Modified');
@@ -3422,11 +3055,7 @@ String _buildReleaseCommitMessage({
     if (rationale.isNotEmpty) {
       buf.writeln('## Version Bump Rationale');
       buf.writeln();
-      buf.writeln(
-        rationale.length > 1000
-            ? '${rationale.substring(0, 1000)}...'
-            : rationale,
-      );
+      buf.writeln(rationale.length > 1000 ? '${rationale.substring(0, 1000)}...' : rationale);
       buf.writeln();
     }
   }
@@ -3454,14 +3083,9 @@ String _buildReleaseCommitMessage({
   }
 
   // Commit range
-  final commitCount = _runSync(
-    'git rev-list --count "$prevTag"..HEAD 2>/dev/null',
-    repoRoot,
-  );
+  final commitCount = _runSync('git rev-list --count "$prevTag"..HEAD 2>/dev/null', repoRoot);
   buf.writeln('---');
-  buf.writeln(
-    'Automated release by CI/CD pipeline (Gemini CLI + GitHub Actions)',
-  );
+  buf.writeln('Automated release by CI/CD pipeline (Gemini CLI + GitHub Actions)');
   buf.writeln('Commits since $prevTag: $commitCount');
   buf.writeln('Generated: ${DateTime.now().toUtc().toIso8601String()}');
 
@@ -3480,10 +3104,7 @@ bool _commandExists(String command) {
 
 String _runSync(String command, String workingDirectory) {
   if (_verbose) _info('[CMD] $command');
-  final result = Process.runSync('sh', [
-    '-c',
-    command,
-  ], workingDirectory: workingDirectory);
+  final result = Process.runSync('sh', ['-c', command], workingDirectory: workingDirectory);
   final output = (result.stdout as String).trim();
   if (_verbose && output.isNotEmpty) _info('  $output');
   return output;
@@ -3526,11 +3147,8 @@ String _releaseLink(String tag) {
 /// ```
 /// Idempotent: replaces any existing reference-link block.
 void _addChangelogReferenceLinks(String repoRoot, String content) {
-  final server =
-      Platform.environment['GITHUB_SERVER_URL'] ?? 'https://github.com';
-  final repo =
-      Platform.environment['GITHUB_REPOSITORY'] ??
-      '${config.repoOwner}/${config.repoName}';
+  final server = Platform.environment['GITHUB_SERVER_URL'] ?? 'https://github.com';
+  final repo = Platform.environment['GITHUB_REPOSITORY'] ?? '${config.repoOwner}/${config.repoName}';
 
   // Extract all version headers: ## [X.Y.Z] (skip any [Unreleased] entries)
   final versionPattern = RegExp(r'^## \[([^\]]+)\]', multiLine: true);
@@ -3538,10 +3156,7 @@ void _addChangelogReferenceLinks(String repoRoot, String content) {
 
   if (matches.isEmpty) return;
 
-  final versions = matches
-      .map((m) => m.group(1)!)
-      .where((v) => v != 'Unreleased')
-      .toList();
+  final versions = matches.map((m) => m.group(1)!).where((v) => v != 'Unreleased').toList();
 
   if (versions.isEmpty) return;
 
@@ -3552,9 +3167,7 @@ void _addChangelogReferenceLinks(String repoRoot, String content) {
     if (i + 1 < versions.length) {
       // Compare from previous version
       final prevVersion = versions[i + 1];
-      links.writeln(
-        '[$version]: $server/$repo/compare/v$prevVersion...v$version',
-      );
+      links.writeln('[$version]: $server/$repo/compare/v$prevVersion...v$version');
     } else {
       // Oldest version: link to the tag itself
       links.writeln('[$version]: $server/$repo/releases/tag/v$version');
@@ -3565,9 +3178,7 @@ void _addChangelogReferenceLinks(String repoRoot, String content) {
   if (linksStr.isEmpty) return;
 
   // Strip any existing reference-link block (lines matching [X.Y.Z]: http...)
-  final existingLinksPattern = RegExp(
-    r'\n*(\[[\w.\-]+\]: https?://[^\n]+\n?)+$',
-  );
+  final existingLinksPattern = RegExp(r'\n*(\[[\w.\-]+\]: https?://[^\n]+\n?)+$');
   var cleaned = content.replaceAll(existingLinksPattern, '');
   cleaned = cleaned.trimRight();
 
@@ -3589,12 +3200,7 @@ String _readFileOr(String path, [String fallback = '(not available)']) {
 }
 
 /// Execute a command. Set [fatal] to true to exit on failure (default: false).
-void _exec(
-  String executable,
-  List<String> args, {
-  String? cwd,
-  bool fatal = false,
-}) {
+void _exec(String executable, List<String> args, {String? cwd, bool fatal = false}) {
   if (_verbose) _info('  \$ $executable ${args.join(" ")}');
   final result = Process.runSync(executable, args, workingDirectory: cwd);
   if (result.exitCode != 0) {
@@ -3605,9 +3211,7 @@ void _exec(
 
 void _requireGeminiCli() {
   if (!_commandExists('gemini')) {
-    _error(
-      'Gemini CLI is not installed. Run: dart run runtime_ci_tooling:manage_cicd setup',
-    );
+    _error('Gemini CLI is not installed. Run: dart run runtime_ci_tooling:manage_cicd setup');
     exit(1);
   }
 }
@@ -3616,9 +3220,7 @@ void _requireApiKey() {
   final key = Platform.environment['GEMINI_API_KEY'];
   if (key == null || key.isEmpty) {
     _error('GEMINI_API_KEY is not set.');
-    _error(
-      'Set it via: export GEMINI_API_KEY=<your-key-from-aistudio.google.com>',
-    );
+    _error('Set it via: export GEMINI_API_KEY=<your-key-from-aistudio.google.com>');
     exit(1);
   }
 }
@@ -3631,9 +3233,7 @@ bool _geminiAvailable({bool warnOnly = false}) {
       _warn('Gemini CLI not installed — skipping Gemini-powered step.');
       return false;
     }
-    _error(
-      'Gemini CLI is not installed. Run: dart run runtime_ci_tooling:manage_cicd setup',
-    );
+    _error('Gemini CLI is not installed. Run: dart run runtime_ci_tooling:manage_cicd setup');
     exit(1);
   }
   final key = Platform.environment['GEMINI_API_KEY'];
@@ -3737,15 +3337,9 @@ Future<void> _runInit(String repoRoot) async {
   final pubspecFile = File('$repoRoot/pubspec.yaml');
   if (pubspecFile.existsSync()) {
     final content = pubspecFile.readAsStringSync();
-    final nameMatch = RegExp(
-      r'^name:\s*(\S+)',
-      multiLine: true,
-    ).firstMatch(content);
+    final nameMatch = RegExp(r'^name:\s*(\S+)', multiLine: true).firstMatch(content);
     if (nameMatch != null) packageName = nameMatch.group(1)!;
-    final versionMatch = RegExp(
-      r'^version:\s*(\S+)',
-      multiLine: true,
-    ).firstMatch(content);
+    final versionMatch = RegExp(r'^version:\s*(\S+)', multiLine: true).firstMatch(content);
     if (versionMatch != null) packageVersion = versionMatch.group(1)!;
     _success('Detected package: $packageName v$packageVersion');
   } else {
@@ -3774,11 +3368,7 @@ Future<void> _runInit(String repoRoot) async {
   if (repoOwner == 'unknown') {
     // Fallback: try parsing git remote
     try {
-      final gitResult = Process.runSync('git', [
-        'remote',
-        'get-url',
-        'origin',
-      ], workingDirectory: repoRoot);
+      final gitResult = Process.runSync('git', ['remote', 'get-url', 'origin'], workingDirectory: repoRoot);
       if (gitResult.exitCode == 0) {
         final url = (gitResult.stdout as String).trim();
         // git@github.com:owner/repo.git or https://github.com/owner/repo.git
@@ -3834,12 +3424,7 @@ Future<void> _runInit(String repoRoot) async {
         'release_notes_path': '$kReleaseNotesDir',
       },
       'gcp': {'project': ''},
-      'sentry': {
-        'organization': '',
-        'projects': <String>[],
-        'scan_on_pre_release': false,
-        'recent_errors_hours': 168,
-      },
+      'sentry': {'organization': '', 'projects': <String>[], 'scan_on_pre_release': false, 'recent_errors_hours': 168},
       'release': {
         'pre_release_scan_sentry': false,
         'pre_release_scan_github': true,
@@ -3858,25 +3443,13 @@ Future<void> _runInit(String repoRoot) async {
         },
       },
       'labels': {
-        'type': [
-          'bug',
-          'feature-request',
-          'enhancement',
-          'documentation',
-          'question',
-        ],
+        'type': ['bug', 'feature-request', 'enhancement', 'documentation', 'question'],
         'priority': ['P0-critical', 'P1-high', 'P2-medium', 'P3-low'],
         'area': areaLabels,
       },
       'thresholds': {'auto_close': 0.9, 'suggest_close': 0.7, 'comment': 0.5},
       'agents': {
-        'enabled': [
-          'code_analysis',
-          'pr_correlation',
-          'duplicate',
-          'sentiment',
-          'changelog',
-        ],
+        'enabled': ['code_analysis', 'pr_correlation', 'duplicate', 'sentiment', 'changelog'],
         'conditional': {
           'changelog': {'require_file': 'CHANGELOG.md'},
         },
@@ -3896,9 +3469,7 @@ Future<void> _runInit(String repoRoot) async {
       },
     };
 
-    configFile.writeAsStringSync(
-      '${const JsonEncoder.withIndent('  ').convert(configData)}\n',
-    );
+    configFile.writeAsStringSync('${const JsonEncoder.withIndent('  ').convert(configData)}\n');
     _success('Created $kConfigFileName');
   } else {
     _info('$kConfigFileName already exists (kept as-is)');
@@ -3923,16 +3494,12 @@ Future<void> _runInit(String repoRoot) async {
   if (gitignoreFile.existsSync()) {
     final content = gitignoreFile.readAsStringSync();
     if (!content.contains('.runtime_ci/runs/')) {
-      gitignoreFile.writeAsStringSync(
-        '$content\n# Runtime CI audit trails (local only)\n.runtime_ci/runs/\n',
-      );
+      gitignoreFile.writeAsStringSync('$content\n# Runtime CI audit trails (local only)\n.runtime_ci/runs/\n');
       _success('Added .runtime_ci/runs/ to .gitignore');
       repaired++;
     }
   } else {
-    gitignoreFile.writeAsStringSync(
-      '# Runtime CI audit trails (local only)\n.runtime_ci/runs/\n',
-    );
+    gitignoreFile.writeAsStringSync('# Runtime CI audit trails (local only)\n.runtime_ci/runs/\n');
     _success('Created .gitignore with .runtime_ci/runs/');
     repaired++;
   }
@@ -3955,9 +3522,7 @@ Future<void> _runInit(String repoRoot) async {
   print('');
   if (!configExists) {
     _info('Next steps:');
-    _info(
-      '  1. Review .runtime_ci/config.json and customize area labels, cross-repo, etc.',
-    );
+    _info('  1. Review .runtime_ci/config.json and customize area labels, cross-repo, etc.');
     _info('  2. Add runtime_ci_tooling as a dev_dependency in pubspec.yaml');
     _info('  3. Run: dart run runtime_ci_tooling:manage_cicd setup');
     _info('  4. Run: dart run runtime_ci_tooling:manage_cicd status');
