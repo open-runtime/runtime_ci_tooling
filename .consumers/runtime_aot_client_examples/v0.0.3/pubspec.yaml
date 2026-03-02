@@ -43,17 +43,17 @@ dependencies:
     git:
       url: git@github.com:open-runtime/encrypt.git
       tag_pattern: v{{version}}
-    version: ^5.1.11
+    version: ^6.0.0
   grpc:
     git:
       url: git@github.com:open-runtime/grpc-dart.git
       tag_pattern: v{{version}}
-    version: ^5.3.7
+    version: ^5.3.8
   runtime_isomorphic_library:
     git:
       url: git@github.com:open-runtime/runtime_isomorphic_library.git
       tag_pattern: v{{version}}
-    version: ^1.2.6
+    version: ^3.0.0
   runtime_mindfck:
     git:
       url: git@github.com:open-runtime/mindfck.git
@@ -75,7 +75,7 @@ dev_dependencies:
     git:
       url: git@github.com:open-runtime/runtime_ci_tooling.git
       tag_pattern: v{{version}}
-    version: ^0.9.1
+    version: ^0.14.1
 
   # ==========================================================================
   #
