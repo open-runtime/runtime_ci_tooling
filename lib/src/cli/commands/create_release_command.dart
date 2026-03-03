@@ -307,14 +307,17 @@ class CreateReleaseCommand extends Command<void> {
       // (e.g. another pipeline job pushed between checkout and now), fall back to
       // fetch + merge (NOT rebase — rebase fails when there are unstaged changes
       // from earlier pipeline steps like autodoc/compose-artifacts).
+      // Include [skip ci] in the fallback merge commit to avoid triggering a
+      // second CI/release run that can cancel the in-progress release run.
       final pushResult = Process.runSync('git', ['push', 'origin', 'main'], workingDirectory: repoRoot);
       if (pushResult.exitCode != 0) {
         Logger.warn('Direct push failed (non-fast-forward); fetching and merging remote changes...');
         if (global.verbose) Logger.info('  push stderr: ${(pushResult.stderr as String).trim()}');
         CiProcessRunner.exec('git', ['fetch', 'origin', 'main'], cwd: repoRoot, fatal: true, verbose: global.verbose);
+        const fallbackMergeMessage = 'Merge remote-tracking branch \'origin/main\' [skip ci]';
         CiProcessRunner.exec(
           'git',
-          ['merge', 'origin/main', '--no-edit'],
+          ['merge', 'origin/main', '-m', fallbackMergeMessage],
           cwd: repoRoot,
           fatal: true,
           verbose: global.verbose,
