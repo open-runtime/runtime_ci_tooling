@@ -75,6 +75,10 @@
       "managed_analyze": false,
       "managed_test": false
     },
+    "runner_overrides": {
+      "ubuntu-x64": "ubuntu-latest",
+      "windows-x64": "windows-latest"
+    },
     "secrets": {},
     "sub_packages": [],
     "platforms": ["ubuntu-x64", "ubuntu-arm64", "macos-arm64", "macos-x64", "windows-x64", "windows-arm64"]
