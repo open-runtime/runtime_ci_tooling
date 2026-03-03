@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.4] - 2026-03-03
+
+### Changed
+- Updated a comment in create-release to avoid using a CI skip token literal in commit text, allowing follow-up pushes to execute CI verification
+
+### Fixed
+- Added [skip ci] to the fallback merge commit message in create-release to prevent non-fast-forward recovery merges from spawning a new CI/release run that can cancel the active release
+
 ## [0.14.3] - 2026-03-03
 
 ### Changed
@@ -271,6 +279,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed `git add` failure in release process by adding files individually (commit 1d45361)
 
+[0.14.4]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.14.3...v0.14.4
 [0.14.3]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.14.1...v0.14.3
 [0.14.1]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/open-runtime/runtime_ci_tooling/compare/v0.13.0...v0.14.0
