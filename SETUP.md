@@ -314,7 +314,7 @@ The CI workflow (`.github/workflows/ci.yaml`) is generated from your `ci` sectio
 | `features.managed_analyze` | bool | `false` | Run `dart analyze` via tooling |
 | `features.managed_test` | bool | `false` | Run `dart test` via tooling |
 | `features.build_runner` | bool | `false` | Run `dart run build_runner build --delete-conflicting-outputs` before analyze, test, and web-test. In multi-platform mode this runs once in `analyze` and once per matrix `test` job. |
-| `features.web_test` | bool | `false` | Add a standalone `web-test` job that runs `dart test -p chrome` on Ubuntu |
+| `features.web_test` | bool | `false` | Add a standalone `web-test` job that runs `dart test -p chrome` on Ubuntu (includes an Ubuntu 23.10+/24.04 AppArmor userns compatibility step for Chrome sandbox startup) |
 | `web_test.concurrency` | int | `1` | Number of concurrent browser test suites (1–32) |
 | `web_test.paths` | list | `[]` | Specific test paths to run (empty = run all tests via `dart test -p chrome`). Paths are strictly validated (rules below). |
 | `platforms` | list | `["ubuntu"]` | Platform matrix. If 2+ entries, CI runs `analyze` once then `test` as a matrix. Valid: `ubuntu-x64`, `ubuntu-arm64`, `macos-arm64`, `macos-x64`, `windows-x64`, `windows-arm64` (plus aliases `ubuntu`, `macos`, `windows`). |
@@ -323,6 +323,9 @@ The CI workflow (`.github/workflows/ci.yaml`) is generated from your `ci` sectio
 | `sub_packages` | list | `[]` | Sub-packages as `[{ "name": "...", "path": "..." }]` |
 
 When `features.web_test` is `true`, the `web_test` object is optional; if omitted, defaults are used (`concurrency: 1`, `paths: []`).
+
+`web-test` Linux compatibility note:
+- On Ubuntu 23.10+ (including GitHub-hosted `ubuntu-24.04`), AppArmor can block Chrome sandbox startup (`No usable sandbox`). Generated workflows include a Linux-only `sysctl` step to allow Chrome user namespaces during the job runtime.
 
 `web_test.paths` validation rules:
 - Entries must be non-empty strings with no leading/trailing whitespace.

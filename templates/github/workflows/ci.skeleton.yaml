@@ -547,6 +547,16 @@ jobs:
       - name: Verify Chrome
         run: ${{ steps.setup-chrome.outputs.chrome-path }} --version
 
+      # Ubuntu 23.10+/24.04 restricts unprivileged user namespaces via AppArmor.
+      # Chrome can fail with "No usable sandbox!" on hosted runners without this.
+      - name: Enable Chrome user namespaces on Ubuntu
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          if [[ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+
 <%#web_test_has_paths%>
       - name: Web Test
         run: dart test -p chrome --concurrency=<%web_test_concurrency%> -- <%web_test_paths%>

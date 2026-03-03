@@ -1255,7 +1255,7 @@ final exists = await commandExists('git');
 4. **Multi-platform mode** (`ci.platforms` has 2+ entries):
    - `analyze` — Run analysis once (Ubuntu)
    - `test` — Run tests as a matrix across OS+arch (`x64` + `arm64`)
-5. Optional `web-test` — If `ci.features.web_test=true`, runs `dart test -p chrome` in a standalone Ubuntu job with deterministic Chrome provisioning via SHA-pinned `browser-actions/setup-chrome@v2.1.1`
+5. Optional `web-test` — If `ci.features.web_test=true`, runs `dart test -p chrome` in a standalone Ubuntu job with deterministic Chrome provisioning via SHA-pinned `browser-actions/setup-chrome@v2.1.1` and a Linux-only AppArmor/userns compatibility step for Chrome sandbox startup on Ubuntu 23.10+/24.04
 
 **Platform matrix configuration:**
 - `ci.platforms`: list of platform IDs (e.g. `["ubuntu-x64","ubuntu-arm64","macos-arm64","macos-x64","windows-x64","windows-arm64"]`)
@@ -1263,7 +1263,7 @@ final exists = await commandExists('git');
 
 **Optional features:**
 - `ci.features.build_runner`: When `true`, runs `dart run build_runner build --delete-conflicting-outputs` before analyze, test, and web-test steps to regenerate `.g.dart` codegen files
-- `ci.features.web_test`: When `true`, adds a `web-test` job that provisions Chrome via SHA-pinned `browser-actions/setup-chrome@v2.1.1` and runs `dart test -p chrome`. Configure via `ci.web_test`:
+- `ci.features.web_test`: When `true`, adds a `web-test` job that provisions Chrome via SHA-pinned `browser-actions/setup-chrome@v2.1.1`, applies a Linux-only AppArmor/userns compatibility step, and runs `dart test -p chrome`. Configure via `ci.web_test`:
   - `concurrency` (1–32, default `1`): parallel test shards
   - `paths`: list of relative repo paths (e.g. `["test/web/"]`): paths are normalized, shell-quoted, and validated (no traversal, no shell metacharacters). Empty list = run all tests
 - `ci.artifact_retention_days`: Optional retention period for uploaded test artifacts (1–90, default `7`)

@@ -1331,6 +1331,8 @@ void main() {
       expect(rendered, contains('web-test:'));
       expect(rendered, contains('dart test -p chrome'));
       expect(rendered, contains('--concurrency=1'));
+      expect(rendered, contains('Enable Chrome user namespaces on Ubuntu'));
+      expect(rendered, contains('kernel.apparmor_restrict_unprivileged_userns=0'));
       expect(rendered, isNot(contains("'test/")));
     });
 
