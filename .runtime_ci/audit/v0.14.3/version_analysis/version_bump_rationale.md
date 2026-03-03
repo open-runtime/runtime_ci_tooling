@@ -1,0 +1,9 @@
+- **Decision**: patch. The recent commit modifies the Continuous Integration (CI) configuration files, specifically GitHub Actions workflows, to prevent timeouts during the documentation generation process. The job `timeout-minutes` parameter was increased from 60 to 120 minutes, and environment variable references within shell commands were improved. These changes represent a bug fix and chore to maintain pipeline reliability, warranting a patch version bump. There are no changes to the public API surface or breaking changes.
+- **Key Changes**:
+  - Increased `timeout-minutes` from 60 to 120 in the `.github/workflows/release.yaml` templates.
+  - Refactored workflow steps to assign tokens to environment variables instead of directly interpolating them via GitHub context expression syntax.
+  - Updated template hashes in `.runtime_ci/template_versions.json` to reflect the CI template modifications.
+- **Breaking Changes**: None
+- **New Features**: None
+- **References**:
+  - Commit: `fix(ci): increase release pipeline timeout from 60 to 120 minutes`

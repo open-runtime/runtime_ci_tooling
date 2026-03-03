@@ -26,7 +26,7 @@ Add `runtime_ci_tooling` to your `dev_dependencies`:
 
 ```yaml
 dev_dependencies:
-  runtime_ci_tooling: ^0.14.2
+  runtime_ci_tooling: ^0.14.3
 ```
 
 Or run:
@@ -97,8 +97,8 @@ dart run bin/triage_cli.dart <command> [options]
 **Usage Examples:**
 - **Single Issue**: `dart run bin/triage_cli.dart <issue_number>`
 - **Auto Triage**: `dart run bin/triage_cli.dart --auto`
-- **Pre-Release Scan**: `dart run bin/triage_cli.dart --pre-release --prev-tag v0.14.1 --version 0.14.2`
-- **Post-Release Loop**: `dart run bin/triage_cli.dart --post-release --version 0.14.2 --release-tag v0.14.2`
+- **Pre-Release Scan**: `dart run bin/triage_cli.dart --pre-release --prev-tag v0.14.2 --version 0.14.3`
+- **Post-Release Loop**: `dart run bin/triage_cli.dart --post-release --version 0.14.3 --release-tag v0.14.3`
 
 Run `dart run bin/triage_cli.dart --help` for full usage details.
 
