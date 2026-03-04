@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:test/test.dart';
+import 'package:yaml/yaml.dart';
 
 import 'package:runtime_ci_tooling/src/cli/utils/workflow_generator.dart';
 
@@ -15,6 +16,7 @@ Map<String, dynamic> _validConfig({
   dynamic lineLength,
   List<dynamic>? subPackages,
   Map<String, dynamic>? runnerOverrides,
+  Map<String, dynamic>? webTest,
 }) {
   return <String, dynamic>{
     'dart_sdk': dartSdk,
@@ -25,7 +27,21 @@ Map<String, dynamic> _validConfig({
     if (lineLength != null) 'line_length': lineLength,
     if (subPackages != null) 'sub_packages': subPackages,
     if (runnerOverrides != null) 'runner_overrides': runnerOverrides,
+    if (webTest != null) 'web_test': webTest,
   };
+}
+
+String _readToolingVersionFromPubspec() {
+  final pubspec = File('pubspec.yaml');
+  if (!pubspec.existsSync()) {
+    throw StateError('pubspec.yaml not found in current working directory');
+  }
+  final content = pubspec.readAsStringSync();
+  final match = RegExp(r'^version:\s*([^\s]+)\s*$', multiLine: true).firstMatch(content);
+  if (match == null) {
+    throw StateError('Could not parse version from pubspec.yaml');
+  }
+  return match.group(1)!;
 }
 
 void main() {
@@ -41,61 +57,40 @@ void main() {
       });
 
       test('null dart_sdk produces error', () {
-        final errors = WorkflowGenerator.validate({
-          'dart_sdk': null,
-          'features': <String, dynamic>{},
-        });
+        final errors = WorkflowGenerator.validate({'dart_sdk': null, 'features': <String, dynamic>{}});
         expect(errors, contains('ci.dart_sdk is required'));
       });
 
       test('non-string dart_sdk produces error', () {
-        final errors = WorkflowGenerator.validate({
-          'dart_sdk': 42,
-          'features': <String, dynamic>{},
-        });
+        final errors = WorkflowGenerator.validate({'dart_sdk': 42, 'features': <String, dynamic>{}});
         expect(errors, anyElement(contains('must be a string')));
       });
 
       test('empty-string dart_sdk produces error', () {
-        final errors = WorkflowGenerator.validate({
-          'dart_sdk': '',
-          'features': <String, dynamic>{},
-        });
+        final errors = WorkflowGenerator.validate({'dart_sdk': '', 'features': <String, dynamic>{}});
         expect(errors, anyElement(contains('non-empty')));
       });
 
       test('whitespace-only dart_sdk produces error', () {
-        final errors = WorkflowGenerator.validate({
-          'dart_sdk': '  ',
-          'features': <String, dynamic>{},
-        });
+        final errors = WorkflowGenerator.validate({'dart_sdk': '  ', 'features': <String, dynamic>{}});
         // After trim the string is empty
         expect(errors, anyElement(contains('non-empty')));
       });
 
       test('dart_sdk with leading/trailing whitespace produces error', () {
-        final errors = WorkflowGenerator.validate({
-          'dart_sdk': ' 3.9.2 ',
-          'features': <String, dynamic>{},
-        });
+        final errors = WorkflowGenerator.validate({'dart_sdk': ' 3.9.2 ', 'features': <String, dynamic>{}});
         expect(errors, anyElement(contains('whitespace')));
       });
 
       test('dart_sdk with trailing newline triggers whitespace error', () {
         // A trailing \n makes trimmed != sdk, so the whitespace check fires first.
-        final errors = WorkflowGenerator.validate({
-          'dart_sdk': '3.9.2\n',
-          'features': <String, dynamic>{},
-        });
+        final errors = WorkflowGenerator.validate({'dart_sdk': '3.9.2\n', 'features': <String, dynamic>{}});
         expect(errors, anyElement(contains('whitespace')));
       });
 
       test('dart_sdk with embedded tab (after trim is identity) triggers newlines/tabs error', () {
         // A tab in the middle: trim() has no effect but the regex catches it.
-        final errors = WorkflowGenerator.validate({
-          'dart_sdk': '3.9\t.2',
-          'features': <String, dynamic>{},
-        });
+        final errors = WorkflowGenerator.validate({'dart_sdk': '3.9\t.2', 'features': <String, dynamic>{}});
         expect(errors, anyElement(contains('newlines/tabs')));
       });
 
@@ -143,10 +138,7 @@ void main() {
       });
 
       test('non-map features produces error', () {
-        final errors = WorkflowGenerator.validate({
-          'dart_sdk': '3.9.2',
-          'features': 'not_a_map',
-        });
+        final errors = WorkflowGenerator.validate({'dart_sdk': '3.9.2', 'features': 'not_a_map'});
         expect(errors, anyElement(contains('features must be an object')));
       });
 
@@ -167,17 +159,20 @@ void main() {
       });
 
       test('all known feature keys pass validation', () {
-        final errors = WorkflowGenerator.validate(_validConfig(
-          features: {
-            'proto': true,
-            'lfs': false,
-            'format_check': true,
-            'analysis_cache': false,
-            'managed_analyze': true,
-            'managed_test': false,
-            'build_runner': true,
-          },
-        ));
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            features: {
+              'proto': true,
+              'lfs': false,
+              'format_check': true,
+              'analysis_cache': false,
+              'managed_analyze': true,
+              'managed_test': false,
+              'build_runner': true,
+              'web_test': true,
+            },
+          ),
+        );
         expect(errors.where((e) => e.contains('features')), isEmpty);
       });
 
@@ -212,9 +207,7 @@ void main() {
       });
 
       test('valid multi-platform passes', () {
-        final errors = WorkflowGenerator.validate(
-          _validConfig(platforms: ['ubuntu', 'macos', 'windows']),
-        );
+        final errors = WorkflowGenerator.validate(_validConfig(platforms: ['ubuntu', 'macos', 'windows']));
         expect(errors.where((e) => e.contains('platforms')), isEmpty);
       });
 
@@ -239,10 +232,43 @@ void main() {
       });
 
       test('valid secrets map passes', () {
-        final errors = WorkflowGenerator.validate(
-          _validConfig(secrets: {'API_KEY': 'SOME_SECRET'}),
-        );
+        final errors = WorkflowGenerator.validate(_validConfig(secrets: {'API_KEY': 'SOME_SECRET'}));
         expect(errors.where((e) => e.contains('secrets')), isEmpty);
+      });
+
+      test('secrets key with hyphen produces error (unsafe identifier)', () {
+        final errors = WorkflowGenerator.validate(_validConfig(secrets: {'API-KEY': 'SOME_SECRET'}));
+        expect(errors, anyElement(contains('safe identifier')));
+      });
+
+      test('secrets key starting with digit produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(secrets: {'1API_KEY': 'SOME_SECRET'}));
+        expect(errors, anyElement(contains('safe identifier')));
+      });
+
+      test('secrets value with hyphen produces error (unsafe secret name)', () {
+        final errors = WorkflowGenerator.validate(_validConfig(secrets: {'API_KEY': 'SOME-SECRET'}));
+        expect(errors, anyElement(contains('safe secret name')));
+      });
+
+      test('secrets key and value with underscore pass', () {
+        final errors = WorkflowGenerator.validate(_validConfig(secrets: {'API_KEY': 'MY_SECRET_NAME'}));
+        expect(errors.where((e) => e.contains('secrets')), isEmpty);
+      });
+
+      test('secrets key with leading underscore produces error (must start with uppercase letter)', () {
+        final errors = WorkflowGenerator.validate(_validConfig(secrets: {'_API_KEY': 'MY_SECRET'}));
+        expect(errors, anyElement(contains('safe identifier')));
+      });
+
+      test('secrets key with lowercase produces error (uppercase only)', () {
+        final errors = WorkflowGenerator.validate(_validConfig(secrets: {'api_key': 'MY_SECRET'}));
+        expect(errors, anyElement(contains('safe identifier')));
+      });
+
+      test('secrets value with lowercase produces error (uppercase only)', () {
+        final errors = WorkflowGenerator.validate(_validConfig(secrets: {'API_KEY': 'my_secret'}));
+        expect(errors, anyElement(contains('safe secret name')));
       });
     });
 
@@ -269,6 +295,31 @@ void main() {
         final errors = WorkflowGenerator.validate(_validConfig());
         expect(errors.where((e) => e.contains('personal_access_token_secret')), isEmpty);
       });
+
+      test('pat with hyphen produces error (unsafe identifier)', () {
+        final errors = WorkflowGenerator.validate(_validConfig(pat: 'MY-PAT'));
+        expect(errors, anyElement(contains('safe identifier')));
+      });
+
+      test('pat with special chars produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(pat: r'MY_PAT$'));
+        expect(errors, anyElement(contains('safe identifier')));
+      });
+
+      test('pat GITHUB_TOKEN passes', () {
+        final errors = WorkflowGenerator.validate(_validConfig(pat: 'GITHUB_TOKEN'));
+        expect(errors.where((e) => e.contains('personal_access_token_secret')), isEmpty);
+      });
+
+      test('pat with leading underscore produces error (must start with uppercase letter)', () {
+        final errors = WorkflowGenerator.validate(_validConfig(pat: '_MY_PAT'));
+        expect(errors, anyElement(contains('safe identifier')));
+      });
+
+      test('pat with lowercase produces error (uppercase only)', () {
+        final errors = WorkflowGenerator.validate(_validConfig(pat: 'my_pat'));
+        expect(errors, anyElement(contains('safe identifier')));
+      });
     });
 
     // ---- line_length ----
@@ -292,6 +343,83 @@ void main() {
         final errors = WorkflowGenerator.validate(_validConfig());
         expect(errors.where((e) => e.contains('line_length')), isEmpty);
       });
+
+      test('string line_length "abc" produces error (must be digits only)', () {
+        final errors = WorkflowGenerator.validate(_validConfig(lineLength: 'abc'));
+        expect(errors, anyElement(contains('digits only')));
+      });
+
+      test('string line_length empty string produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(lineLength: ''));
+        expect(errors, anyElement(contains('must not be empty')));
+      });
+
+      test('string line_length "+120" produces error (digits only, no sign)', () {
+        final errors = WorkflowGenerator.validate(_validConfig(lineLength: '+120'));
+        expect(errors, anyElement(contains('digits only')));
+      });
+
+      test('string line_length "-120" produces error (digits only, no sign)', () {
+        final errors = WorkflowGenerator.validate(_validConfig(lineLength: '-120'));
+        expect(errors, anyElement(contains('digits only')));
+      });
+
+      test('string line_length with leading/trailing whitespace produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(lineLength: ' 120 '));
+        expect(errors, anyElement(contains('whitespace')));
+      });
+
+      test('string line_length with embedded newline produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(lineLength: '12\n0'));
+        expect(errors, anyElement(contains('newlines or control')));
+      });
+
+      test('string line_length "0" produces error (out of range)', () {
+        final errors = WorkflowGenerator.validate(_validConfig(lineLength: '0'));
+        expect(errors, anyElement(contains('between 1 and 10000')));
+      });
+
+      test('string line_length "10001" produces error (out of range)', () {
+        final errors = WorkflowGenerator.validate(_validConfig(lineLength: '10001'));
+        expect(errors, anyElement(contains('between 1 and 10000')));
+      });
+
+      test('int line_length 0 produces error (out of range)', () {
+        final errors = WorkflowGenerator.validate(_validConfig(lineLength: 0));
+        expect(errors, anyElement(contains('between 1 and 10000')));
+      });
+
+      test('int line_length 10001 produces error (out of range)', () {
+        final errors = WorkflowGenerator.validate(_validConfig(lineLength: 10001));
+        expect(errors, anyElement(contains('between 1 and 10000')));
+      });
+    });
+
+    // ---- artifact_retention_days ----
+    group('artifact_retention_days', () {
+      test('int artifact_retention_days passes', () {
+        final config = _validConfig()..['artifact_retention_days'] = 14;
+        final errors = WorkflowGenerator.validate(config);
+        expect(errors.where((e) => e.contains('artifact_retention_days')), isEmpty);
+      });
+
+      test('string artifact_retention_days passes', () {
+        final config = _validConfig()..['artifact_retention_days'] = '30';
+        final errors = WorkflowGenerator.validate(config);
+        expect(errors.where((e) => e.contains('artifact_retention_days')), isEmpty);
+      });
+
+      test('artifact_retention_days empty string produces error', () {
+        final config = _validConfig()..['artifact_retention_days'] = '';
+        final errors = WorkflowGenerator.validate(config);
+        expect(errors, anyElement(contains('artifact_retention_days string must not be empty')));
+      });
+
+      test('artifact_retention_days above 90 produces error', () {
+        final config = _validConfig()..['artifact_retention_days'] = 91;
+        final errors = WorkflowGenerator.validate(config);
+        expect(errors, anyElement(contains('between 1 and 90')));
+      });
     });
 
     // ---- sub_packages (Issue #9 validation) ----
@@ -304,117 +432,183 @@ void main() {
       });
 
       test('sub_packages entry that is not a map produces error', () {
-        final errors = WorkflowGenerator.validate(
-          _validConfig(subPackages: ['just_a_string']),
-        );
+        final errors = WorkflowGenerator.validate(_validConfig(subPackages: ['just_a_string']));
         expect(errors, anyElement(contains('sub_packages entries must be objects')));
       });
 
       test('sub_packages with missing name produces error', () {
         final errors = WorkflowGenerator.validate(
-          _validConfig(subPackages: [
-            <String, dynamic>{'path': 'packages/foo'},
-          ]),
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'path': 'packages/foo'},
+            ],
+          ),
         );
         expect(errors, anyElement(contains('name must be a non-empty string')));
       });
 
       test('sub_packages with empty name produces error', () {
         final errors = WorkflowGenerator.validate(
-          _validConfig(subPackages: [
-            <String, dynamic>{'name': '', 'path': 'packages/foo'},
-          ]),
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': '', 'path': 'packages/foo'},
+            ],
+          ),
         );
         expect(errors, anyElement(contains('name must be a non-empty string')));
       });
 
+      test('sub_packages with name containing unsupported characters produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': 'foo bar', 'path': 'packages/foo'},
+            ],
+          ),
+        );
+        expect(errors, anyElement(contains('name contains unsupported characters')));
+      });
+
       test('sub_packages with missing path produces error', () {
         final errors = WorkflowGenerator.validate(
-          _validConfig(subPackages: [
-            <String, dynamic>{'name': 'foo'},
-          ]),
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': 'foo'},
+            ],
+          ),
         );
         expect(errors, anyElement(contains('path must be a non-empty string')));
       });
 
       test('sub_packages with empty path produces error', () {
         final errors = WorkflowGenerator.validate(
-          _validConfig(subPackages: [
-            <String, dynamic>{'name': 'foo', 'path': ''},
-          ]),
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': 'foo', 'path': ''},
+            ],
+          ),
         );
         expect(errors, anyElement(contains('path must be a non-empty string')));
       });
 
       test('sub_packages path with directory traversal (..) produces error', () {
         final errors = WorkflowGenerator.validate(
-          _validConfig(subPackages: [
-            <String, dynamic>{'name': 'foo', 'path': '../../../etc/passwd'},
-          ]),
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': 'foo', 'path': '../../../etc/passwd'},
+            ],
+          ),
         );
         expect(errors, anyElement(contains('must not traverse outside the repo')));
       });
 
       test('sub_packages path with embedded traversal produces error', () {
         final errors = WorkflowGenerator.validate(
-          _validConfig(subPackages: [
-            <String, dynamic>{'name': 'foo', 'path': 'packages/../../../etc'},
-          ]),
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': 'foo', 'path': 'packages/../../../etc'},
+            ],
+          ),
         );
         expect(errors, anyElement(contains('must not traverse outside the repo')));
       });
 
       test('sub_packages absolute path produces error', () {
         final errors = WorkflowGenerator.validate(
-          _validConfig(subPackages: [
-            <String, dynamic>{'name': 'foo', 'path': '/usr/local/bin'},
-          ]),
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': 'foo', 'path': '/usr/local/bin'},
+            ],
+          ),
         );
         expect(errors, anyElement(contains('must be a relative repo path')));
       });
 
       test('sub_packages path starting with ~ produces error', () {
         final errors = WorkflowGenerator.validate(
-          _validConfig(subPackages: [
-            <String, dynamic>{'name': 'foo', 'path': '~/evil'},
-          ]),
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': 'foo', 'path': '~/evil'},
+            ],
+          ),
         );
         expect(errors, anyElement(contains('must be a relative repo path')));
       });
 
+      test('sub_packages path "." (repo root) produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': 'foo', 'path': '.'},
+            ],
+          ),
+        );
+        expect(errors, anyElement(contains('must not be repo root')));
+      });
+
+      test('sub_packages path starting with "-" produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': 'foo', 'path': '--help'},
+            ],
+          ),
+        );
+        expect(errors, anyElement(contains('must not start with "-"')));
+      });
+
       test('sub_packages path with backslashes produces error', () {
         final errors = WorkflowGenerator.validate(
-          _validConfig(subPackages: [
-            <String, dynamic>{'name': 'foo', 'path': r'packages\foo'},
-          ]),
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': 'foo', 'path': r'packages\foo'},
+            ],
+          ),
         );
         expect(errors, anyElement(contains('forward slashes')));
       });
 
       test('sub_packages path with unsupported characters produces error', () {
         final errors = WorkflowGenerator.validate(
-          _validConfig(subPackages: [
-            <String, dynamic>{'name': 'foo', 'path': 'packages/foo bar'},
-          ]),
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': 'foo', 'path': 'packages/foo bar'},
+            ],
+          ),
         );
         expect(errors, anyElement(contains('unsupported characters')));
       });
 
       test('sub_packages path with leading/trailing whitespace produces error', () {
         final errors = WorkflowGenerator.validate(
-          _validConfig(subPackages: [
-            <String, dynamic>{'name': 'foo', 'path': ' packages/foo '},
-          ]),
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': 'foo', 'path': ' packages/foo '},
+            ],
+          ),
         );
         expect(errors, anyElement(contains('whitespace')));
+      });
+
+      test('sub_packages name with leading/trailing whitespace produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': ' foo ', 'path': 'packages/foo'},
+            ],
+          ),
+        );
+        expect(errors, anyElement(contains('name must not have leading/trailing whitespace')));
       });
 
       test('sub_packages path with trailing tab triggers whitespace error', () {
         // Trailing \t means trimmed != value, so the whitespace check fires first.
         final errors = WorkflowGenerator.validate(
-          _validConfig(subPackages: [
-            <String, dynamic>{'name': 'foo', 'path': 'packages/foo\t'},
-          ]),
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': 'foo', 'path': 'packages/foo\t'},
+            ],
+          ),
         );
         expect(errors, anyElement(contains('whitespace')));
       });
@@ -422,39 +616,47 @@ void main() {
       test('sub_packages path with embedded tab triggers newlines/tabs error', () {
         // Embedded tab: trim() is identity, so newlines/tabs check catches it.
         final errors = WorkflowGenerator.validate(
-          _validConfig(subPackages: [
-            <String, dynamic>{'name': 'foo', 'path': 'packages/f\too'},
-          ]),
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': 'foo', 'path': 'packages/f\too'},
+            ],
+          ),
         );
         expect(errors, anyElement(contains('newlines/tabs')));
       });
 
       test('sub_packages duplicate name produces error', () {
         final errors = WorkflowGenerator.validate(
-          _validConfig(subPackages: [
-            <String, dynamic>{'name': 'foo', 'path': 'packages/foo'},
-            <String, dynamic>{'name': 'foo', 'path': 'packages/bar'},
-          ]),
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': 'foo', 'path': 'packages/foo'},
+              <String, dynamic>{'name': 'foo', 'path': 'packages/bar'},
+            ],
+          ),
         );
         expect(errors, anyElement(contains('duplicate name "foo"')));
       });
 
       test('sub_packages duplicate path (after normalization) produces error', () {
         final errors = WorkflowGenerator.validate(
-          _validConfig(subPackages: [
-            <String, dynamic>{'name': 'foo', 'path': 'packages/foo'},
-            <String, dynamic>{'name': 'bar', 'path': 'packages/./foo'},
-          ]),
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': 'foo', 'path': 'packages/foo'},
+              <String, dynamic>{'name': 'bar', 'path': 'packages/./foo'},
+            ],
+          ),
         );
         expect(errors, anyElement(contains('duplicate path')));
       });
 
       test('valid sub_packages passes', () {
         final errors = WorkflowGenerator.validate(
-          _validConfig(subPackages: [
-            <String, dynamic>{'name': 'core', 'path': 'packages/core'},
-            <String, dynamic>{'name': 'api', 'path': 'packages/api'},
-          ]),
+          _validConfig(
+            subPackages: [
+              <String, dynamic>{'name': 'core', 'path': 'packages/core'},
+              <String, dynamic>{'name': 'api', 'path': 'packages/api'},
+            ],
+          ),
         );
         expect(errors.where((e) => e.contains('sub_packages')), isEmpty);
       });
@@ -475,41 +677,468 @@ void main() {
       });
 
       test('runner_overrides with invalid platform key produces error', () {
-        final errors = WorkflowGenerator.validate(
-          _validConfig(runnerOverrides: {'solaris': 'my-runner'}),
-        );
+        final errors = WorkflowGenerator.validate(_validConfig(runnerOverrides: {'solaris': 'my-runner'}));
         expect(errors, anyElement(contains('invalid platform key "solaris"')));
       });
 
       test('runner_overrides with empty string value produces error', () {
-        final errors = WorkflowGenerator.validate(
-          _validConfig(runnerOverrides: {'ubuntu': ''}),
-        );
+        final errors = WorkflowGenerator.validate(_validConfig(runnerOverrides: {'ubuntu': ''}));
         expect(errors, anyElement(contains('must be a non-empty string')));
       });
 
+      test('runner_overrides value with surrounding whitespace produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(runnerOverrides: {'ubuntu': ' custom-runner '}));
+        expect(errors, anyElement(contains('leading/trailing whitespace')));
+      });
+
       test('valid runner_overrides passes', () {
+        final errors = WorkflowGenerator.validate(_validConfig(runnerOverrides: {'ubuntu': 'custom-runner-label'}));
+        expect(errors.where((e) => e.contains('runner_overrides')), isEmpty);
+      });
+
+      test('runner_overrides value with newline produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(runnerOverrides: {'ubuntu': 'runner\nlabel'}));
+        expect(errors, anyElement(contains('newlines, control chars')));
+      });
+
+      test('runner_overrides value with tab produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(runnerOverrides: {'ubuntu': 'runner\tlabel'}));
+        expect(errors, anyElement(contains('newlines, control chars')));
+      });
+
+      test('runner_overrides value with YAML-injection char produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(runnerOverrides: {'ubuntu': 'runner:label'}));
+        expect(errors, anyElement(contains('unsafe YAML chars')));
+      });
+
+      test('runner_overrides value with dollar sign produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(runnerOverrides: {'ubuntu': r'runner$label'}));
+        expect(errors, anyElement(contains('unsafe YAML chars')));
+      });
+
+      test('runner_overrides value with hyphen and dot passes', () {
         final errors = WorkflowGenerator.validate(
-          _validConfig(runnerOverrides: {'ubuntu': 'custom-runner-label'}),
+          _validConfig(runnerOverrides: {'ubuntu': 'runtime-ubuntu-24.04-x64-256gb'}),
         );
         expect(errors.where((e) => e.contains('runner_overrides')), isEmpty);
       });
     });
 
+    // ---- web_test ----
+    group('web_test', () {
+      test('non-map web_test produces error', () {
+        final config = _validConfig();
+        config['web_test'] = 'not_a_map';
+        final errors = WorkflowGenerator.validate(config);
+        expect(errors, anyElement(contains('web_test must be an object')));
+      });
+
+      test('null web_test is fine (optional)', () {
+        final errors = WorkflowGenerator.validate(_validConfig());
+        expect(errors.where((e) => e.contains('web_test')), isEmpty);
+      });
+
+      test('web_test.concurrency non-int produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(webTest: {'concurrency': 'fast'}));
+        expect(errors, anyElement(contains('concurrency must be an integer')));
+      });
+
+      test('web_test.concurrency zero produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(webTest: {'concurrency': 0}));
+        expect(errors, anyElement(contains('between 1 and 32')));
+      });
+
+      test('web_test.concurrency negative produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(webTest: {'concurrency': -1}));
+        expect(errors, anyElement(contains('between 1 and 32')));
+      });
+
+      test('web_test.concurrency exceeds upper bound produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(webTest: {'concurrency': 33}));
+        expect(errors, anyElement(contains('between 1 and 32')));
+      });
+
+      test('web_test.concurrency double/float produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(webTest: {'concurrency': 3.14}));
+        expect(errors, anyElement(contains('concurrency must be an integer')));
+      });
+
+      test('web_test.concurrency valid int passes', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(features: {'proto': false, 'lfs': false, 'web_test': true}, webTest: {'concurrency': 4}),
+        );
+        expect(errors.where((e) => e.contains('web_test')), isEmpty);
+      });
+
+      test('web_test.concurrency at upper bound (32) passes', () {
+        final errors = WorkflowGenerator.validate(_validConfig(webTest: {'concurrency': 32}));
+        expect(errors.where((e) => e.contains('concurrency')), isEmpty);
+      });
+
+      test('web_test.concurrency null is fine (defaults to 1)', () {
+        final errors = WorkflowGenerator.validate(_validConfig(webTest: <String, dynamic>{}));
+        expect(errors.where((e) => e.contains('concurrency')), isEmpty);
+      });
+
+      test('web_test.paths non-list produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(webTest: {'paths': 'not_a_list'}));
+        expect(errors, anyElement(contains('paths must be an array')));
+      });
+
+      test('web_test.paths with empty string produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': [''],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('must be a non-empty string')));
+      });
+
+      test('web_test.paths with absolute path produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': ['/etc/passwd'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('must be a relative repo path')));
+      });
+
+      test('web_test.paths with traversal produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': ['../../../etc/passwd'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('must not traverse outside the repo')));
+      });
+
+      test('web_test.paths with embedded traversal (test/web/../../../etc/passwd) produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            features: {'proto': false, 'lfs': false, 'web_test': true},
+            webTest: {
+              'paths': ['test/web/../../../etc/passwd'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('must not traverse outside the repo')));
+      });
+
+      test('web_test.paths with shell metacharacters (\$(curl evil)) produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': [r'$(curl evil)'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('unsupported characters')));
+      });
+
+      test('web_test.paths with shell metacharacters (; rm -rf /) produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': ['; rm -rf /'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('unsupported characters')));
+      });
+
+      test('web_test.paths with single quote produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': ["test/web/foo'bar_test.dart"],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('unsupported characters')));
+      });
+
+      test('web_test.paths duplicate (after normalization) produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            features: {'proto': false, 'lfs': false, 'web_test': true},
+            webTest: {
+              'paths': ['test/web/foo_test.dart', 'test/web/./foo_test.dart'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('duplicate path')));
+      });
+
+      test('web_test.paths with backslashes produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': [r'test\web\foo_test.dart'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('forward slashes')));
+      });
+
+      test('web_test.paths with unsupported characters produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': ['test/web test/foo.dart'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('unsupported characters')));
+      });
+
+      test('web_test.paths with leading whitespace produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': [' test/web/foo_test.dart'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('whitespace')));
+      });
+
+      test('web_test.paths with tilde produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': ['~/test/foo.dart'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('must be a relative repo path')));
+      });
+
+      test('web_test.paths "." (repo root) produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': ['.'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('must not be repo root')));
+      });
+
+      test('web_test.paths starting with "-" produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': ['--help'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('must not start with "-"')));
+      });
+
+      test('web_test.paths with newline produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': ['test/foo\nbar.dart'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('newlines/tabs')));
+      });
+
+      test('web_test.paths with embedded traversal that escapes repo produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': ['test/../../../etc/passwd'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('must not traverse outside the repo')));
+      });
+
+      test('web_test.paths with embedded .. that stays in repo is fine', () {
+        // test/web/../../etc/passwd normalizes to etc/passwd (still inside repo)
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            features: {'proto': false, 'lfs': false, 'web_test': true},
+            webTest: {
+              'paths': ['test/web/../../etc/passwd'],
+            },
+          ),
+        );
+        expect(errors.where((e) => e.contains('traverse')), isEmpty);
+      });
+
+      test('web_test.paths with shell metacharacter \$ produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': [r'$(curl evil.com)'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('unsupported characters')));
+      });
+
+      test('web_test.paths with shell metacharacter ; produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': ['test/foo; rm -rf /'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('unsupported characters')));
+      });
+
+      test('web_test.paths with duplicate paths produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': ['test/web/foo_test.dart', 'test/web/foo_test.dart'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('duplicate path')));
+      });
+
+      test('web_test.paths with duplicate normalized paths produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': ['test/web/./foo_test.dart', 'test/web/foo_test.dart'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('duplicate path')));
+      });
+
+      test('web_test.paths with trailing whitespace produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': ['test/web/foo_test.dart '],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('whitespace')));
+      });
+
+      test('web_test.paths with tab produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            webTest: {
+              'paths': ['test/web/\tfoo_test.dart'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('newlines/tabs')));
+      });
+
+      test('valid web_test.paths passes', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            features: {'proto': false, 'lfs': false, 'web_test': true},
+            webTest: {
+              'paths': ['test/web/foo_test.dart', 'test/web/bar_test.dart'],
+            },
+          ),
+        );
+        expect(errors.where((e) => e.contains('web_test')), isEmpty);
+      });
+
+      test('empty web_test.paths list is fine', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(features: {'proto': false, 'lfs': false, 'web_test': true}, webTest: {'paths': <String>[]}),
+        );
+        expect(errors.where((e) => e.contains('web_test')), isEmpty);
+      });
+
+      test('valid full web_test config passes', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            features: {'proto': false, 'lfs': false, 'web_test': true},
+            webTest: {
+              'concurrency': 2,
+              'paths': ['test/web/'],
+            },
+          ),
+        );
+        expect(errors.where((e) => e.contains('web_test')), isEmpty);
+      });
+
+      test('web_test with unknown key (typo) produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(webTest: {'concurreny': 2}), // typo: concurreny
+        );
+        expect(errors, anyElement(contains('unknown key "concurreny"')));
+      });
+
+      test('cross-validation: web_test config present but feature disabled produces error', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            features: {'proto': false, 'lfs': false, 'web_test': false},
+            webTest: {
+              'concurrency': 2,
+              'paths': ['test/web/'],
+            },
+          ),
+        );
+        expect(errors, anyElement(contains('web_test config is present but ci.features.web_test is not enabled')));
+      });
+
+      test('cross-validation: web_test feature enabled but config wrong type produces error', () {
+        final config = _validConfig(features: {'proto': false, 'lfs': false, 'web_test': true});
+        config['web_test'] = 'yes';
+        final errors = WorkflowGenerator.validate(config);
+        expect(errors, anyElement(contains('web_test must be an object')));
+      });
+
+      test('cross-validation: web_test feature enabled with no config object (null) is allowed, uses defaults', () {
+        final errors = WorkflowGenerator.validate(
+          _validConfig(
+            features: {'proto': false, 'lfs': false, 'web_test': true},
+            // webTest: null (omitted) — config is optional when feature is enabled
+          ),
+        );
+        expect(errors.where((e) => e.contains('web_test')), isEmpty);
+      });
+
+      test('cross-validation: web_test feature enabled with explicit null config is allowed', () {
+        final config = _validConfig(features: {'proto': false, 'lfs': false, 'web_test': true});
+        config['web_test'] = null;
+        final errors = WorkflowGenerator.validate(config);
+        expect(errors.where((e) => e.contains('web_test')), isEmpty);
+      });
+    });
+
     // ---- fully valid config produces no errors ----
     test('fully valid config produces no errors', () {
-      final errors = WorkflowGenerator.validate(_validConfig(
-        dartSdk: '3.9.2',
-        features: {'proto': true, 'lfs': false},
-        platforms: ['ubuntu', 'macos'],
-        secrets: {'API_KEY': 'MY_SECRET'},
-        pat: 'MY_PAT',
-        lineLength: 120,
-        subPackages: [
-          <String, dynamic>{'name': 'core', 'path': 'packages/core'},
-        ],
-        runnerOverrides: {'ubuntu': 'custom-runner'},
-      ));
+      final errors = WorkflowGenerator.validate(
+        _validConfig(
+          dartSdk: '3.9.2',
+          features: {'proto': true, 'lfs': false, 'web_test': true},
+          platforms: ['ubuntu', 'macos'],
+          secrets: {'API_KEY': 'MY_SECRET'},
+          pat: 'MY_PAT',
+          lineLength: 120,
+          subPackages: [
+            <String, dynamic>{'name': 'core', 'path': 'packages/core'},
+          ],
+          runnerOverrides: {'ubuntu': 'custom-runner'},
+          webTest: {
+            'concurrency': 2,
+            'paths': ['test/web/'],
+          },
+        ),
+      );
       expect(errors, isEmpty);
     });
 
@@ -518,7 +1147,7 @@ void main() {
       final errors = WorkflowGenerator.validate(<String, dynamic>{
         // missing dart_sdk, missing features
       });
-      expect(errors.length, greaterThanOrEqualTo(2));
+      expect(errors.length, equals(2));
       expect(errors, anyElement(contains('dart_sdk')));
       expect(errors, anyElement(contains('features')));
     });
@@ -545,21 +1174,21 @@ void main() {
 
     test('returns null when config.json exists but has no "ci" key', () {
       final configDir = Directory('${tempDir.path}/.runtime_ci')..createSync();
-      File('${configDir.path}/config.json').writeAsStringSync(json.encode({
-        'repo_name': 'test_repo',
-      }));
+      File('${configDir.path}/config.json').writeAsStringSync(json.encode({'repo_name': 'test_repo'}));
       final result = WorkflowGenerator.loadCiConfig(tempDir.path);
       expect(result, isNull);
     });
 
     test('returns the ci map when config.json has a valid "ci" section', () {
       final configDir = Directory('${tempDir.path}/.runtime_ci')..createSync();
-      File('${configDir.path}/config.json').writeAsStringSync(json.encode({
-        'ci': {
-          'dart_sdk': '3.9.2',
-          'features': {'proto': true},
-        },
-      }));
+      File('${configDir.path}/config.json').writeAsStringSync(
+        json.encode({
+          'ci': {
+            'dart_sdk': '3.9.2',
+            'features': {'proto': true},
+          },
+        }),
+      );
       final result = WorkflowGenerator.loadCiConfig(tempDir.path);
       expect(result, isNotNull);
       expect(result, isA<Map<String, dynamic>>());
@@ -578,9 +1207,7 @@ void main() {
 
     test('throws StateError when "ci" is not a Map', () {
       final configDir = Directory('${tempDir.path}/.runtime_ci')..createSync();
-      File('${configDir.path}/config.json').writeAsStringSync(json.encode({
-        'ci': 'not_a_map',
-      }));
+      File('${configDir.path}/config.json').writeAsStringSync(json.encode({'ci': 'not_a_map'}));
       expect(
         () => WorkflowGenerator.loadCiConfig(tempDir.path),
         throwsA(isA<StateError>().having((e) => e.message, 'message', contains('object'))),
@@ -589,13 +1216,705 @@ void main() {
 
     test('throws StateError when "ci" is a list instead of a map', () {
       final configDir = Directory('${tempDir.path}/.runtime_ci')..createSync();
-      File('${configDir.path}/config.json').writeAsStringSync(json.encode({
-        'ci': [1, 2, 3],
-      }));
-      expect(
-        () => WorkflowGenerator.loadCiConfig(tempDir.path),
-        throwsA(isA<StateError>()),
+      File('${configDir.path}/config.json').writeAsStringSync(
+        json.encode({
+          'ci': [1, 2, 3],
+        }),
       );
+      expect(() => WorkflowGenerator.loadCiConfig(tempDir.path), throwsA(isA<StateError>()));
+    });
+  });
+
+  // ===========================================================================
+  // P0: render() — validation guard and web_test output integration tests
+  // ===========================================================================
+  group('WorkflowGenerator.render()', () {
+    Map<String, dynamic> _minimalValidConfig({
+      bool webTest = false,
+      Map<String, dynamic>? webTestConfig,
+      Map<String, dynamic>? featureOverrides,
+      List<String>? platforms,
+    }) {
+      final features = <String, dynamic>{
+        'proto': false,
+        'lfs': false,
+        'format_check': false,
+        'analysis_cache': false,
+        'managed_analyze': false,
+        'managed_test': false,
+        'build_runner': false,
+        'web_test': webTest,
+      };
+      if (featureOverrides != null) {
+        features.addAll(featureOverrides);
+      }
+      features['web_test'] = webTest;
+      return _validConfig(
+        dartSdk: '3.9.2',
+        features: features,
+        platforms: platforms ?? ['ubuntu'],
+        webTest: webTestConfig,
+      );
+    }
+
+    // ---- render() validation guard (defense-in-depth) ----
+    test('render throws StateError when config is invalid (missing dart_sdk)', () {
+      final gen = WorkflowGenerator(ciConfig: {'features': <String, dynamic>{}}, toolingVersion: '0.0.0-test');
+      expect(
+        () => gen.render(),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            allOf(contains('Cannot render with invalid config'), contains('dart_sdk')),
+          ),
+        ),
+      );
+    });
+
+    test('render throws StateError when config has multiple validation errors', () {
+      final gen = WorkflowGenerator(ciConfig: <String, dynamic>{}, toolingVersion: '0.0.0-test');
+      expect(
+        () => gen.render(),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            allOf(contains('Cannot render with invalid config'), contains('dart_sdk'), contains('features')),
+          ),
+        ),
+      );
+    });
+
+    test('render throws StateError when config has invalid web_test type', () {
+      final gen = WorkflowGenerator(
+        ciConfig: _validConfig(features: {'proto': false, 'lfs': false, 'web_test': true})..['web_test'] = 'yes',
+        toolingVersion: '0.0.0-test',
+      );
+      expect(
+        () => gen.render(),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            allOf(contains('Cannot render with invalid config'), contains('web_test must be an object')),
+          ),
+        ),
+      );
+    });
+
+    test('render succeeds on valid config', () {
+      final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(webTest: false), toolingVersion: '0.0.0-test');
+      final rendered = gen.render();
+      expect(rendered, isNotEmpty);
+      final parsed = loadYaml(rendered) as YamlMap;
+      expect(parsed, isA<YamlMap>());
+      expect(parsed.containsKey('name'), isTrue);
+      expect(parsed['name'], equals('CI'));
+      expect(parsed.containsKey('jobs'), isTrue);
+      final jobs = parsed['jobs'] as YamlMap;
+      expect(jobs, isA<YamlMap>());
+      expect(jobs.containsKey('pre-check'), isTrue);
+      expect(jobs.containsKey('analyze-and-test'), isTrue);
+    });
+
+    test('web_test=false: rendered output does not contain web-test job', () {
+      final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(webTest: false), toolingVersion: '0.0.0-test');
+      final rendered = gen.render();
+      expect(rendered, isNot(contains('web-test:')));
+      expect(rendered, isNot(contains('dart test -p chrome')));
+    });
+
+    test('web_test=true with omitted config uses default concurrency and no explicit paths', () {
+      final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(webTest: true), toolingVersion: '0.0.0-test');
+      final rendered = gen.render();
+      expect(rendered, contains('web-test:'));
+      expect(rendered, contains('dart test -p chrome'));
+      expect(rendered, contains('--concurrency=1'));
+      expect(rendered, contains('Enable Chrome user namespaces on Ubuntu'));
+      expect(rendered, contains('kernel.apparmor_restrict_unprivileged_userns=0'));
+      expect(rendered, isNot(contains("'test/")));
+    });
+
+    test('web_test=true with paths: rendered output includes path args', () {
+      final gen = WorkflowGenerator(
+        ciConfig: _minimalValidConfig(
+          webTest: true,
+          webTestConfig: {
+            'paths': ['test/web/foo_test.dart'],
+            'concurrency': 2,
+          },
+        ),
+        toolingVersion: '0.0.0-test',
+      );
+      final rendered = gen.render();
+      expect(rendered, contains("'test/web/foo_test.dart'"));
+      expect(rendered, contains('--concurrency=2'));
+      expect(rendered, contains('-- \'test/web/foo_test.dart\''));
+    });
+
+    test('web_test=true with concurrency at upper bound (32): rendered output uses 32', () {
+      final gen = WorkflowGenerator(
+        ciConfig: _minimalValidConfig(webTest: true, webTestConfig: {'concurrency': 32}),
+        toolingVersion: '0.0.0-test',
+      );
+      final rendered = gen.render();
+      expect(rendered, contains('--concurrency=32'));
+    });
+
+    test('rendered output parses as valid YAML with jobs map', () {
+      final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
+      final rendered = gen.render();
+      final parsed = loadYaml(rendered) as YamlMap;
+
+      expect(parsed.containsKey('name'), isTrue);
+      expect(parsed['name'], equals('CI'));
+
+      final on = parsed['on'] as YamlMap;
+      expect(on.containsKey('push'), isTrue);
+      expect(on.containsKey('pull_request'), isTrue);
+      final pushBranches = (on['push'] as YamlMap)['branches'] as YamlList;
+      expect(pushBranches, contains('main'));
+
+      final jobs = parsed['jobs'] as YamlMap;
+      expect(jobs.containsKey('pre-check'), isTrue);
+
+      final preCheck = jobs['pre-check'] as YamlMap;
+      expect(preCheck['runs-on'], equals('ubuntu-latest'));
+      final steps = preCheck['steps'] as YamlList;
+      expect(steps.length, greaterThanOrEqualTo(2));
+      final firstStep = steps[0] as YamlMap;
+      expect('${firstStep['uses']}', contains('actions/checkout'));
+    });
+
+    test('rendered workflow stays in sync with committed .github/workflows/ci.yaml', () {
+      final ciConfig = WorkflowGenerator.loadCiConfig(Directory.current.path);
+      expect(ciConfig, isNotNull, reason: 'Repository CI config must be present');
+
+      final goldenPath = '.github/workflows/ci.yaml';
+      final goldenFile = File(goldenPath);
+      expect(goldenFile.existsSync(), isTrue, reason: 'Committed workflow golden must exist');
+
+      final existingContent = goldenFile.readAsStringSync();
+      final toolingVersion = _readToolingVersionFromPubspec();
+      final rendered = WorkflowGenerator(
+        ciConfig: ciConfig!,
+        toolingVersion: toolingVersion,
+      ).render(existingContent: existingContent);
+
+      String normalize(String input) => '${input.replaceAll('\r\n', '\n').trimRight()}\n';
+
+      expect(
+        normalize(rendered),
+        equals(normalize(existingContent)),
+        reason: 'Generated workflow drifted from committed file. Re-run workflow generation and commit updated output.',
+      );
+    });
+
+    test('managed_test: upload step uses success() || failure() not cancelled', () {
+      final gen = WorkflowGenerator(
+        ciConfig: _minimalValidConfig(featureOverrides: {'managed_test': true}),
+        toolingVersion: '0.0.0-test',
+      );
+      final rendered = gen.render();
+      expect(rendered, contains('success() || failure()'));
+      expect(rendered, isNot(contains('always()')));
+    });
+
+    test('managed_test: Test step has pipefail and tee for correct exit propagation', () {
+      // Single-platform and multi-platform must share identical test step
+      // structure: pipefail ensures test exit code propagates through tee.
+      final single = WorkflowGenerator(
+        ciConfig: _minimalValidConfig(featureOverrides: {'managed_test': true}, platforms: ['ubuntu']),
+        toolingVersion: '0.0.0-test',
+      ).render();
+      final multi = WorkflowGenerator(
+        ciConfig: _minimalValidConfig(featureOverrides: {'managed_test': true}, platforms: ['ubuntu', 'macos']),
+        toolingVersion: '0.0.0-test',
+      ).render();
+      for (final rendered in [single, multi]) {
+        expect(rendered, contains('set -o pipefail'));
+        expect(rendered, contains('tee "'));
+        expect(rendered, contains('console.log"'));
+        expect(rendered, contains('manage_cicd test 2>&1'));
+      }
+    });
+
+    test('feature flags render expected snippets', () {
+      final cases = <Map<String, String>>[
+        {'feature': 'proto', 'snippet': 'Install protoc'},
+        {'feature': 'lfs', 'snippet': 'lfs: true'},
+        {'feature': 'format_check', 'snippet': 'auto-format:'},
+        {'feature': 'analysis_cache', 'snippet': 'Cache Dart analysis'},
+        {'feature': 'managed_analyze', 'snippet': 'runtime_ci_tooling:manage_cicd analyze'},
+        {'feature': 'managed_test', 'snippet': 'runtime_ci_tooling:manage_cicd test'},
+        {'feature': 'build_runner', 'snippet': 'Run build_runner'},
+      ];
+
+      for (final c in cases) {
+        final feature = c['feature']!;
+        final snippet = c['snippet']!;
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(featureOverrides: {feature: true}),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        expect(rendered, contains(snippet), reason: 'Feature "$feature" should render "$snippet".');
+      }
+    });
+
+    test('build_runner=false omits build_runner step', () {
+      final gen = WorkflowGenerator(
+        ciConfig: _minimalValidConfig(featureOverrides: {'build_runner': false}),
+        toolingVersion: '0.0.0-test',
+      );
+      final rendered = gen.render();
+      expect(rendered, isNot(contains('Run build_runner')));
+    });
+
+    test('multi-platform render emits analyze + matrix test jobs', () {
+      final gen = WorkflowGenerator(
+        ciConfig: _minimalValidConfig(platforms: ['ubuntu', 'macos']),
+        toolingVersion: '0.0.0-test',
+      );
+      final rendered = gen.render();
+      final parsed = loadYaml(rendered) as YamlMap;
+      final jobs = parsed['jobs'] as YamlMap;
+
+      expect(jobs.containsKey('analyze'), isTrue);
+      expect(jobs.containsKey('test'), isTrue);
+      expect(jobs.containsKey('analyze-and-test'), isFalse);
+
+      final testJob = jobs['test'] as YamlMap;
+      final strategy = testJob['strategy'] as YamlMap;
+      final matrix = strategy['matrix'] as YamlMap;
+      final include = matrix['include'] as YamlList;
+      expect(include.length, equals(2));
+    });
+
+    // ---- render(existingContent) / _preserveUserSections ----
+    group('render(existingContent) preserves user sections', () {
+      test('user section content is preserved when existingContent has custom lines in a user block', () {
+        final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
+        final base = gen.render();
+        // Append a user block with content so extraction finds it (first occurrence is empty)
+        const customBlock = '''
+# --- BEGIN USER: pre-test ---
+      - name: Custom pre-test step
+        run: echo "user-added"
+# --- END USER: pre-test ---
+''';
+        final existing = base + customBlock;
+        final rendered = gen.render(existingContent: existing);
+        expect(rendered, contains('Custom pre-test step'));
+        expect(rendered, contains('user-added'));
+        expect(rendered, contains('# --- BEGIN USER: pre-test ---'));
+        expect(rendered, contains('# --- END USER: pre-test ---'));
+      });
+
+      test('CRLF normalization: existing content with \\r\\n still preserves sections', () {
+        final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
+        final base = gen.render();
+        const customContent = '\r\n      - run: echo "crlf-test"\r\n';
+        final existing = base.replaceFirst(
+          '# --- BEGIN USER: pre-test ---\n# --- END USER: pre-test ---',
+          '# --- BEGIN USER: pre-test ---$customContent# --- END USER: pre-test ---',
+        );
+        final rendered = gen.render(existingContent: existing);
+        expect(rendered, contains('crlf-test'));
+        expect(rendered, contains('# --- BEGIN USER: pre-test ---'));
+      });
+
+      test('multiple user sections preserve independently', () {
+        final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
+        final base = gen.render();
+        var existing = base;
+        existing = existing.replaceFirst(
+          '# --- BEGIN USER: pre-test ---\n# --- END USER: pre-test ---',
+          '# --- BEGIN USER: pre-test ---\n      - run: echo pre\n# --- END USER: pre-test ---',
+        );
+        existing = existing.replaceFirst(
+          '# --- BEGIN USER: post-test ---\n# --- END USER: post-test ---',
+          '# --- BEGIN USER: post-test ---\n      - run: echo post\n# --- END USER: post-test ---',
+        );
+        existing = existing.replaceFirst(
+          '# --- BEGIN USER: extra-jobs ---\n# --- END USER: extra-jobs ---',
+          '# --- BEGIN USER: extra-jobs ---\n  custom-job:\n    runs-on: ubuntu-latest\n# --- END USER: extra-jobs ---',
+        );
+        final rendered = gen.render(existingContent: existing);
+        expect(rendered, contains('echo pre'));
+        expect(rendered, contains('echo post'));
+        expect(rendered, contains('custom-job:'));
+        expect(rendered, contains('runs-on: ubuntu-latest'));
+      });
+
+      test('empty/whitespace-only existing user section does not overwrite rendered section', () {
+        final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
+        final base = gen.render();
+        // Existing has pre-test with only whitespace; post-test has real content
+        final existing = base
+            .replaceFirst(
+              '# --- BEGIN USER: pre-test ---\n# --- END USER: pre-test ---',
+              '# --- BEGIN USER: pre-test ---\n   \n  \t  \n# --- END USER: pre-test ---',
+            )
+            .replaceFirst(
+              '# --- BEGIN USER: post-test ---\n# --- END USER: post-test ---',
+              '# --- BEGIN USER: post-test ---\n      - run: echo kept\n# --- END USER: post-test ---',
+            );
+        final rendered = gen.render(existingContent: existing);
+        // pre-test: whitespace-only was skipped, so rendered keeps empty placeholder
+        expect(rendered, contains('# --- BEGIN USER: pre-test ---\n# --- END USER: pre-test ---'));
+        // post-test: real content was preserved
+        expect(rendered, contains('echo kept'));
+      });
+
+      test('unknown section name in existing content is silently ignored', () {
+        final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
+        final base = gen.render();
+        // Add a user section that doesn't exist in the skeleton
+        final existing = '$base\n# --- BEGIN USER: nonexistent ---\n  custom: stuff\n# --- END USER: nonexistent ---\n';
+        final rendered = gen.render(existingContent: existing);
+        // The unknown section content should not appear in the rendered output
+        // (there's no matching placeholder to insert it into)
+        expect(rendered, isNot(contains('custom: stuff')));
+        // Known sections still render correctly
+        expect(rendered, contains('# --- BEGIN USER: pre-test ---'));
+      });
+
+      test('malformed section markers (missing END) are ignored', () {
+        final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
+        final base = gen.render();
+        // Inject a BEGIN without matching END — regex won't match, so it's ignored
+        final existing = base.replaceFirst(
+          '# --- BEGIN USER: pre-test ---\n# --- END USER: pre-test ---',
+          '# --- BEGIN USER: pre-test ---\n      - run: echo orphan\n',
+        );
+        final rendered = gen.render(existingContent: existing);
+        // The orphaned content won't be extracted (regex requires matched pair)
+        expect(rendered, isNot(contains('echo orphan')));
+      });
+
+      test('mismatched section names (BEGIN X / END Y) are ignored', () {
+        final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
+        final base = gen.render();
+        final existing = base.replaceFirst(
+          '# --- BEGIN USER: pre-test ---\n# --- END USER: pre-test ---',
+          '# --- BEGIN USER: pre-test ---\n      - run: echo mismatch\n# --- END USER: post-test ---',
+        );
+        final rendered = gen.render(existingContent: existing);
+        // Mismatched names: regex backreference \1 won't match, so nothing extracted
+        expect(rendered, isNot(contains('echo mismatch')));
+      });
+
+      test('section content with regex-special characters is preserved verbatim', () {
+        final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
+        final base = gen.render();
+        // Content with regex special chars: $, (), *, +, ?, |, ^, {, }
+        const specialContent = r'      - run: echo "${{ matrix.os }}" && test [[ "$(whoami)" == "ci" ]]';
+        final existing = base.replaceFirst(
+          '# --- BEGIN USER: pre-test ---\n# --- END USER: pre-test ---',
+          '# --- BEGIN USER: pre-test ---\n$specialContent\n# --- END USER: pre-test ---',
+        );
+        final rendered = gen.render(existingContent: existing);
+        expect(rendered, contains(specialContent));
+      });
+
+      test('duplicate user section markers in existing content: last matched section wins', () {
+        final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
+        final base = gen.render();
+        final existing =
+            '''
+$base
+# --- BEGIN USER: pre-test ---
+      - run: echo first
+# --- END USER: pre-test ---
+# --- BEGIN USER: pre-test ---
+      - run: echo second
+# --- END USER: pre-test ---
+''';
+        final rendered = gen.render(existingContent: existing);
+        expect(rendered, contains('echo second'));
+        expect(rendered, isNot(contains('echo first')));
+      });
+
+      test('null existingContent produces same output as no existingContent', () {
+        final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
+        final withoutExisting = gen.render();
+        final withNull = gen.render(existingContent: null);
+        expect(withNull, equals(withoutExisting));
+      });
+
+      test('existingContent with no user sections produces same output as fresh render', () {
+        final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
+        final fresh = gen.render();
+        // Use a completely unrelated string as existing content
+        final rendered = gen.render(existingContent: 'name: SomeOtherWorkflow\non: push');
+        expect(rendered, equals(fresh));
+      });
+    });
+
+    // ---- render() feature flag combinations ----
+    group('feature flag combinations', () {
+      test('format_check + web_test: web-test needs includes auto-format', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(webTest: true, featureOverrides: {'format_check': true}),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        final parsed = loadYaml(rendered) as YamlMap;
+        final webTestJob = parsed['jobs']['web-test'] as YamlMap;
+        final needs = (webTestJob['needs'] as YamlList).toList();
+        expect(needs, contains('pre-check'));
+        expect(needs, contains('auto-format'));
+      });
+
+      test('format_check renders repo-wide dart format command (.)', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(featureOverrides: {'format_check': true}),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        expect(rendered, contains('run: dart format --line-length 120 .'));
+      });
+
+      test('git-config steps use env indirection (GH_PAT) instead of inline secrets in run', () {
+        final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
+        final rendered = gen.render();
+        expect(rendered, contains('GH_PAT: \${{ secrets.'));
+        expect(rendered, contains('echo "::add-mask::\${GH_PAT}"'));
+        expect(rendered, isNot(contains('TOKEN="\${{ secrets.')));
+      });
+
+      test('web_test without format_check: web-test needs omits auto-format', () {
+        final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(webTest: true), toolingVersion: '0.0.0-test');
+        final rendered = gen.render();
+        final parsed = loadYaml(rendered) as YamlMap;
+        final webTestJob = parsed['jobs']['web-test'] as YamlMap;
+        final needs = (webTestJob['needs'] as YamlList).toList();
+        expect(needs, contains('pre-check'));
+        expect(needs, isNot(contains('auto-format')));
+      });
+
+      test('build_runner + web_test: web-test job contains build_runner step', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(webTest: true, featureOverrides: {'build_runner': true}),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        // Find the web-test job section and check it contains build_runner
+        final webTestStart = rendered.indexOf('web-test:');
+        expect(webTestStart, isNot(-1));
+        final afterWebTest = rendered.substring(webTestStart);
+        expect(afterWebTest, contains('Run build_runner'));
+      });
+
+      test('proto + web_test: web-test job contains proto steps', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(webTest: true, featureOverrides: {'proto': true}),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        final webTestStart = rendered.indexOf('web-test:');
+        expect(webTestStart, isNot(-1));
+        final afterWebTest = rendered.substring(webTestStart);
+        expect(afterWebTest, contains('Install protoc'));
+        expect(afterWebTest, contains('Verify proto files'));
+      });
+
+      test('multi-platform + web_test: web-test depends on analyze (not test)', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(webTest: true, platforms: ['ubuntu', 'macos']),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        final parsed = loadYaml(rendered) as YamlMap;
+        final webTestJob = parsed['jobs']['web-test'] as YamlMap;
+        final needs = (webTestJob['needs'] as YamlList).toList();
+        expect(needs, contains('analyze'));
+        expect(needs, isNot(contains('test')));
+        expect(needs, isNot(contains('analyze-and-test')));
+      });
+
+      test('single-platform + web_test: web-test depends on analyze-and-test', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(webTest: true, platforms: ['ubuntu']),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        final parsed = loadYaml(rendered) as YamlMap;
+        final webTestJob = parsed['jobs']['web-test'] as YamlMap;
+        final needs = (webTestJob['needs'] as YamlList).toList();
+        expect(needs, contains('pre-check'));
+        expect(needs, contains('analyze-and-test'));
+      });
+
+      test('single-platform uses explicit PLATFORM_ID from single_platform_id context', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(featureOverrides: {'managed_test': true}, platforms: ['windows-x64']),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        final parsed = loadYaml(rendered) as YamlMap;
+        final job = parsed['jobs']['analyze-and-test'] as YamlMap;
+        final steps = (job['steps'] as YamlList).toList();
+        final testStep = steps.firstWhere((s) => s is YamlMap && s['name'] == 'Test', orElse: () => null);
+        expect(testStep, isNotNull);
+        final env = (testStep as YamlMap)['env'] as YamlMap;
+        expect(env['PLATFORM_ID'], equals('windows-x64'));
+      });
+
+      test('secrets render in web-test job env block', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(webTest: true)..['secrets'] = {'API_KEY': 'MY_SECRET'},
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        final webTestStart = rendered.indexOf('web-test:');
+        expect(webTestStart, isNot(-1));
+        final afterWebTest = rendered.substring(webTestStart);
+        expect(afterWebTest, contains('API_KEY'));
+        expect(afterWebTest, contains('MY_SECRET'));
+      });
+
+      test('lfs + web_test: web-test checkout has lfs: true', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(webTest: true, featureOverrides: {'lfs': true}),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        final webTestStart = rendered.indexOf('web-test:');
+        expect(webTestStart, isNot(-1));
+        final afterWebTest = rendered.substring(webTestStart);
+        expect(afterWebTest, contains('lfs: true'));
+      });
+
+      test('managed_test in multi-platform: test job uses managed test command', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(featureOverrides: {'managed_test': true}, platforms: ['ubuntu', 'macos']),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        final parsed = loadYaml(rendered) as YamlMap;
+        final testJob = parsed['jobs']['test'] as YamlMap;
+        final steps = (testJob['steps'] as YamlList).toList();
+        final testStep = steps.firstWhere((s) => s is YamlMap && s['name'] == 'Test', orElse: () => null);
+        expect(testStep, isNotNull);
+        expect((testStep as YamlMap)['run'], contains('manage_cicd test'));
+      });
+
+      test('all features enabled renders valid YAML', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(
+            webTest: true,
+            webTestConfig: {
+              'concurrency': 4,
+              'paths': ['test/web/'],
+            },
+            featureOverrides: {
+              'proto': true,
+              'lfs': true,
+              'format_check': true,
+              'analysis_cache': true,
+              'managed_analyze': true,
+              'managed_test': true,
+              'build_runner': true,
+            },
+            platforms: ['ubuntu', 'macos'],
+          )..['secrets'] = {'API_KEY': 'MY_SECRET'},
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        // Must parse as valid YAML
+        final parsed = loadYaml(rendered) as YamlMap;
+        final jobs = parsed['jobs'] as YamlMap;
+        expect(jobs.containsKey('pre-check'), isTrue);
+        expect(jobs.containsKey('auto-format'), isTrue);
+        expect(jobs.containsKey('analyze'), isTrue);
+        expect(jobs.containsKey('test'), isTrue);
+        expect(jobs.containsKey('web-test'), isTrue);
+        // web-test should have Chrome setup
+        final webTestSteps = (jobs['web-test']['steps'] as YamlList).toList();
+        final chromeStep = webTestSteps.firstWhere(
+          (s) => s is YamlMap && s['name'] == 'Setup Chrome',
+          orElse: () => null,
+        );
+        expect(chromeStep, isNotNull);
+      });
+
+      test('no features enabled (all false) renders minimal valid YAML', () {
+        final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
+        final rendered = gen.render();
+        final parsed = loadYaml(rendered) as YamlMap;
+        final jobs = parsed['jobs'] as YamlMap;
+        expect(jobs.containsKey('pre-check'), isTrue);
+        expect(jobs.containsKey('analyze-and-test'), isTrue);
+        expect(jobs.containsKey('auto-format'), isFalse);
+        expect(jobs.containsKey('web-test'), isFalse);
+        // Should NOT contain feature-gated content
+        expect(rendered, isNot(contains('Install protoc')));
+        expect(rendered, isNot(contains('lfs: true')));
+        expect(rendered, isNot(contains('auto-format')));
+        expect(rendered, isNot(contains('Run build_runner')));
+      });
+
+      test('sub_packages render in single-platform job', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig()
+            ..['sub_packages'] = [
+              {'name': 'core', 'path': 'packages/core'},
+              {'name': 'api', 'path': 'packages/api'},
+            ],
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        expect(rendered, contains('Analyze (core)'));
+        expect(rendered, contains('Analyze (api)'));
+        expect(rendered, contains('working-directory: packages/core'));
+        expect(rendered, contains('working-directory: packages/api'));
+      });
+
+      test('runner_overrides change runs-on in single-platform', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig()..['runner_overrides'] = {'ubuntu': 'my-custom-runner'},
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        final parsed = loadYaml(rendered) as YamlMap;
+        final job = parsed['jobs']['analyze-and-test'] as YamlMap;
+        expect(job['runs-on'], equals('my-custom-runner'));
+      });
+
+      test('artifact retention-days policy applied consistently (7 days)', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(featureOverrides: {'managed_test': true}),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        expect(rendered, contains('retention-days: 7'));
+        expect(rendered, contains('Policy: test artifact retention-days = 7'));
+      });
+
+      test('artifact retention-days can be overridden via ci.artifact_retention_days', () {
+        final ci = _minimalValidConfig(featureOverrides: {'managed_test': true});
+        ci['artifact_retention_days'] = 14;
+        final gen = WorkflowGenerator(ciConfig: ci, toolingVersion: '0.0.0-test');
+        final rendered = gen.render();
+        expect(rendered, contains('retention-days: 14'));
+        expect(rendered, contains('Policy: test artifact retention-days = 14'));
+      });
+
+      test('Windows pub-cache path uses format for Dart default (%LOCALAPPDATA%\\Pub\\Cache)', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(platforms: ['windows']),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        expect(rendered, contains('Pub'));
+        expect(rendered, contains('Cache'));
+        expect(rendered, contains('env.LOCALAPPDATA'));
+        expect(rendered, contains("'~/.pub-cache'"));
+        expect(rendered, contains("runner.os == 'Windows'"));
+      });
     });
   });
 }

@@ -1,6 +1,5 @@
 // ignore_for_file: avoid_print
 
-import 'dart:async';
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
@@ -10,6 +9,7 @@ import '../../triage/utils/config.dart' show kConfigFileName;
 import '../manage_cicd_cli.dart';
 import '../options/update_all_options.dart';
 import '../utils/logger.dart';
+import '../utils/process_runner.dart';
 
 /// Batch-update all packages under a root directory.
 ///
@@ -235,11 +235,14 @@ class UpdateAllCommand extends Command<void> {
         execArgs = ['run', 'runtime_ci_tooling:manage_cicd', ...args];
       }
 
-      final result = await Process.run(
+      final result = await CiProcessRunner.runWithTimeout(
         executable,
         execArgs,
         workingDirectory: pkg.path,
-      ).timeout(const Duration(minutes: 5), onTimeout: () => ProcessResult(0, 124, '', 'Timed out after 5 minutes'));
+        timeout: const Duration(minutes: 5),
+        timeoutExitCode: 124,
+        timeoutMessage: 'Timed out after 5 minutes',
+      );
 
       sw.stop();
 

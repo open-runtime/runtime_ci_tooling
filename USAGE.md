@@ -141,7 +141,7 @@ dart run runtime_ci_tooling:manage_cicd init
 4. Creates `.runtime_ci/config.json` with detected values (skipped if already present)
 5. Creates `.runtime_ci/autodoc.json` from `lib/src/` directory structure (skipped if already present)
 6. Creates a starter `CHANGELOG.md` if none exists
-7. Installs `.git/hooks/pre-commit` to auto-format staged `lib/` Dart files before every commit
+7. Installs `.git/hooks/pre-commit` to auto-format staged Dart files under `lib/` before every commit
 8. Adds `.runtime_ci/runs/` to `.gitignore`
 9. Prints a summary of all actions taken and suggested next steps
 
@@ -501,14 +501,20 @@ dart run runtime_ci_tooling:manage_cicd create-release \
 
 ### test
 
-Run `dart test` excluding GCP-tagged tests.
+Run `dart test` with enhanced output capture and job summary.
 
 ```bash
 dart run runtime_ci_tooling:manage_cicd test
 ```
 
-Runs `dart test --exclude-tags gcp`, parses output for pass/fail/skip counts,
-and writes a GitHub Actions step summary.
+**Enhanced managed test behavior (when `ci.features.managed_test=true`):**
+- Excludes `gcp` and `integration` tags via `--exclude-tags gcp,integration`
+- Uses JSON and expanded file reporters for full output capture (including `print()`, isolate output, FFI)
+- Writes logs to `$TEST_LOG_DIR` (CI) or `.dart_tool/test-logs/` (local)
+- Generates a rich GitHub Actions step summary with pass/fail/skip counts and failure details
+- Runs tests in sub-packages (from `ci.sub_packages`) with `pub get` per package
+
+When `ci.features.managed_test=false`, CI falls back to plain `dart test` with no enhanced capture/reporting.
 
 ---
 
@@ -1243,16 +1249,24 @@ final exists = await commandExists('git');
 
 **Jobs:**
 1. `pre-check` — Skip bot commits (author `github-actions[bot]` or `[skip ci]`)
-2. Optional `auto-format` — If `ci.features.format_check=true`, auto-format `lib/` and push `bot(format)` commit
+2. Optional `auto-format` — If `ci.features.format_check=true`, runs `dart format --line-length <N> .`, stages tracked `*.dart` updates, and pushes a `bot(format)` commit
 3. **Single-platform mode** (default, `ci.platforms` missing or 1 entry):
    - `analyze-and-test` — Verify protos, run analysis, run tests
 4. **Multi-platform mode** (`ci.platforms` has 2+ entries):
    - `analyze` — Run analysis once (Ubuntu)
    - `test` — Run tests as a matrix across OS+arch (`x64` + `arm64`)
+5. Optional `web-test` — If `ci.features.web_test=true`, runs `dart test -p chrome` in a standalone Ubuntu job with deterministic Chrome provisioning via SHA-pinned `browser-actions/setup-chrome@v2.1.1` and a Linux-only AppArmor/userns compatibility step for Chrome sandbox startup on Ubuntu 23.10+/24.04
 
 **Platform matrix configuration:**
 - `ci.platforms`: list of platform IDs (e.g. `["ubuntu-x64","ubuntu-arm64","macos-arm64","macos-x64","windows-x64","windows-arm64"]`)
 - `ci.runner_overrides`: optional map to point platform IDs at custom `runs-on` labels (e.g. org-managed GitHub-hosted runners)
+
+**Optional features:**
+- `ci.features.build_runner`: When `true`, runs `dart run build_runner build --delete-conflicting-outputs` before analyze, test, and web-test steps to regenerate `.g.dart` codegen files
+- `ci.features.web_test`: When `true`, adds a `web-test` job that provisions Chrome via SHA-pinned `browser-actions/setup-chrome@v2.1.1`, applies a Linux-only AppArmor/userns compatibility step, and runs `dart test -p chrome`. Configure via `ci.web_test`:
+  - `concurrency` (1–32, default `1`): parallel test shards
+  - `paths`: list of relative repo paths (e.g. `["test/web/"]`): paths are normalized, shell-quoted, and validated (no traversal, no shell metacharacters). Empty list = run all tests
+- `ci.artifact_retention_days`: Optional retention period for uploaded test artifacts (1–90, default `7`)
 
 **Key steps:**
 ```yaml

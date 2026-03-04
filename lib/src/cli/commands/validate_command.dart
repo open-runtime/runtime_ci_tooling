@@ -8,6 +8,7 @@ import '../../triage/utils/config.dart';
 import '../utils/ci_constants.dart';
 import '../utils/logger.dart';
 import '../utils/repo_utils.dart';
+import '../utils/workflow_generator.dart';
 
 /// Validate all configuration files.
 class ValidateCommand extends Command<void> {
@@ -86,6 +87,29 @@ class ValidateCommand extends Command<void> {
           allValid = false;
         }
       }
+    }
+
+    Logger.info('');
+    Logger.info('Checking semantic CI config...');
+    try {
+      final ciConfig = WorkflowGenerator.loadCiConfig(repoRoot);
+      if (ciConfig == null) {
+        Logger.info('No .runtime_ci/config.json ci section found — skipping semantic CI validation');
+      } else {
+        final ciErrors = WorkflowGenerator.validate(ciConfig);
+        if (ciErrors.isEmpty) {
+          Logger.success('Valid CI config semantics: .runtime_ci/config.json#ci');
+        } else {
+          Logger.error('Invalid CI config semantics: .runtime_ci/config.json#ci');
+          for (final err in ciErrors) {
+            Logger.error('  - $err');
+          }
+          allValid = false;
+        }
+      }
+    } on StateError catch (e) {
+      Logger.error('$e');
+      allValid = false;
     }
 
     // Validate Stage 1 artifacts

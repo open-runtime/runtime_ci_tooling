@@ -52,7 +52,31 @@ const Set<String> _knownFeatureKeys = {
   'managed_analyze',
   'managed_test',
   'build_runner',
+  'web_test',
 };
+
+const Set<String> _knownWebTestKeys = {'concurrency', 'paths'};
+
+/// Safe identifier for env vars and GitHub secrets (e.g. API_KEY, GITHUB_TOKEN).
+/// Must start with uppercase letter, then uppercase letters, digits, underscores only.
+bool _isSafeSecretIdentifier(String s) {
+  return RegExp(r'^[A-Z][A-Z0-9_]*$').hasMatch(s);
+}
+
+/// Runner label must not contain newlines, control chars, or YAML-injection chars.
+/// Allows alphanumeric, underscore, hyphen, dot (e.g. ubuntu-latest, runtime-ubuntu-24.04-x64).
+bool _isSafeRunnerLabel(String s) {
+  if (s.contains(RegExp(r'[\r\n\t\x00-\x1f]'))) return false;
+  if (RegExp('[{}:\[\]#@|>&*"\'\\\$]').hasMatch(s)) return false;
+  return RegExp(r'^[A-Za-z0-9_.-]+$').hasMatch(s);
+}
+
+/// Sub-package names are rendered into YAML and shell-facing messages.
+/// Keep them to a conservative character set.
+bool _isSafeSubPackageName(String s) {
+  if (s.contains(RegExp(r'[\r\n\t\x00-\x1f]'))) return false;
+  return RegExp(r'^[A-Za-z0-9_.-]+$').hasMatch(s);
+}
 
 /// Renders CI workflow YAML from a Mustache skeleton template and config.json.
 ///
@@ -69,6 +93,45 @@ class WorkflowGenerator {
   final String toolingVersion;
 
   WorkflowGenerator({required this.ciConfig, required this.toolingVersion});
+
+  /// Validates a single sub-package entry. Returns null if valid, otherwise error message.
+  /// Mutates [seenNames] and [seenPaths] only when valid. Used by [SubPackageUtils.loadSubPackages].
+  static String? validateSubPackageEntry(Map<String, dynamic> sp, Set<String> seenNames, Set<String> seenPaths) {
+    final name = sp['name'];
+    final pathValue = sp['path'];
+
+    if (name is! String || name.trim().isEmpty) return 'name must be a non-empty string';
+    if (name != name.trim()) return 'name must not have leading/trailing whitespace';
+    if (!_isSafeSubPackageName(name)) return 'name contains unsupported characters: "$name"';
+
+    if (pathValue is! String || pathValue.trim().isEmpty) return 'path must be a non-empty string';
+    if (pathValue != pathValue.trim()) return 'path must not have leading/trailing whitespace';
+    if (pathValue.contains(RegExp(r'[\r\n\t]'))) return 'path must not contain newlines/tabs';
+    if (p.isAbsolute(pathValue) || pathValue.startsWith('~')) {
+      return 'path must be a relative repo path';
+    }
+    if (pathValue.contains('\\')) return 'path must use forward slashes (/)';
+    final normalized = p.posix.normalize(pathValue);
+    if (normalized.startsWith('..') || normalized.contains('/../')) {
+      return 'path must not traverse outside the repo';
+    }
+    if (normalized == '.') return 'path must not be repo root (".")';
+    if (normalized.startsWith('-')) {
+      return 'path must not start with "-" (reserved for CLI options)';
+    }
+    if (RegExp(r'[^A-Za-z0-9_./-]').hasMatch(pathValue)) {
+      return 'path contains unsupported characters: "$pathValue"';
+    }
+    if (!seenNames.add(name)) return 'duplicate name "$name"';
+    if (!seenPaths.add(normalized)) return 'duplicate path "$normalized"';
+    return null;
+  }
+
+  /// Returns the web_test config map if present and valid; otherwise null.
+  static Map<String, dynamic>? _getWebTestConfig(Map<String, dynamic> ciConfig) {
+    final raw = ciConfig['web_test'];
+    return raw is Map<String, dynamic> ? raw : null;
+  }
 
   /// Load the CI config section from a repo's config.json.
   ///
@@ -95,7 +158,15 @@ class WorkflowGenerator {
   /// Render the CI workflow from the skeleton template.
   ///
   /// If [existingContent] is provided, user sections are preserved from it.
+  ///
+  /// Throws [StateError] if the config is invalid. Always validates before
+  /// rendering to prevent interpolation of unsafe values into shell commands.
   String render({String? existingContent}) {
+    final errors = validate(ciConfig);
+    if (errors.isNotEmpty) {
+      throw StateError('Cannot render with invalid config:\n  ${errors.join('\n  ')}');
+    }
+
     final skeletonPath = TemplateResolver.resolveTemplatePath('github/workflows/ci.skeleton.yaml');
     final skeletonFile = File(skeletonPath);
     if (!skeletonFile.existsSync()) {
@@ -165,9 +236,12 @@ class WorkflowGenerator {
 
     return {
       'tooling_version': toolingVersion,
-      'dart_sdk': ciConfig['dart_sdk'] ?? '3.9.2',
-      'line_length': '${ciConfig['line_length'] ?? 120}',
+      'dart_sdk': ciConfig['dart_sdk'] as String,
+      'line_length': _resolveLineLength(ciConfig['line_length']),
       'pat_secret': ciConfig['personal_access_token_secret'] as String? ?? 'GITHUB_TOKEN',
+
+      // Artifact retention defaults to 7 days unless explicitly configured.
+      'artifact_retention_days': _resolveArtifactRetentionDays(ciConfig['artifact_retention_days']),
 
       // Feature flags
       'proto': features['proto'] == true,
@@ -177,6 +251,12 @@ class WorkflowGenerator {
       'managed_analyze': features['managed_analyze'] == true,
       'managed_test': features['managed_test'] == true,
       'build_runner': features['build_runner'] == true,
+      'web_test': features['web_test'] == true,
+
+      // Web test config (only computed when web_test is true)
+      'web_test_concurrency': features['web_test'] == true ? _resolveWebTestConcurrency(ciConfig) : '1',
+      'web_test_paths': features['web_test'] == true ? _resolveWebTestPaths(ciConfig) : '',
+      'web_test_has_paths': features['web_test'] == true && _resolveWebTestHasPaths(ciConfig),
 
       // Secrets / env
       'has_secrets': secretsList.isNotEmpty,
@@ -186,15 +266,73 @@ class WorkflowGenerator {
       'sub_packages': subPackages
           .whereType<Map<String, dynamic>>()
           .where((sp) => sp['name'] != null && sp['path'] != null)
-          .map((sp) => {'name': sp['name'], 'path': sp['path']})
+          .map((sp) => {'name': (sp['name'] as String).trim(), 'path': (sp['path'] as String).trim()})
           .toList(),
 
       // Platform support
       'multi_platform': isMultiPlatform,
       'single_platform': !isMultiPlatform,
       'runner': isMultiPlatform ? '' : resolveRunner(platforms.first),
+      'single_platform_id': isMultiPlatform ? '' : platforms.first,
       'platform_matrix_json': json.encode(platformMatrix),
     };
+  }
+
+  static String _resolveWebTestConcurrency(Map<String, dynamic> ciConfig) {
+    final webTestConfig = _getWebTestConfig(ciConfig);
+    if (webTestConfig != null) {
+      final concurrency = webTestConfig['concurrency'];
+      if (concurrency is int && concurrency > 0 && concurrency <= 32) {
+        return '$concurrency';
+      }
+    }
+    return '1';
+  }
+
+  static String _resolveLineLength(dynamic raw) {
+    if (raw is int) return '$raw';
+    if (raw is String) {
+      final parsed = int.tryParse(raw.trim());
+      if (parsed != null) return '$parsed';
+    }
+    return '120';
+  }
+
+  static String _resolveArtifactRetentionDays(dynamic raw) {
+    if (raw is int && raw >= 1 && raw <= 90) return '$raw';
+    if (raw is String) {
+      final parsed = int.tryParse(raw.trim());
+      if (parsed != null && parsed >= 1 && parsed <= 90) return '$parsed';
+    }
+    return '7';
+  }
+
+  /// Shared filter: extracts valid, normalized web test paths from config.
+  static List<String> _filteredWebTestPaths(Map<String, dynamic> ciConfig) {
+    final webTestConfig = _getWebTestConfig(ciConfig);
+    if (webTestConfig != null) {
+      final paths = webTestConfig['paths'];
+      if (paths is List && paths.isNotEmpty) {
+        return paths.whereType<String>().where((s) => s.trim().isNotEmpty).map((s) => p.posix.normalize(s)).toList();
+      }
+    }
+    return const [];
+  }
+
+  static String _resolveWebTestPaths(Map<String, dynamic> ciConfig) {
+    final filtered = _filteredWebTestPaths(ciConfig);
+    if (filtered.isEmpty) return '';
+    // Shell-quote each path for defense-in-depth (validation already blocks
+    // dangerous characters, but quoting prevents breakage from future changes).
+    return filtered.map(_shellQuote).join(' ');
+  }
+
+  static String _shellQuote(String value) {
+    return "'${value.replaceAll("'", "'\"'\"'")}'";
+  }
+
+  static bool _resolveWebTestHasPaths(Map<String, dynamic> ciConfig) {
+    return _filteredWebTestPaths(ciConfig).isNotEmpty;
   }
 
   /// Extract user sections from the existing file and re-insert them
@@ -284,14 +422,77 @@ class WorkflowGenerator {
     final secrets = ciConfig['secrets'];
     if (secrets != null && secrets is! Map) {
       errors.add('ci.secrets must be an object, got ${secrets.runtimeType}');
+    } else if (secrets is Map) {
+      for (final entry in secrets.entries) {
+        final key = entry.key;
+        final value = entry.value;
+        if (key is! String) {
+          errors.add('ci.secrets keys must be strings, got ${key.runtimeType}');
+          continue;
+        }
+        if (!_isSafeSecretIdentifier(key)) {
+          errors.add('ci.secrets key "$key" must be a safe identifier (e.g. API_KEY, GITHUB_TOKEN)');
+        }
+        if (value is String) {
+          if (!_isSafeSecretIdentifier(value)) {
+            errors.add('ci.secrets["$key"] value "$value" must be a safe secret name (e.g. MY_SECRET)');
+          }
+        }
+      }
     }
     final pat = ciConfig['personal_access_token_secret'];
     if (pat != null && (pat is! String || pat.isEmpty)) {
       errors.add('ci.personal_access_token_secret must be a non-empty string');
+    } else if (pat is String && !_isSafeSecretIdentifier(pat)) {
+      errors.add('ci.personal_access_token_secret "$pat" must be a safe identifier (e.g. GITHUB_TOKEN)');
     }
     final lineLength = ciConfig['line_length'];
     if (lineLength != null && lineLength is! int && lineLength is! String) {
       errors.add('ci.line_length must be a number or string, got ${lineLength.runtimeType}');
+    } else if (lineLength is int) {
+      if (lineLength < 1 || lineLength > 10000) {
+        errors.add('ci.line_length must be between 1 and 10000, got $lineLength');
+      }
+    } else if (lineLength is String) {
+      final trimmed = lineLength.trim();
+      if (trimmed.isEmpty) {
+        errors.add('ci.line_length string must not be empty or whitespace-only');
+      } else if (trimmed != lineLength) {
+        errors.add('ci.line_length must not have leading/trailing whitespace');
+      } else if (lineLength.contains(RegExp(r'[\r\n\t\x00-\x1f]'))) {
+        errors.add('ci.line_length must not contain newlines or control characters');
+      } else if (!RegExp(r'^\d+$').hasMatch(lineLength)) {
+        errors.add('ci.line_length string must be digits only (e.g. 120), got "$lineLength"');
+      } else {
+        final parsed = int.parse(lineLength);
+        if (parsed < 1 || parsed > 10000) {
+          errors.add('ci.line_length must be between 1 and 10000, got $lineLength');
+        }
+      }
+    }
+    final artifactRetention = ciConfig['artifact_retention_days'];
+    if (artifactRetention != null && artifactRetention is! int && artifactRetention is! String) {
+      errors.add('ci.artifact_retention_days must be a number or string, got ${artifactRetention.runtimeType}');
+    } else if (artifactRetention is int) {
+      if (artifactRetention < 1 || artifactRetention > 90) {
+        errors.add('ci.artifact_retention_days must be between 1 and 90, got $artifactRetention');
+      }
+    } else if (artifactRetention is String) {
+      final trimmed = artifactRetention.trim();
+      if (trimmed.isEmpty) {
+        errors.add('ci.artifact_retention_days string must not be empty or whitespace-only');
+      } else if (trimmed != artifactRetention) {
+        errors.add('ci.artifact_retention_days must not have leading/trailing whitespace');
+      } else if (artifactRetention.contains(RegExp(r'[\r\n\t\x00-\x1f]'))) {
+        errors.add('ci.artifact_retention_days must not contain newlines or control characters');
+      } else if (!RegExp(r'^\d+$').hasMatch(artifactRetention)) {
+        errors.add('ci.artifact_retention_days string must be digits only (e.g. 7), got "$artifactRetention"');
+      } else {
+        final parsed = int.parse(artifactRetention);
+        if (parsed < 1 || parsed > 90) {
+          errors.add('ci.artifact_retention_days must be between 1 and 90, got $artifactRetention');
+        }
+      }
     }
     final platforms = ciConfig['platforms'];
     if (platforms != null) {
@@ -327,6 +528,10 @@ class WorkflowGenerator {
           final pathValue = sp['path'];
           if (name is! String || name.trim().isEmpty) {
             errors.add('ci.sub_packages[].name must be a non-empty string');
+          } else if (name != name.trim()) {
+            errors.add('ci.sub_packages[].name must not have leading/trailing whitespace');
+          } else if (!_isSafeSubPackageName(name)) {
+            errors.add('ci.sub_packages[].name contains unsupported characters: "$name"');
           } else if (!seenNames.add(name)) {
             errors.add('ci.sub_packages contains duplicate name "$name"');
           }
@@ -355,6 +560,16 @@ class WorkflowGenerator {
           final normalized = p.posix.normalize(pathValue);
           if (normalized.startsWith('..') || normalized.contains('/../')) {
             errors.add('ci.sub_packages["${name is String ? name : '?'}"].path must not traverse outside the repo');
+            continue;
+          }
+          if (normalized == '.') {
+            errors.add('ci.sub_packages["${name is String ? name : '?'}"].path must not be repo root (".")');
+            continue;
+          }
+          if (normalized.startsWith('-')) {
+            errors.add(
+              'ci.sub_packages["${name is String ? name : '?'}"].path must not start with "-" (reserved for CLI options)',
+            );
             continue;
           }
           if (RegExp(r'[^A-Za-z0-9_./-]').hasMatch(pathValue)) {
@@ -387,10 +602,100 @@ class WorkflowGenerator {
           }
           if (value is! String || value.trim().isEmpty) {
             errors.add('ci.runner_overrides["$key"] must be a non-empty string');
+          } else if (value != value.trim()) {
+            errors.add('ci.runner_overrides["$key"] must not have leading/trailing whitespace');
+          } else if (!_isSafeRunnerLabel(value.trim())) {
+            errors.add('ci.runner_overrides["$key"] must not contain newlines, control chars, or unsafe YAML chars');
           }
         }
       }
     }
+
+    final webTestConfig = ciConfig['web_test'];
+    if (webTestConfig != null) {
+      if (webTestConfig is! Map) {
+        errors.add('ci.web_test must be an object, got ${webTestConfig.runtimeType}');
+      } else {
+        // Detect unknown keys inside web_test config
+        for (final key in webTestConfig.keys) {
+          if (key is String && !_knownWebTestKeys.contains(key)) {
+            errors.add('ci.web_test contains unknown key "$key" (typo?)');
+          }
+        }
+
+        final concurrency = webTestConfig['concurrency'];
+        if (concurrency != null) {
+          if (concurrency is! int) {
+            errors.add('ci.web_test.concurrency must be an integer, got ${concurrency.runtimeType}');
+          } else if (concurrency < 1 || concurrency > 32) {
+            errors.add('ci.web_test.concurrency must be between 1 and 32, got $concurrency');
+          }
+        }
+
+        final paths = webTestConfig['paths'];
+        if (paths != null) {
+          if (paths is! List) {
+            errors.add('ci.web_test.paths must be an array, got ${paths.runtimeType}');
+          } else {
+            final seenPaths = <String>{};
+            for (var i = 0; i < paths.length; i++) {
+              final pathValue = paths[i];
+              if (pathValue is! String || pathValue.trim().isEmpty) {
+                errors.add('ci.web_test.paths[$i] must be a non-empty string');
+                continue;
+              }
+              if (pathValue != pathValue.trim()) {
+                errors.add('ci.web_test.paths[$i] must not have leading/trailing whitespace');
+                continue;
+              }
+              if (pathValue.contains(RegExp(r'[\r\n\t]'))) {
+                errors.add('ci.web_test.paths[$i] must not contain newlines/tabs');
+                continue;
+              }
+              if (p.isAbsolute(pathValue) || pathValue.startsWith('~')) {
+                errors.add('ci.web_test.paths[$i] must be a relative repo path');
+                continue;
+              }
+              if (pathValue.contains('\\')) {
+                errors.add('ci.web_test.paths[$i] must use forward slashes (/)');
+                continue;
+              }
+              final normalized = p.posix.normalize(pathValue);
+              if (normalized.startsWith('..') || normalized.contains('/../')) {
+                errors.add('ci.web_test.paths[$i] must not traverse outside the repo');
+                continue;
+              }
+              if (normalized == '.') {
+                errors.add('ci.web_test.paths[$i] must not be repo root (".")');
+                continue;
+              }
+              if (normalized.startsWith('-')) {
+                errors.add('ci.web_test.paths[$i] must not start with "-" (reserved for CLI options)');
+                continue;
+              }
+              if (RegExp(r'[^A-Za-z0-9_./-]').hasMatch(pathValue)) {
+                errors.add('ci.web_test.paths[$i] contains unsupported characters: "$pathValue"');
+                continue;
+              }
+              if (!seenPaths.add(normalized)) {
+                errors.add('ci.web_test.paths contains duplicate path "$normalized"');
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Cross-validate: both mismatch directions
+    // Direction 1: config present but feature disabled (below)
+    // Direction 2: feature enabled but config wrong type — handled by web_test block above
+    if (features is Map) {
+      final webTestEnabled = features['web_test'] == true;
+      if (!webTestEnabled && webTestConfig is Map && webTestConfig.isNotEmpty) {
+        errors.add('ci.web_test config is present but ci.features.web_test is not enabled (dead config?)');
+      }
+    }
+
     return errors;
   }
 
@@ -405,12 +710,21 @@ class WorkflowGenerator {
     Logger.info('  Dart SDK: ${ciConfig['dart_sdk']}');
     Logger.info('  PAT secret: ${ciConfig['personal_access_token_secret']}');
     Logger.info('  Platforms: ${platforms.join(', ')}');
+    Logger.info('  Artifact retention days: ${_resolveArtifactRetentionDays(ciConfig['artifact_retention_days'])}');
 
     final enabledFeatures = features.entries.where((e) => e.value == true).map((e) => e.key).toList();
     if (enabledFeatures.isNotEmpty) {
       Logger.info('  Features: ${enabledFeatures.join(', ')}');
     } else {
       Logger.info('  Features: (none)');
+    }
+
+    if (features['web_test'] == true) {
+      final wtConfig = ciConfig['web_test'];
+      final wtMap = wtConfig is Map<String, dynamic> ? wtConfig : <String, dynamic>{};
+      final concurrency = wtMap['concurrency'] is int ? wtMap['concurrency'] : 1;
+      final webPaths = wtMap['paths'] is List ? wtMap['paths'] as List : [];
+      Logger.info('  Web test: concurrency=$concurrency, paths=${webPaths.isEmpty ? "(all)" : webPaths.join(", ")}');
     }
 
     if (secrets.isNotEmpty) {

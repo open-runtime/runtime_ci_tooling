@@ -134,6 +134,7 @@ class InitCommand extends Command<void> {
           'dart_sdk': '3.9.2',
           'personal_access_token_secret': 'GITHUB_TOKEN',
           'line_length': 120,
+          'artifact_retention_days': 7,
           'features': {
             'proto': false,
             'lfs': false,
@@ -141,6 +142,8 @@ class InitCommand extends Command<void> {
             'analysis_cache': true,
             'managed_analyze': true,
             'managed_test': true,
+            'build_runner': false,
+            'web_test': false,
           },
           'secrets': {},
           'sub_packages': [],

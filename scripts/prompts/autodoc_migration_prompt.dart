@@ -9,9 +9,7 @@ import 'dart:io';
 
 void main(List<String> args) {
   if (args.length < 2) {
-    stderr.writeln(
-      'Usage: autodoc_migration_prompt.dart <module_name> <source_dir> [prev_hash]',
-    );
+    stderr.writeln('Usage: autodoc_migration_prompt.dart <module_name> <source_dir> [prev_hash]');
     exit(1);
   }
 
@@ -22,24 +20,16 @@ void main(List<String> args) {
   // Get diff of Dart source files
   String sourceDiff;
   if (prevHash.isNotEmpty) {
-    sourceDiff = _truncate(
-      _runSync('git diff $prevHash..HEAD -- $sourceDir'),
-      30000,
-    );
+    sourceDiff = _truncate(_runSync('git diff $prevHash..HEAD -- $sourceDir'), 30000);
   } else {
     // No previous hash, show recent changes
-    sourceDiff = _truncate(
-      _runSync('git log --oneline -20 -- $sourceDir'),
-      5000,
-    );
+    sourceDiff = _truncate(_runSync('git log --oneline -20 -- $sourceDir'), 5000);
   }
 
   // Get list of changed files
   final changedFiles = prevHash.isNotEmpty
       ? _runSync('git diff --name-only $prevHash..HEAD -- $sourceDir')
-      : _runSync(
-          'git log --oneline --name-only -10 -- $sourceDir | grep ".dart"',
-        );
+      : _runSync('git log --oneline --name-only -10 -- $sourceDir | grep ".dart"');
 
   // Get added/removed classes, mixins, extensions, enums
   final addedDefinitions = prevHash.isNotEmpty
@@ -105,11 +95,7 @@ Generate the complete MIGRATION.md content.
 
 String _runSync(String command) {
   try {
-    final result = Process.runSync(
-      'sh',
-      ['-c', command],
-      workingDirectory: Directory.current.path,
-    );
+    final result = Process.runSync('sh', ['-c', command], workingDirectory: Directory.current.path);
     if (result.exitCode == 0) return (result.stdout as String).trim();
     return '';
   } catch (_) {

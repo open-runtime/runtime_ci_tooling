@@ -84,7 +84,7 @@ jobs:
       - name: Cache Dart pub dependencies
         uses: actions/cache@v5.0.3
         with:
-          path: ~/.pub-cache
+          path: ${{ runner.os == 'Windows' && format('{0}\\Pub\\Cache', env.LOCALAPPDATA) || '~/.pub-cache' }}
           key: ${{ runner.os }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
           restore-keys: ${{ runner.os }}-dart-pub-
 
@@ -158,7 +158,7 @@ jobs:
       - name: Cache Dart pub dependencies
         uses: actions/cache@v5.0.3
         with:
-          path: ~/.pub-cache
+          path: ${{ runner.os == 'Windows' && format('{0}\\Pub\\Cache', env.LOCALAPPDATA) || '~/.pub-cache' }}
           key: ${{ runner.os }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
           restore-keys: ${{ runner.os }}-dart-pub-
 
@@ -242,7 +242,7 @@ jobs:
       - name: Cache Dart pub dependencies
         uses: actions/cache@v5.0.3
         with:
-          path: ~/.pub-cache
+          path: ${{ runner.os == 'Windows' && format('{0}\\Pub\\Cache', env.LOCALAPPDATA) || '~/.pub-cache' }}
           key: ${{ runner.os }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
           restore-keys: ${{ runner.os }}-dart-pub-
 
@@ -333,7 +333,7 @@ jobs:
       - name: Cache Dart pub dependencies
         uses: actions/cache@v5.0.3
         with:
-          path: ~/.pub-cache
+          path: ${{ runner.os == 'Windows' && format('{0}\\Pub\\Cache', env.LOCALAPPDATA) || '~/.pub-cache' }}
           key: ${{ runner.os }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
           restore-keys: ${{ runner.os }}-dart-pub-
 
@@ -438,7 +438,7 @@ jobs:
       - name: Cache Dart pub
         uses: actions/cache@v5.0.3
         with:
-          path: ~/.pub-cache
+          path: ${{ runner.os == 'Windows' && format('{0}\\Pub\\Cache', env.LOCALAPPDATA) || '~/.pub-cache' }}
           key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
           restore-keys: ${{ runner.os }}-pub-
 
@@ -538,7 +538,7 @@ jobs:
       - name: Cache Dart pub dependencies
         uses: actions/cache@v5.0.3
         with:
-          path: ~/.pub-cache
+          path: ${{ runner.os == 'Windows' && format('{0}\\Pub\\Cache', env.LOCALAPPDATA) || '~/.pub-cache' }}
           key: ${{ runner.os }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
           restore-keys: ${{ runner.os }}-dart-pub-
 
@@ -679,7 +679,7 @@ jobs:
       - name: Cache Dart pub dependencies
         uses: actions/cache@v5.0.3
         with:
-          path: ~/.pub-cache
+          path: ${{ runner.os == 'Windows' && format('{0}\\Pub\\Cache', env.LOCALAPPDATA) || '~/.pub-cache' }}
           key: ${{ runner.os }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
           restore-keys: ${{ runner.os }}-dart-pub-
 
@@ -805,7 +805,7 @@ jobs:
       - name: Cache Dart pub dependencies
         uses: actions/cache@v5.0.3
         with:
-          path: ~/.pub-cache
+          path: ${{ runner.os == 'Windows' && format('{0}\\Pub\\Cache', env.LOCALAPPDATA) || '~/.pub-cache' }}
           key: ${{ runner.os }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
           restore-keys: ${{ runner.os }}-dart-pub-
 
