@@ -17,8 +17,8 @@
         "quickstart",
         "api_reference"
       ],
-      "hash": "76df361b9a4a6b822f028cdbbea49f7a8a661cdf93d9cec3381eea8fe98e01a0",
-      "last_updated": "2026-03-03T22:17:24.601764Z"
+      "hash": "125efd04f8f781ba540fd34f2ae8908f2d49bc7debfedc88e9ae9e087564a147",
+      "last_updated": "2026-03-04T15:57:32.693766Z"
     },
     {
       "id": "prompts",
@@ -50,8 +50,8 @@
         "quickstart",
         "api_reference"
       ],
-      "hash": "02523298d4cc67d929288f86b85f5cd61390d878f1821ed64926a4dbebc0a02f",
-      "last_updated": "2026-02-24T22:23:29.777148Z"
+      "hash": "14a102f7065f7892fe0cf943918faf999bfd4008d590b05fa910ff844dcd8f00",
+      "last_updated": "2026-03-04T15:57:32.702206Z"
     },
     {
       "id": "utils",

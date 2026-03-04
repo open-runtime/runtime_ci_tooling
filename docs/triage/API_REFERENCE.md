@@ -1,758 +1,438 @@
-# Issue Triage Engine API Reference
+# Issue Triage Engine - API Reference
 
-This documentation covers the classes, enums, and functions used by the Issue Triage Engine module.
+This document covers the models, enums, configuration, and phases of the Issue Triage Engine.
 
 ## 1. Classes
 
-### `TriageAction`
-A concrete action to take on a GitHub issue.
-- **Fields**:
-  - `type` (`ActionType`): The type of action to take.
-  - `description` (`String`): Description of the action.
-  - `parameters` (`Map<String, dynamic>`): Action-specific parameters.
-  - `executed` (`bool`): Tracks if the action was executed.
-  - `verified` (`bool`): Tracks if the action was verified successfully.
-  - `error` (`String?`): Any error that occurred during execution.
-- **Methods**:
-  - `toJson()`: Converts the instance to a JSON map.
-- **Constructors**:
-  - `TriageAction({required ActionType type, required String description, Map<String, dynamic> parameters = const {}, bool executed = false, bool verified = false, String? error})`
-  - `TriageAction.fromJson(Map<String, dynamic> json)`: Factory constructor.
-- **Example**:
-  ```dart
-  import 'package:runtime_ci_tooling/src/triage/models/triage_decision.dart';
-
-  final action = TriageAction(
-    type: ActionType.label,
-    description: 'Apply needs-investigation label',
-    parameters: {'labels': ['needs-investigation']},
-  )
-    ..executed = false
-    ..verified = false;
-  ```
-
-### `TriageDecision`
-The aggregated triage decision for a single issue.
-- **Fields**:
-  - `issueNumber` (`int`): The GitHub issue number.
-  - `aggregateConfidence` (`double`): Overall confidence score for the decision.
-  - `riskLevel` (`RiskLevel`): Associated risk level based on confidence.
-  - `rationale` (`String`): Explanation of the decision.
-  - `actions` (`List<TriageAction>`): Concrete actions recommended for the issue.
-  - `investigationResults` (`List<InvestigationResult>`): Results from the triage agents.
-- **Methods**:
-  - `toJson()`: Converts the instance to a JSON map.
-- **Constructors**:
-  - `TriageDecision({required int issueNumber, required double aggregateConfidence, required RiskLevel riskLevel, required String rationale, required List<TriageAction> actions, List<InvestigationResult> investigationResults = const []})`
-  - `TriageDecision.fromJson(Map<String, dynamic> json)`: Factory constructor.
-  - `TriageDecision.fromResults({required int issueNumber, required List<InvestigationResult> results})`: Factory constructor that aggregates agent results.
-- **Example**:
-  ```dart
-  import 'package:runtime_ci_tooling/src/triage/models/triage_decision.dart';
-
-  final decision = TriageDecision(
-    issueNumber: 42,
-    aggregateConfidence: 0.85,
-    riskLevel: RiskLevel.medium,
-    rationale: 'Multiple agents confirmed the fix.',
-    actions: [
-      TriageAction(
-        type: ActionType.comment,
-        description: 'Post findings comment',
-      )
-    ],
-  );
-  ```
-
-### `TriageTask`
-A single investigation or action task within the game plan.
-- **Fields**:
-  - `id` (`String`): Unique identifier for the task.
-  - `agent` (`AgentType`): The agent assigned to the task.
-  - `status` (`TaskStatus`): Current execution status.
-  - `error` (`String?`): Error encountered during task execution.
-  - `result` (`Map<String, dynamic>?`): Unstructured output result of the task.
-- **Methods**:
-  - `toJson()`: Converts the instance to a JSON map.
-- **Constructors**:
-  - `TriageTask({required String id, required AgentType agent, TaskStatus status = TaskStatus.pending, String? error, Map<String, dynamic>? result})`
-  - `TriageTask.fromJson(Map<String, dynamic> json)`: Factory constructor.
-- **Example**:
-  ```dart
-  import 'package:runtime_ci_tooling/src/triage/models/game_plan.dart';
-
-  final task = TriageTask(
-    id: 'issue-42-code',
-    agent: AgentType.codeAnalysis,
-  )
-    ..status = TaskStatus.running
-    ..error = null
-    ..result = {'confidence': 0.9};
-  ```
-
-### `IssuePlan`
-The triage plan for a single GitHub issue.
-- **Fields**:
-  - `number` (`int`): The GitHub issue number.
-  - `title` (`String`): The issue title.
-  - `author` (`String`): The issue author username.
-  - `existingLabels` (`List<String>`): Labels already applied to the issue.
-  - `tasks` (`List<TriageTask>`): The agent tasks planned for this issue.
-  - `decision` (`Map<String, dynamic>?`): The finalized triage decision map.
-  - `investigationComplete` (`bool`): Getter indicating if all tasks are complete or failed.
-- **Methods**:
-  - `toJson()`: Converts the instance to a JSON map.
-- **Constructors**:
-  - `IssuePlan({required int number, required String title, required String author, List<String> existingLabels = const [], required List<TriageTask> tasks, Map<String, dynamic>? decision})`
-  - `IssuePlan.fromJson(Map<String, dynamic> json)`: Factory constructor.
-- **Example**:
-  ```dart
-  import 'package:runtime_ci_tooling/src/triage/models/game_plan.dart';
-
-  final issuePlan = IssuePlan(
-    number: 42,
-    title: 'Bug in authentication',
-    author: 'johndoe',
-    existingLabels: ['bug'],
-    tasks: [
-      TriageTask(id: 'task-1', agent: AgentType.codeAnalysis),
-    ],
-  )..decision = {'risk_level': 'low'};
-  ```
-
-### `LinkSpec`
-A link to create between two entities (issue, PR, changelog, release notes).
-- **Fields**:
-  - `sourceType` (`String`): The entity source type (e.g., "issue", "pr").
-  - `sourceId` (`String`): The ID of the source entity.
-  - `targetType` (`String`): The entity target type.
-  - `targetId` (`String`): The ID of the target entity.
-  - `description` (`String`): Description of the relationship.
-  - `applied` (`bool`): Whether the link has been successfully applied.
-- **Methods**:
-  - `toJson()`: Converts the instance to a JSON map.
-- **Constructors**:
-  - `LinkSpec({required String sourceType, required String sourceId, required String targetType, required String targetId, required String description, bool applied = false})`
-  - `LinkSpec.fromJson(Map<String, dynamic> json)`: Factory constructor.
-- **Example**:
-  ```dart
-  import 'package:runtime_ci_tooling/src/triage/models/game_plan.dart';
-
-  final link = LinkSpec(
-    sourceType: 'issue',
-    sourceId: '42',
-    targetType: 'pr',
-    targetId: '43',
-    description: 'Related PR',
-  )..applied = true;
-  ```
-
-### `GamePlan`
-The top-level game plan that orchestrates the entire triage pipeline.
-- **Fields**:
-  - `planId` (`String`): Unique identifier for the game plan.
-  - `createdAt` (`DateTime`): Creation timestamp.
-  - `issues` (`List<IssuePlan>`): The list of individual issue plans.
-  - `linksToCreate` (`List<LinkSpec>`): Deferred cross-links to be applied.
-- **Methods**:
-  - `toJson()`: Converts the instance to a JSON map.
-  - `toJsonString()`: Returns pretty-printed JSON structure.
-- **Constructors**:
-  - `GamePlan({required String planId, required DateTime createdAt, required List<IssuePlan> issues, List<LinkSpec> linksToCreate = const []})`
-  - `GamePlan.fromJson(Map<String, dynamic> json)`: Factory constructor.
-  - `GamePlan.forIssues(List<Map<String, dynamic>> issueData)`: Factory constructor creating default tasks.
-- **Example**:
-  ```dart
-  import 'package:runtime_ci_tooling/src/triage/models/game_plan.dart';
-
-  final gamePlan = GamePlan(
-    planId: 'triage-123456789',
-    createdAt: DateTime.now(),
-    issues: [
-      IssuePlan(
-        number: 42,
-        title: 'Fix login issue',
-        author: 'janedoe',
-        tasks: [],
-      ),
-    ],
-  );
-  ```
-
-### `InvestigationResult`
-Data class for investigation agent results.
-- **Fields**:
-  - `agentId` (`String`): Identifier for the agent.
-  - `issueNumber` (`int`): GitHub issue number being investigated.
-  - `confidence` (`double`): Level of certainty calculated by the agent.
-  - `summary` (`String`): Description/summary of findings.
-  - `evidence` (`List<String>`): Points of evidence gathered.
-  - `recommendedLabels` (`List<String>`): Labels suggested by the agent.
-  - `suggestedComment` (`String?`): Optional comment text suggested.
-  - `suggestClose` (`bool`): Whether the agent recommends closing.
-  - `closeReason` (`String?`): Reason provided if suggestClose is true.
-  - `relatedEntities` (`List<RelatedEntity>`): Connected entities discovered.
-  - `turnsUsed` (`int`): Total conversational turns utilized.
-  - `toolCallsMade` (`int`): Total tool calls made during investigation.
-  - `durationMs` (`int`): Execution duration in milliseconds.
-- **Methods**:
-  - `toJson()`: Converts the instance to a JSON map.
-- **Constructors**:
-  - `InvestigationResult({required String agentId, required int issueNumber, required double confidence, required String summary, List<String> evidence = const [], List<String> recommendedLabels = const [], String? suggestedComment, bool suggestClose = false, String? closeReason, List<RelatedEntity> relatedEntities = const [], int turnsUsed = 0, int toolCallsMade = 0, int durationMs = 0})`
-  - `InvestigationResult.fromJson(Map<String, dynamic> json)`: Factory constructor.
-  - `InvestigationResult.failed({required String agentId, required int issueNumber, required String error})`: Factory constructor for failures.
-- **Example**:
-  ```dart
-  import 'package:runtime_ci_tooling/src/triage/models/investigation_result.dart';
-
-  final result = InvestigationResult(
-    agentId: 'code_analysis',
-    issueNumber: 42,
-    confidence: 0.95,
-    summary: 'Fix is clearly merged, tests pass.',
-    evidence: ['Found commit #abcd123'],
-    recommendedLabels: ['released'],
-    suggestClose: true,
-    closeReason: 'completed',
-    relatedEntities: [
-      RelatedEntity(
-        type: 'commit',
-        id: 'abcd123',
-        description: 'Fix login error',
-        relevance: 1.0,
-      ),
-    ],
-  );
-  ```
-
-### `RelatedEntity`
-A reference to a related entity (PR, issue, commit, file) found during investigation.
-- **Fields**:
-  - `type` (`String`): Entity type ("pr", "issue", "commit", "file").
-  - `id` (`String`): Entity identifier.
-  - `description` (`String`): Brief description.
-  - `relevance` (`double`): Relevance score (0.0 - 1.0).
-- **Methods**:
-  - `toJson()`: Converts the instance to a JSON map.
-- **Constructors**:
-  - `RelatedEntity({required String type, required String id, required String description, double relevance = 0.5})`
-  - `RelatedEntity.fromJson(Map<String, dynamic> json)`: Factory constructor.
-- **Example**:
-  ```dart
-  import 'package:runtime_ci_tooling/src/triage/models/investigation_result.dart';
-
-  final entity = RelatedEntity(
-    type: 'pr',
-    id: '100',
-    description: 'Adds missing auth header',
-    relevance: 0.85,
-  );
-  ```
-
-### `RunContext`
-Manages a run-scoped audit trail directory for CI/CD operations.
-- **Fields**:
-  - `repoRoot` (`String`): Repository root directory.
-  - `runDir` (`String`): Isolated directory for the context run.
-  - `command` (`String`): Executing command triggering the run.
-  - `startedAt` (`DateTime`): Launch timestamp.
-  - `args` (`List<String>`): Provided CLI arguments.
-  - `runId` (`String`): Getter fetching the run ID (directory name).
-- **Methods**:
-  - `subdir(String name)`: Gets or creates a subdirectory within the run directory.
-  - `savePrompt(String phase, String prompt)`: Saves a prompt sent to Gemini CLI.
-  - `saveResponse(String phase, String rawResponse)`: Saves Gemini CLI response.
-  - `saveArtifact(String phase, String filename, String content)`: Saves a structured artifact.
-  - `saveJsonArtifact(String phase, String filename, Map<String, dynamic> data)`: Saves a JSON artifact.
-  - `artifactPath(String phase, String filename)`: Gets the path for an artifact file.
-  - `readArtifact(String phase, String filename)`: Reads an artifact file.
-  - `hasArtifact(String phase, String filename)`: Checks if an artifact exists.
-  - `finalize({int? exitCode})`: Updates meta.json with completion info.
-  - `archiveForRelease(String version)`: Archives important artifacts to `cicd_audit`.
-- **Constructors**:
-  - `RunContext.create(String repoRoot, String command, {List<String> args = const []})`: Factory constructor.
-  - `RunContext.load(String repoRoot, String runDirPath)`: Factory constructor.
-- **Static Methods**:
-  - `findLatestRun(String repoRoot, {String? command})`: Finds the most recent run directory.
-  - `listRuns(String repoRoot)`: Lists all run directories.
-- **Example**:
-  ```dart
-  import 'package:runtime_ci_tooling/src/triage/utils/run_context.dart';
-
-  final context = RunContext.create('/path/to/repo', 'triage_cli', args: ['--auto']);
-  context.savePrompt('explore', 'Analyze this issue...');
-  context.saveResponse('explore', '{"confidence": 0.9}');
-  context.finalize(exitCode: 0);
-  ```
-
-### `ValidationResult`
-JSON validation utilities for triage pipeline artifacts.
-- **Fields**:
-  - `valid` (`bool`): Validation status.
-  - `path` (`String`): Evaluated file path.
-  - `errors` (`List<String>`): Encountered errors.
-- **Methods**:
-  - `toString()`: Prints valid/invalid string message representation.
-- **Constructors**:
-  - `ValidationResult({required bool valid, required String path, List<String> errors = const []})`
-- **Example**:
-  ```dart
-  import 'package:runtime_ci_tooling/src/triage/utils/json_schemas.dart';
-
-  final result = ValidationResult(
-    valid: false,
-    path: '/tmp/game_plan.json',
-    errors: ['Missing required keys: plan_id'],
-  );
-  print(result.toString()); // Invalid: /tmp/game_plan.json -- Missing required keys: plan_id
-  ```
-
-### `TriageConfig`
+### TriageConfig
 Centralized, config-driven loader for the runtime CI tooling pipeline.
-- **Fields & Getters**:
-  - `loadedFrom` (`String?`): Resolved path to loaded config file.
-  - `isConfigured` (`bool`): Whether this repo has opted into the CI tooling.
+- **Fields:**
+  - `loadedFrom` (`String?`): The resolved path to the config file that was loaded (null if defaults).
+  - `isConfigured` (`bool`): Whether this repo has opted into the CI tooling by having a config file.
   - `repoName` (`String`): Dart package name / GitHub repo name.
   - `repoOwner` (`String`): GitHub org or user.
-  - `triagedLabel` (`String`): Triage label string.
-  - `changelogPath` (`String`): Path to CHANGELOG.md.
-  - `releaseNotesPath` (`String`): Target directory for release notes.
-  - `gcpProject` (`String`): GCP project identifier.
-  - `sentryOrganization` (`String`): Associated Sentry org.
-  - `sentryProjects` (`List<String>`): Listed Sentry projects.
-  - `sentryScanOnPreRelease` (`bool`): Sentry scan flag.
-  - `sentryRecentErrorsHours` (`int`): Sentry error time span parameter.
-  - `preReleaseScanSentry` (`bool`): Feature flag.
-  - `preReleaseScanGithub` (`bool`): Feature flag.
-  - `postReleaseCloseOwnRepo` (`bool`): Feature flag.
-  - `postReleaseCloseCrossRepo` (`bool`): Feature flag.
-  - `postReleaseCommentCrossRepo` (`bool`): Feature flag.
-  - `postReleaseLinkSentry` (`bool`): Feature flag.
-  - `crossRepoEnabled` (`bool`): Feature flag.
-  - `crossRepoRepos` (`List<CrossRepoEntry>`): Configured dependent repos.
-  - `typeLabels`, `priorityLabels`, `areaLabels` (`List<String>`): Label schemas.
-  - `autoCloseThreshold`, `suggestCloseThreshold`, `commentThreshold` (`double`): Automated pipeline confidence thresholds.
-  - `enabledAgents` (`List<String>`): Permitted agent strings.
-  - `flashModel`, `proModel` (`String`): Configured Gemini model targets.
-  - `maxTurns`, `maxConcurrent`, `maxRetries` (`int`): Execution scaling constraints.
-  - `geminiApiKeyEnv`, `gcpSecretName` (`String`): Key locators.
-  - `githubTokenEnvNames` (`List<String>`): Configured possible token variable titles.
-- **Methods**:
-  - `shouldRunAgent(String agentName, String repoRoot)`: Checks if an agent condition applies.
-  - `resolveGeminiApiKey()`: Gets key via env or GCP.
-  - `resolveGithubToken()`: Gets token via env or GCP.
-- **Constructors**:
-  - `TriageConfig.load()`: Factory constructor.
-- **Example**:
-  ```dart
-  import 'package:runtime_ci_tooling/src/triage/utils/config.dart';
+  - `triagedLabel` (`String`): Label marking an issue as triaged.
+  - `changelogPath` (`String`): Path to the changelog file.
+  - `releaseNotesPath` (`String`): Path to the release notes directory.
+  - `gcpProject` (`String`): GCP project ID for Secret Manager.
+  - `sentryOrganization` (`String`): Sentry organization slug.
+  - `sentryProjects` (`List<String>`): Sentry projects to scan.
+  - `sentryScanOnPreRelease` (`bool`): Whether to scan Sentry during pre-release triage.
+  - `sentryRecentErrorsHours` (`int`): Hours to look back for Sentry errors.
+  - `preReleaseScanSentry` (`bool`): Whether to scan Sentry during pre-release.
+  - `preReleaseScanGithub` (`bool`): Whether to scan GitHub during pre-release.
+  - `postReleaseCloseOwnRepo` (`bool`): Whether to close own-repo issues post-release.
+  - `postReleaseCloseCrossRepo` (`bool`): Whether to close cross-repo issues post-release.
+  - `postReleaseCommentCrossRepo` (`bool`): Whether to comment on cross-repo issues post-release.
+  - `postReleaseLinkSentry` (`bool`): Whether to link Sentry issues post-release.
+  - `crossRepoEnabled` (`bool`): Whether cross-repo workflows are enabled.
+  - `crossRepoRepos` (`List<CrossRepoEntry>`): List of configured dependent repositories.
+  - `crossRepoOrgs` (`List<String>`): Optional allowlist of organizations considered for cross-repo workflows.
+  - `crossRepoDiscoveryEnabled` (`bool`): Whether automatic cross-repo discovery is enabled.
+  - `crossRepoDiscoverySearchOrgs` (`List<String>`): Organizations used for auto-discovery.
+  - `typeLabels` (`List<String>`): Configured type labels (e.g., bug, feature-request).
+  - `priorityLabels` (`List<String>`): Configured priority labels.
+  - `areaLabels` (`List<String>`): Configured area labels.
+  - `autoCloseThreshold` (`double`): Confidence threshold to automatically close an issue.
+  - `suggestCloseThreshold` (`double`): Confidence threshold to suggest closing an issue.
+  - `commentThreshold` (`double`): Confidence threshold to post a comment.
+  - `enabledAgents` (`List<String>`): List of enabled triage agents.
+  - `flashModel` (`String`): Gemini flash model name.
+  - `proModel` (`String`): Gemini pro model name.
+  - `maxTurns` (`int`): Maximum turns for Gemini CLI.
+  - `maxConcurrent` (`int`): Maximum concurrent Gemini CLI executions.
+  - `maxRetries` (`int`): Maximum retries for Gemini CLI.
+  - `geminiApiKeyEnv` (`String`): Environment variable name for the Gemini API key.
+  - `githubTokenEnvNames` (`List<String>`): Environment variable names for the GitHub token.
+  - `gcpSecretName` (`String`): GCP secret name for credentials.
 
-  final conf = TriageConfig.load();
-  print(conf.repoName);
-  print(conf.autoCloseThreshold);
-  ```
+**Example:**
+```dart
+import 'package:runtime_ci_tooling/src/triage/utils/config.dart';
 
-### `CrossRepoEntry`
-Data model defining dependent cross-repository.
-- **Fields**:
-  - `owner` (`String`): GitHub repo owner.
-  - `repo` (`String`): Target GitHub repository.
-  - `relationship` (`String`): Structural connection descriptor.
-  - `fullName` (`String`): Getter returning `$owner/$repo`.
-- **Constructors**:
-  - `CrossRepoEntry({required String owner, required String repo, required String relationship})`
-- **Example**:
-  ```dart
-  import 'package:runtime_ci_tooling/src/triage/utils/config.dart';
+final conf = TriageConfig.load();
+print('Repository: ${conf.repoOwner}/${conf.repoName}');
+```
 
-  final entry = CrossRepoEntry(
-    owner: 'open-runtime',
-    repo: 'dart-runtime',
-    relationship: 'dependency',
-  );
-  print(entry.fullName); // open-runtime/dart-runtime
-  ```
+### RunContext
+Manages a run-scoped audit trail directory for CI/CD operations.
+- **Fields:**
+  - `repoRoot` (`String`): Root directory of the repository.
+  - `runDir` (`String`): Path to the specific run directory.
+  - `command` (`String`): CLI command that initiated the run.
+  - `startedAt` (`DateTime`): Timestamp when the run started.
+  - `args` (`List<String>`): Arguments passed to the command.
+  - `runId` (`String`): The unique identifier for this run (directory name).
 
-### `GeminiResult`
-Structured outcome block resulting from an isolated Gemini process.
-- **Fields**:
-  - `taskId` (`String`): Targeted invocation ID.
-  - `response` (`String?`): Evaluated JSON-safe return payload.
-  - `stats`, `error` (`Map<String, dynamic>?`): Operational metadata mappings.
-  - `attempts`, `durationMs` (`int`): Exec cycle diagnostics.
-  - `success` (`bool`): Execution validity.
-  - `toolCalls`, `turnsUsed` (`int`): Computed run properties.
-  - `errorMessage` (`String`): Fetched exception data string.
-- **Constructors**:
-  - `GeminiResult({required String taskId, String? response, Map<String, dynamic>? stats, Map<String, dynamic>? error, int attempts = 1, int durationMs = 0, required bool success})`
-- **Example**:
-  ```dart
-  import 'package:runtime_ci_tooling/src/triage/utils/gemini_runner.dart';
+**Example:**
+```dart
+import 'package:runtime_ci_tooling/src/triage/utils/run_context.dart';
 
-  final result = GeminiResult(
-    taskId: 'task-1',
-    response: '{"status": "ok"}',
-    stats: {'tools': {'totalCalls': 2}},
-    success: true,
-    attempts: 1,
-    durationMs: 1500,
-  );
-  ```
+final ctx = RunContext.create('/path/to/repo', 'triage_cli', args: ['--auto']);
+ctx.saveArtifact('plan', 'plan.json', '{"status": "ok"}');
+ctx.finalize(exitCode: 0);
+```
 
-### `GeminiTask`
-Representation mapping of individual agent job inputs for batch dispatch.
-- **Fields**:
-  - `id`, `prompt`, `model` (`String`): Fundamental text identifiers/inputs.
-  - `maxTurns` (`int`): Interaction allowance.
-  - `allowedTools`, `fileIncludes` (`List<String>`): Sandboxed inclusions/entitlements.
-  - `workingDirectory`, `auditDir` (`String?`): Path boundaries.
-  - `sandbox` (`bool`): Strict system toggle.
-- **Constructors**:
-  - `GeminiTask({required String id, required String prompt, String model = kDefaultFlashModel, int maxTurns = kDefaultMaxTurns, List<String> allowedTools = const ["run_shell_command(git)", "run_shell_command(gh)"], List<String> fileIncludes = const [], String? workingDirectory, bool sandbox = false, String? auditDir})`
-- **Example**:
-  ```dart
-  import 'package:runtime_ci_tooling/src/triage/utils/gemini_runner.dart';
+### GeminiResult
+The structured result from a Gemini CLI invocation.
+- **Fields:**
+  - `taskId` (`String`): Identifier of the executed task.
+  - `response` (`String?`): Text response from Gemini.
+  - `stats` (`Map<String, dynamic>?`): Execution stats.
+  - `error` (`Map<String, dynamic>?`): Error details if execution failed.
+  - `attempts` (`int`): Number of execution attempts.
+  - `durationMs` (`int`): Duration of execution in milliseconds.
+  - `success` (`bool`): Whether the execution succeeded.
+  - `toolCalls` (`int`): Total tool calls made.
+  - `turnsUsed` (`int`): Turns used (proxy via tool calls).
+  - `errorMessage` (`String`): Resolved error message.
 
-  final task = GeminiTask(
-    id: 'issue-42-code',
-    prompt: 'Analyze this issue...',
-    model: 'gemini-3.1-pro-preview',
-    maxTurns: 50,
-    allowedTools: ['run_shell_command(git)'],
-  );
-  ```
+### GeminiTask
+A single task to execute via Gemini CLI.
+- **Fields:**
+  - `id` (`String`): Task identifier.
+  - `prompt` (`String`): Prompt for the model.
+  - `model` (`String`): Model name.
+  - `maxTurns` (`int`): Maximum turns allowed.
+  - `allowedTools` (`List<String>`): Tools the model is allowed to use.
+  - `fileIncludes` (`List<String>`): Files to include in the context.
+  - `workingDirectory` (`String?`): Directory to execute the command.
+  - `sandbox` (`bool`): Whether to use the sandbox.
+  - `auditDir` (`String?`): Optional audit directory to save prompts/responses.
 
-### `GeminiRunner`
-Manages parallel Gemini CLI execution with retries and load-balancing parameters.
-- **Fields**:
-  - `maxConcurrent`, `maxRetries` (`int`): Parallel pool limiters.
-  - `initialBackoff`, `maxBackoff` (`Duration`): Stalling thresholds.
-  - `verbose` (`bool`): Diagnostic stream flag.
-- **Methods**:
-  - `executeBatch(List<GeminiTask> tasks)` -> `Future<List<GeminiResult>>`: Executes a batch of tasks sequentially matching the configured scaling allowances.
-- **Constructors**:
-  - `GeminiRunner({int maxConcurrent = kDefaultMaxConcurrent, int maxRetries = kDefaultMaxRetries, Duration initialBackoff = kDefaultInitialBackoff, Duration maxBackoff = kDefaultMaxBackoff, bool verbose = false})`
-- **Example**:
-  ```dart
-  import 'package:runtime_ci_tooling/src/triage/utils/gemini_runner.dart';
+**Example:**
+```dart
+import 'package:runtime_ci_tooling/src/triage/utils/gemini_runner.dart';
 
-  final runner = GeminiRunner(
-    maxConcurrent: 2,
-    maxRetries: 3,
-    verbose: true,
-  );
-  // final results = await runner.executeBatch([task1, task2]);
-  ```
+final task = GeminiTask(
+  id: 'task-1',
+  prompt: 'Analyze this code.',
+  model: 'gemini-3.1-pro-preview',
+  maxTurns: 10,
+);
+```
 
-### `VerificationCheck`
-Encapsulates individual verification node testing parameters and outcomes.
-- **Fields**:
-  - `name` (`String`): Identification string matching the rule validated.
-  - `passed` (`bool`): Logic resolution.
-  - `message` (`String`): Contextual info resulting from resolution.
-- **Methods**:
-  - `toJson()`: Outputs internal JSON map instance.
-- **Constructors**:
-  - `VerificationCheck({required String name, required bool passed, required String message})`
-- **Example**:
-  ```dart
-  import 'package:runtime_ci_tooling/src/triage/phases/verify.dart';
+### GamePlan
+The top-level game plan that orchestrates the entire triage pipeline.
+- **Fields:**
+  - `planId` (`String`): Unique identifier for the game plan.
+  - `createdAt` (`DateTime`): Creation timestamp.
+  - `issues` (`List<IssuePlan>`): List of issues to triage.
+  - `linksToCreate` (`List<LinkSpec>`): List of links to create across entities.
 
-  final check = VerificationCheck(
-    name: 'label_needs-investigation',
-    passed: true,
-    message: 'Label "needs-investigation" applied',
-  );
-  ```
+**Example:**
+```dart
+import 'package:runtime_ci_tooling/src/triage/models/game_plan.dart';
 
-### `IssueVerification`
-Groups verification sequences applied per individual issue number.
-- **Fields**:
-  - `issueNumber` (`int`): Linked issue identifier.
-  - `passed` (`bool`): Master aggregation indicator for children checks.
-  - `checks` (`List<VerificationCheck>`): Node sequences validated.
-- **Methods**:
-  - `toJson()`: Outputs internal JSON map instance.
-- **Constructors**:
-  - `IssueVerification({required int issueNumber, required bool passed, required List<VerificationCheck> checks})`
-- **Example**:
-  ```dart
-  import 'package:runtime_ci_tooling/src/triage/phases/verify.dart';
+final plan = GamePlan(
+  planId: 'triage-12345',
+  createdAt: DateTime.now(),
+  issues: [],
+)
+  ..linksToCreate.add(LinkSpec(
+    sourceType: 'issue',
+    sourceId: '1',
+    targetType: 'pr',
+    targetId: '2',
+    description: 'Fixes issue',
+  ));
+```
 
-  final verification = IssueVerification(
-    issueNumber: 42,
-    passed: true,
-    checks: [
-      VerificationCheck(name: 'state_closed', passed: true, message: 'Issue correctly closed')
-    ],
-  );
-  ```
+### IssuePlan
+The triage plan for a single GitHub issue.
+- **Fields:**
+  - `number` (`int`): Issue number.
+  - `title` (`String`): Issue title.
+  - `author` (`String`): Issue author username.
+  - `existingLabels` (`List<String>`): Currently applied labels.
+  - `tasks` (`List<TriageTask>`): Investigation tasks for this issue.
+  - `decision` (`Map<String, dynamic>?`): Generated triage decision.
+  - `investigationComplete` (`bool`): Whether all investigation tasks have completed.
 
-### `VerificationReport`
-Wrapper class encapsulating a verification pass structure.
-- **Fields**:
-  - `verifications` (`List<IssueVerification>`): Output check groups mappings.
-  - `timestamp` (`DateTime`): Process time mapping point.
-  - `allPassed` (`bool`): Master flag computed checking nested evaluations.
-- **Methods**:
-  - `toJson()`: Outputs internal JSON map instance.
-- **Constructors**:
-  - `VerificationReport({required List<IssueVerification> verifications, required DateTime timestamp})`
-- **Example**:
-  ```dart
-  import 'package:runtime_ci_tooling/src/triage/phases/verify.dart';
+**Example:**
+```dart
+import 'package:runtime_ci_tooling/src/triage/models/game_plan.dart';
 
-  final report = VerificationReport(
-    verifications: [],
-    timestamp: DateTime.now(),
-  );
-  ```
+final issue = IssuePlan(
+  number: 42,
+  title: 'Bug in parsing',
+  author: 'user1',
+  existingLabels: ['bug'],
+  tasks: [],
+)
+  ..decision = {'status': 'close'};
+```
+
+### TriageTask
+A single investigation or action task within the game plan.
+- **Fields:**
+  - `id` (`String`): Task identifier.
+  - `agent` (`AgentType`): Agent type assigned to the task.
+  - `status` (`TaskStatus`): Current execution status.
+  - `error` (`String?`): Error message if failed.
+  - `result` (`Map<String, dynamic>?`): Task result payload.
+
+**Example:**
+```dart
+import 'package:runtime_ci_tooling/src/triage/models/game_plan.dart';
+
+final task = TriageTask(
+  id: 'issue-42-code',
+  agent: AgentType.codeAnalysis,
+)
+  ..status = TaskStatus.completed
+  ..error = null
+  ..result = {'confidence': 0.9};
+```
+
+### LinkSpec
+A link to create between two entities (e.g., issue, PR, changelog, release notes).
+- **Fields:**
+  - `sourceType` (`String`): Type of the source entity.
+  - `sourceId` (`String`): ID of the source entity.
+  - `targetType` (`String`): Type of the target entity.
+  - `targetId` (`String`): ID of the target entity.
+  - `description` (`String`): Description of the relationship.
+  - `applied` (`bool`): Whether the link has been successfully applied.
+
+**Example:**
+```dart
+import 'package:runtime_ci_tooling/src/triage/models/game_plan.dart';
+
+final link = LinkSpec(
+  sourceType: 'issue',
+  sourceId: '10',
+  targetType: 'pr',
+  targetId: '11',
+  description: 'Related PR',
+)
+  ..applied = true;
+```
+
+### InvestigationResult
+Data class for investigation agent results.
+- **Fields:**
+  - `agentId` (`String`): ID of the agent that produced the result.
+  - `issueNumber` (`int`): Targeted issue number.
+  - `confidence` (`double`): Confidence score of the result (0.0 - 1.0).
+  - `summary` (`String`): Summary of findings.
+  - `evidence` (`List<String>`): Supporting evidence for findings.
+  - `recommendedLabels` (`List<String>`): Labels recommended by the agent.
+  - `suggestedComment` (`String?`): Comment text suggested by the agent.
+  - `suggestClose` (`bool`): Whether the agent suggests closing the issue.
+  - `closeReason` (`String?`): Reason for closure (e.g., completed, duplicate).
+  - `relatedEntities` (`List<RelatedEntity>`): Other related GitHub entities found.
+  - `turnsUsed` (`int`): Turns used by the agent during investigation.
+  - `toolCallsMade` (`int`): Number of tools invoked.
+  - `durationMs` (`int`): Duration of the investigation.
+
+**Example:**
+```dart
+import 'package:runtime_ci_tooling/src/triage/models/investigation_result.dart';
+
+final result = InvestigationResult(
+  agentId: 'code_analysis',
+  issueNumber: 42,
+  confidence: 0.95,
+  summary: 'Fix found in commit abcdef',
+  suggestClose: true,
+  closeReason: 'completed',
+);
+```
+
+### RelatedEntity
+A reference to a related entity (PR, issue, commit, file) found during investigation.
+- **Fields:**
+  - `type` (`String`): Type of entity (pr, issue, commit, file).
+  - `id` (`String`): Entity identifier.
+  - `description` (`String`): Description of the entity.
+  - `relevance` (`double`): Relevance score (0.0 - 1.0).
+
+**Example:**
+```dart
+import 'package:runtime_ci_tooling/src/triage/models/investigation_result.dart';
+
+final entity = RelatedEntity(
+  type: 'commit',
+  id: 'abc1234',
+  description: 'Fixed the issue',
+  relevance: 1.0,
+);
+```
+
+### TriageDecision
+The aggregated triage decision for a single issue.
+- **Fields:**
+  - `issueNumber` (`int`): Issue number being decided upon.
+  - `aggregateConfidence` (`double`): Weighted aggregate confidence across all agent results.
+  - `riskLevel` (`RiskLevel`): Overall risk level computed.
+  - `rationale` (`String`): Human-readable explanation of the decision.
+  - `actions` (`List<TriageAction>`): Actions prescribed by this decision.
+  - `investigationResults` (`List<InvestigationResult>`): The raw results that informed this decision.
+
+**Example:**
+```dart
+import 'package:runtime_ci_tooling/src/triage/models/triage_decision.dart';
+
+final decision = TriageDecision(
+  issueNumber: 42,
+  aggregateConfidence: 0.9,
+  riskLevel: RiskLevel.high,
+  rationale: 'High confidence from code analysis.',
+  actions: [],
+);
+```
+
+### TriageAction
+A concrete action to take on a GitHub issue.
+- **Fields:**
+  - `type` (`ActionType`): Type of action.
+  - `description` (`String`): Human-readable description of the action.
+  - `parameters` (`Map<String, dynamic>`): Execution parameters for the action.
+  - `executed` (`bool`): Whether the action has run.
+  - `verified` (`bool`): Whether the action's success has been verified.
+  - `error` (`String?`): Error encountered during execution.
+
+**Example:**
+```dart
+import 'package:runtime_ci_tooling/src/triage/models/triage_decision.dart';
+
+final action = TriageAction(
+  type: ActionType.label,
+  description: 'Add triaged label',
+  parameters: {'labels': ['triaged']},
+)
+  ..executed = true
+  ..verified = true;
+```
+
+### IssueVerification
+Represents the verification status of all actions on a specific issue.
+- **Fields:**
+  - `issueNumber` (`int`): Target issue number.
+  - `passed` (`bool`): True if all checks passed.
+  - `checks` (`List<VerificationCheck>`): The individual checks performed.
+
+### VerificationCheck
+Represents a specific check performed to verify an applied action.
+- **Fields:**
+  - `name` (`String`): Name of the check.
+  - `passed` (`bool`): Whether the check succeeded.
+  - `message` (`String`): Result message of the check.
+
+### VerificationReport
+Aggregated verification report for all triaged issues.
+- **Fields:**
+  - `verifications` (`List<IssueVerification>`): Verifications for individual issues.
+  - `timestamp` (`DateTime`): When the report was generated.
+  - `allPassed` (`bool`): True if all issue verifications passed.
 
 ## 2. Enums
 
-### `TaskStatus`
-Represents the status state progression of an active triage task.
-- `pending`: Awaiting processor block.
-- `running`: Currently in an active resolution phase.
-- `completed`: Task validated and evaluated fully.
-- `failed`: Task aborted or exception encountered internally.
-- `skipped`: Task omitted programmatically.
+### TaskStatus
+Represents the lifecycle state of a task in the game plan.
+- `pending`: Task is waiting to be executed.
+- `running`: Task is currently executing.
+- `completed`: Task finished successfully.
+- `failed`: Task encountered an error.
+- `skipped`: Task was skipped.
 
-### `AgentType`
-Categorical mappings representing specific AI triage specializations.
-- `codeAnalysis`: Analyzes codebase patches relative to issues.
-- `prCorrelation`: Targets issue relations referencing available Pull Requests.
-- `duplicate`: Cross-references duplicate reports mapping identical symptoms.
-- `sentiment`: Targets user intention patterns parsing comment dialogue sequences.
-- `changelog`: Evaluates documented completion inside version/changelog metrics.
+### AgentType
+Identifies the specialized agent assigned to an investigation.
+- `codeAnalysis`: Deep reasoning agent exploring code diffs and test additions.
+- `prCorrelation`: Agent analyzing PR descriptions and states to find fixes.
+- `duplicate`: Agent comparing issues to detect duplicates.
+- `sentiment`: Agent reading issue threads to gauge resolution consensus.
+- `changelog`: Agent checking release artifacts for mentions of the issue.
 
-### `RiskLevel`
-Classifies execution severity impacts derived mechanically from agent confidence points.
-- `low`: Confidence under comment/close limits. Defaults to simple labels.
-- `medium`: Matches mid-tier limit parameters. Action is bounded strictly to suggestions.
-- `high`: Overwhelming validation points resulting in active/hard state closing impacts.
+### RiskLevel
+Indicates the confidence and potential impact of automated actions.
+- `low`: Low confidence, minimal automated action taken (e.g., labeling).
+- `medium`: Moderate confidence, safe automated actions taken (e.g., commenting).
+- `high`: High confidence, definitive automated actions taken (e.g., closing).
 
-### `ActionType`
-Discrete physical mechanisms permitted programmatically mapping over targeted GitHub instances.
-- `label`: Adjusts applied GH taxonomy values.
-- `comment`: Appends GH discussions explicitly.
-- `close`: Forces GH standard resolution triggers.
-- `linkPr`: Commits specific linkage back mapping PR sources natively.
-- `linkIssue`: Commits cross-issue linking paths implicitly.
-- `none`: Nullifier indicator preventing operational consequences.
-
+### ActionType
+Categorizes the specific operation an action will perform.
+- `label`: Apply labels to the issue.
+- `comment`: Post a comment on the issue.
+- `close`: Close the issue.
+- `linkPr`: Add a cross-reference to a PR.
+- `linkIssue`: Add a cross-reference to another issue.
+- `none`: No action required.
 
 ## 3. Extensions
 
-*(No public extensions defined in the provided source code)*
-
+*(No extensions are defined in the public API)*
 
 ## 4. Top-Level Functions
 
-### `kCloseThreshold`
-`double get kCloseThreshold`
-- **Description**: Returns the `config.autoCloseThreshold` value dynamically.
-- **Parameters**: None.
-- **Returns**: `double`
+### Configuration & Settings
+- `TriageConfig get config`
+  - Returns the singleton `TriageConfig` instance.
+- `double get kCloseThreshold`
+  - Returns the configured `autoCloseThreshold`.
+- `double get kSuggestCloseThreshold`
+  - Returns the configured `suggestCloseThreshold`.
+- `double get kCommentThreshold`
+  - Returns the configured `commentThreshold`.
+- `void reloadConfig()`
+  - Reloads `TriageConfig` from disk.
+- `Map<String, dynamic> buildGitHubMcpConfig({String? token})`
+  - Builds the GitHub MCP server configuration.
+- `Map<String, dynamic> buildSentryMcpConfig()`
+  - Builds the Sentry MCP server configuration.
+- `Map<String, dynamic> readSettings(String repoRoot)`
+  - Reads the current `.gemini/settings.json` file.
+- `void writeSettings(String repoRoot, Map<String, dynamic> settings)`
+  - Writes updated settings to `.gemini/settings.json`.
+- `bool ensureMcpConfigured(String repoRoot)`
+  - Ensures MCP servers are configured in `.gemini/settings.json`, returning `true` if updated.
+- `Future<Map<String, bool>> validateMcpServers(String repoRoot)`
+  - Validates that required MCP servers are configured and accessible.
 
-### `kSuggestCloseThreshold`
-`double get kSuggestCloseThreshold`
-- **Description**: Returns the `config.suggestCloseThreshold` value dynamically.
-- **Parameters**: None.
-- **Returns**: `double`
+### JSON & Schema Validation
+- `ValidationResult validateJsonFile(String path, List<String> requiredKeys)`
+  - Validates that a JSON file exists, is valid JSON, and contains specific keys.
+- `ValidationResult validateGamePlan(String path)`
+  - Validates a game plan JSON structure.
+- `ValidationResult validateInvestigationResult(String path)`
+  - Validates an investigation result JSON structure.
+- `void writeJson(String path, Map<String, dynamic> data)`
+  - Writes a JSON object to a file with pretty formatting.
+- `Map<String, dynamic>? readJson(String path)`
+  - Reads and parses a JSON file, returning `null` on error.
 
-### `kCommentThreshold`
-`double get kCommentThreshold`
-- **Description**: Returns the `config.commentThreshold` value dynamically.
-- **Parameters**: None.
-- **Returns**: `double`
+### Triage Pipeline Phases
+- `Future<GamePlan> planSingleIssue(int issueNumber, String repoRoot, {required String runDir})`
+  - Creates a game plan for a single issue.
+- `Future<GamePlan> planAutoTriage(String repoRoot, {required String runDir})`
+  - Creates a game plan for all open untriaged issues.
+- `GamePlan? loadPlan({String? runDir})`
+  - Loads an existing game plan from a run directory.
+- `Future<Map<int, List<InvestigationResult>>> investigate(GamePlan plan, String repoRoot, {required String runDir, bool verbose = false})`
+  - Dispatches investigation agents in parallel and writes results to run-scoped directories.
+- `Future<List<TriageDecision>> act(GamePlan plan, Map<int, List<InvestigationResult>> investigationResults, String repoRoot, {required String runDir})`
+  - Applies triage decisions (label, comment, close) based on investigation results.
+- `Future<VerificationReport> verify(GamePlan plan, List<TriageDecision> decisions, String repoRoot, {required String runDir})`
+  - Confirms that all actions from the Act phase were applied successfully.
+- `Future<void> link(GamePlan plan, List<TriageDecision> decisions, String repoRoot, {required String runDir})`
+  - Creates bidirectional references between issues, PRs, changelogs, and release notes.
+- `Future<void> crossRepoLink(GamePlan plan, List<TriageDecision> decisions, String repoRoot, {required String runDir})`
+  - Searches for related issues in configured dependent repositories and posts cross-references.
+- `Future<String> preReleaseTriage({required String prevTag, required String newVersion, required String repoRoot, required String runDir, bool verbose = false})`
+  - Scans issues and Sentry errors, correlates them with diffs, and produces an `issue_manifest.json` for the upcoming release.
+- `Future<void> postReleaseTriage({required String newVersion, required String releaseTag, required String releaseUrl, required String manifestPath, required String repoRoot, required String runDir, bool verbose = false})`
+  - Closes the loop after a release by commenting on issues, linking Sentry issues, and updating the release notes folder.
 
-### `config`
-`TriageConfig get config`
-- **Description**: Gets the singleton `TriageConfig` instance. Loads from disk on first access.
-- **Parameters**: None.
-- **Returns**: `TriageConfig`
+### Agent Builders
+- `GeminiTask buildTask(IssuePlan issue, String repoRoot, {String? resultsDir})` (in `changelog_agent.dart`)
+  - Builds a Gemini task for changelog/release artifact investigation.
+- `GeminiTask buildTask(IssuePlan issue, String repoRoot, {String? resultsDir})` (in `code_analysis_agent.dart`)
+  - Builds a Gemini task for codebase search and test analysis.
+- `GeminiTask buildTask(IssuePlan issue, String repoRoot, {String? resultsDir})` (in `duplicate_agent.dart`)
+  - Builds a Gemini task to detect duplicate issues.
+- `GeminiTask buildTask(IssuePlan issue, String repoRoot, {String? resultsDir})` (in `pr_correlation_agent.dart`)
+  - Builds a Gemini task to find PRs that may address the issue.
+- `GeminiTask buildTask(IssuePlan issue, String repoRoot, {String? resultsDir})` (in `sentiment_agent.dart`)
+  - Builds a Gemini task to analyze issue discussion threads for consensus and resolution sentiment.
 
-### `reloadConfig`
-`void reloadConfig()`
-- **Description**: Reloads configuration mappings from disk.
-- **Parameters**: None.
-- **Returns**: `void`
-
-### `validateJsonFile`
-`ValidationResult validateJsonFile(String path, List<String> requiredKeys)`
-- **Description**: Validates that a JSON file exists, is valid JSON, and contains required keys.
-- **Parameters**: 
-  - `path` (`String`)
-  - `requiredKeys` (`List<String>`)
-- **Returns**: `ValidationResult`
-
-### `validateGamePlan`
-`ValidationResult validateGamePlan(String path)`
-- **Description**: Validates a game plan JSON structure against base schema checks.
-- **Parameters**: 
-  - `path` (`String`)
-- **Returns**: `ValidationResult`
-
-### `validateInvestigationResult`
-`ValidationResult validateInvestigationResult(String path)`
-- **Description**: Validates an investigation result JSON mapping against specific schema keys.
-- **Parameters**: 
-  - `path` (`String`)
-- **Returns**: `ValidationResult`
-
-### `writeJson`
-`void writeJson(String path, Map<String, dynamic> data)`
-- **Description**: Writes a JSON object mapping to a file with pretty formatting.
-- **Parameters**: 
-  - `path` (`String`)
-  - `data` (`Map<String, dynamic>`)
-- **Returns**: `void`
-
-### `readJson`
-`Map<String, dynamic>? readJson(String path)`
-- **Description**: Reads and parses a specified JSON file safely.
-- **Parameters**: 
-  - `path` (`String`)
-- **Returns**: `Map<String, dynamic>?`
-
-### `buildGitHubMcpConfig`
-`Map<String, dynamic> buildGitHubMcpConfig({String? token})`
-- **Description**: Builds the GitHub MCP server configuration bindings for `.gemini/settings.json`.
-- **Parameters**: 
-  - `token` (`String?`)
-- **Returns**: `Map<String, dynamic>`
-
-### `buildSentryMcpConfig`
-`Map<String, dynamic> buildSentryMcpConfig()`
-- **Description**: Builds the Sentry MCP server configuration object.
-- **Parameters**: None.
-- **Returns**: `Map<String, dynamic>`
-
-### `readSettings`
-`Map<String, dynamic> readSettings(String repoRoot)`
-- **Description**: Reads the current runtime/Gemini settings mapping configurations.
-- **Parameters**: 
-  - `repoRoot` (`String`)
-- **Returns**: `Map<String, dynamic>`
-
-### `writeSettings`
-`void writeSettings(String repoRoot, Map<String, dynamic> settings)`
-- **Description**: Writes updated configurations mapping back physically.
-- **Parameters**: 
-  - `repoRoot` (`String`)
-  - `settings` (`Map<String, dynamic>`)
-- **Returns**: `void`
-
-### `ensureMcpConfigured`
-`bool ensureMcpConfigured(String repoRoot)`
-- **Description**: Ensures the necessary MCP server environments map correctly into active definitions.
-- **Parameters**: 
-  - `repoRoot` (`String`)
-- **Returns**: `bool`
-
-### `validateMcpServers`
-`Future<Map<String, bool>> validateMcpServers(String repoRoot)`
-- **Description**: Validates that required external MCP server dependencies map dynamically safely and exist natively.
-- **Parameters**: 
-  - `repoRoot` (`String`)
-- **Returns**: `Future<Map<String, bool>>`
-
-### `act`
-`Future<List<TriageDecision>> act(GamePlan plan, Map<int, List<InvestigationResult>> investigationResults, String repoRoot, {required String runDir})`
-- **Description**: Phase 3 execution processing engine. Enforces safe-actuating idempotency guards to trigger actionable consequences via gh commands.
-- **Parameters**: 
-  - `plan` (`GamePlan`)
-  - `investigationResults` (`Map<int, List<InvestigationResult>>`)
-  - `repoRoot` (`String`)
-  - `runDir` (`String` - Named/Required)
-- **Returns**: `Future<List<TriageDecision>>`
-
-### `crossRepoLink`
-`Future<void> crossRepoLink(GamePlan plan, List<TriageDecision> decisions, String repoRoot, {required String runDir})`
-- **Description**: Phase 5b engine searching contextual cross-reference mappings across bound repository trees matching title metrics.
-- **Parameters**: 
-  - `plan` (`GamePlan`)
-  - `decisions` (`List<TriageDecision>`)
-  - `repoRoot` (`String`)
-  - `runDir` (`String` - Named/Required)
-- **Returns**: `Future<void>`
-
-### `investigate`
-`Future<Map<int, List<InvestigationResult>>> investigate(GamePlan plan, String repoRoot, {required String runDir, bool verbose = false})`
-- **Description**: Phase 2 core engine dispatching dynamic investigation AI task bindings over Gemini processes scaling concurrently.
-- **Parameters**: 
-  - `plan` (`GamePlan`)
-  - `repoRoot` (`String`)
-  - `runDir` (`String` - Named/Required)
-  - `verbose` (`bool` - Named/Optional)
-- **Returns**: `Future<Map<int, List<InvestigationResult>>>`
-
-### `link`
-`Future<void> link(GamePlan plan, List<TriageDecision> decisions, String repoRoot, {required String runDir})`
-- **Description**: Phase 5 processing logic managing hard associations inside the source repository (binding code bases to PR, issues and notes).
-- **Parameters**: 
-  - `plan` (`GamePlan`)
-  - `decisions` (`List<TriageDecision>`)
-  - `repoRoot` (`String`)
-  - `runDir` (`String` - Named/Required)
-- **Returns**: `Future<void>`
-
-### `planSingleIssue`
-`Future<GamePlan> planSingleIssue(int issueNumber, String repoRoot, {required String runDir})`
-- **Description**: Phase 1 specific issue engine constructor returning the raw task mappings.
-- **Parameters**: 
-  - `issueNumber` (`int`)
-  - `repoRoot` (`String`)
-  - `runDir` (`String` - Named/Required)
-- **Returns**: `Future<GamePlan>`
-
-### `planAutoTriage`
-`Future<GamePlan> planAutoTriage(String repoRoot, {required String runDir})`
-- **Description**: Phase 1 expansive constructor spanning untriaged/missing-label GH collections returning the broad master plan.
-- **Parameters**: 
-  - `repoRoot` (`String`)
-  - `runDir` (`String` - Named/Required)
-- **Returns**: `Future<GamePlan>`
-
-### `loadPlan`
-`GamePlan? loadPlan({String? runDir})`
-- **Description**: Ingests contextual JSON data from disk converting back into mapped structured class constraints.
-- **Parameters**: 
-  - `runDir` (`String?` - Named/Optional)
-- **Returns**: `GamePlan?`
-
-### `postReleaseTriage`
-`Future<void> postReleaseTriage({required String newVersion, required String releaseTag, required String releaseUrl, required String manifestPath, required String repoRoot, required String runDir, bool verbose = false})`
-- **Description**: Operational dispatch handling end-of-lifecycle state updates. Closes confidence-verified nodes dynamically and generates linked_issues associations.
-- **Parameters**: 
-  - `newVersion`, `releaseTag`, `releaseUrl`, `manifestPath`, `repoRoot`, `runDir` (`String` - Named/Required)
-  - `verbose` (`bool` - Named/Optional)
-- **Returns**: `Future<void>`
-
-### `preReleaseTriage`
-`Future<String> preReleaseTriage({required String prevTag, required String newVersion, required String repoRoot, required String runDir, bool verbose = false})`
-- **Description**: Diff validation runner identifying contextual links correlating Sentry metrics and GitHub references before producing validation bounds internally. 
-- **Parameters**: 
-  - `prevTag`, `newVersion`, `repoRoot`, `runDir` (`String` - Named/Required)
-  - `verbose` (`bool` - Named/Optional)
-- **Returns**: `Future<String>`
-
-### `verify`
-`Future<VerificationReport> verify(GamePlan plan, List<TriageDecision> decisions, String repoRoot, {required String runDir})`
-- **Description**: Phase 4 runtime guard validating GH execution mappings via direct state re-reads enforcing idempotency integrity checking structurally.
-- **Parameters**: 
-  - `plan` (`GamePlan`)
-  - `decisions` (`List<TriageDecision>`)
-  - `repoRoot` (`String`)
-  - `runDir` (`String` - Named/Required)
-- **Returns**: `Future<VerificationReport>`
-
-### `buildTask` (Agents)
-`GeminiTask buildTask(IssuePlan issue, String repoRoot, {String? resultsDir})`
-- **Description**: Generates the contextually distinct `GeminiTask` mapping containing prompt constraints targeted locally per agent type. (Available inside `code_analysis_agent.dart`, `pr_correlation_agent.dart`, `duplicate_agent.dart`, `sentiment_agent.dart`, `changelog_agent.dart`).
-- **Parameters**: 
-  - `issue` (`IssuePlan`)
-  - `repoRoot` (`String`)
-  - `resultsDir` (`String?` - Named/Optional)
-- **Returns**: `GeminiTask`
