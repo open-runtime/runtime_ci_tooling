@@ -1,0 +1,37 @@
+{
+  "pull_requests": [
+    {
+      "number": 29,
+      "title": "feat: enhanced managed test with full output capture and rich job summaries",
+      "author": "Tsavo Knott",
+      "labels": [],
+      "summary": "Added web_test CI feature, build_runner support, and an enhanced managed test capability. This includes comprehensive log capture, structured JSON output consumption, rich job summaries, hardened path handling, validation rules, and other CI workflow robustness improvements.",
+      "commits": [
+        "d9ebd59",
+        "08f789f",
+        "593eabf",
+        "6284403",
+        "adaf642",
+        "33d69c4",
+        "3951bd3",
+        "dcae6c2",
+        "877a146",
+        "b711648",
+        "5a98b33",
+        "261466c",
+        "6e04666",
+        "cf410de",
+        "d017a20",
+        "e4ad440",
+        "62e9c5a",
+        "7e14b70",
+        "fe79ee4",
+        "9292802",
+        "32bc1f3",
+        "0b65313",
+        "82fbad0",
+        "d6f11ac"
+      ]
+    }
+  ]
+}

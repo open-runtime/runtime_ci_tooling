@@ -1,0 +1,148 @@
+{
+  "version": "0.15.0",
+  "previous_version": "v0.14.4",
+  "total_commits": 24,
+  "categories": {
+    "added": [
+      {
+        "description": "Added `web_test` CI feature with standalone ubuntu job, configurable concurrency, and test path filtering",
+        "pr": "#29",
+        "commits": [
+          "d6f11ac",
+          "0b65313"
+        ]
+      },
+      {
+        "description": "Enabled `build_runner` feature to run build_runner before analyze/test steps",
+        "pr": "#29",
+        "commits": [
+          "d6f11ac"
+        ]
+      },
+      {
+        "description": "Enhanced managed test with full output capture and rich job summaries",
+        "pr": "#29",
+        "commits": [
+          "82fbad0",
+          "593eabf",
+          "5a98b33",
+          "cf410de"
+        ]
+      },
+      {
+        "description": "Added Utf8BoundedBuffer utility for testable byte-bounded stream capture",
+        "pr": "#29",
+        "commits": [
+          "261466c"
+        ]
+      },
+      {
+        "description": "Expanded workflow generator validation assertions and edge case tests",
+        "pr": "#29",
+        "commits": [
+          "b711648",
+          "d017a20"
+        ]
+      }
+    ],
+    "changed": [
+      {
+        "description": "Made artifact retention days configurable via ci config",
+        "pr": "#29",
+        "commits": [
+          "261466c"
+        ]
+      },
+      {
+        "description": "Standardized Windows pub-cache paths to match release/triage templates",
+        "pr": "#29",
+        "commits": [
+          "261466c"
+        ]
+      },
+      {
+        "description": "Consolidated test utils into StepSummary and deleted standalone test_results_util",
+        "pr": "#29",
+        "commits": [
+          "32bc1f3"
+        ]
+      },
+      {
+        "description": "Broadened CI dart formatting and safe staging to capture non-lib Dart edits",
+        "pr": "#29",
+        "commits": [
+          "62e9c5a"
+        ]
+      }
+    ],
+    "deprecated": [],
+    "removed": [],
+    "fixed": [
+      {
+        "description": "Stabilized managed test verification across environments",
+        "pr": null,
+        "commits": [
+          "adaf642"
+        ]
+      },
+      {
+        "description": "Prevented release race and extended long-running release stages timeouts",
+        "pr": "#29",
+        "commits": [
+          "33d69c4"
+        ]
+      },
+      {
+        "description": "Hardened web_test for Ubuntu AppArmor userns restrictions",
+        "pr": "#29",
+        "commits": [
+          "3951bd3"
+        ]
+      },
+      {
+        "description": "Streamed test result parsing to avoid loading large NDJSON files into memory",
+        "pr": "#29",
+        "commits": [
+          "5a98b33"
+        ]
+      },
+      {
+        "description": "Tightened ci config validation rules for secrets and line lengths",
+        "pr": "#29",
+        "commits": [
+          "e4ad440"
+        ]
+      },
+      {
+        "description": "Hardened process execution and runtime config boundaries",
+        "pr": "#29",
+        "commits": [
+          "6e04666"
+        ]
+      }
+    ],
+    "security": [
+      {
+        "description": "Hardened input validation, shell escaping, and symlink protection for all Mustache-interpolated values",
+        "pr": "#29",
+        "commits": [
+          "7e14b70"
+        ]
+      },
+      {
+        "description": "Added cumulative size guard to prevent exceeding GitHub step summary limit",
+        "pr": "#29",
+        "commits": [
+          "fe79ee4"
+        ]
+      },
+      {
+        "description": "Guarded logDir creation and log file writes with FileSystemException catch blocks",
+        "pr": "#29",
+        "commits": [
+          "fe79ee4"
+        ]
+      }
+    ]
+  }
+}
