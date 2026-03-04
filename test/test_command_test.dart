@@ -91,30 +91,25 @@ void main() {
       final logDir = p.join(tempDir.path, '.dart_tool', 'test-logs');
       expect(Directory(logDir).existsSync(), isTrue, reason: 'log dir should be created');
 
-      // results.json or expanded.txt are written by file reporters
+      // JSON reporter output should always exist when tests run successfully.
       final jsonPath = p.join(logDir, 'results.json');
-      final expandedPath = p.join(logDir, 'expanded.txt');
-      final hasResults = File(jsonPath).existsSync() || File(expandedPath).existsSync();
-      expect(hasResults, isTrue, reason: 'at least one reporter output should exist');
+      expect(File(jsonPath).existsSync(), isTrue, reason: 'json reporter output should exist');
 
-      // If results.json exists, verify parse + writeTestJobSummary pathway
-      if (File(jsonPath).existsSync()) {
-        final results = await TestResultsUtil.parseTestResultsJson(jsonPath);
-        expect(results.parsed, isTrue);
-        expect(results.passed, greaterThanOrEqualTo(1));
-        expect(results.failed, equals(0));
+      final results = await TestResultsUtil.parseTestResultsJson(jsonPath);
+      expect(results.parsed, isTrue);
+      expect(results.passed, greaterThanOrEqualTo(1));
+      expect(results.failed, equals(0));
 
-        String? capturedSummary;
-        TestResultsUtil.writeTestJobSummary(
-          results,
-          0,
-          platformId: 'test-runner',
-          writeSummary: (m) => capturedSummary = m,
-        );
-        expect(capturedSummary, isNotNull);
-        expect(capturedSummary!, contains('## Test Results — test-runner'));
-        expect(capturedSummary!, contains('passed'));
-      }
+      String? capturedSummary;
+      TestResultsUtil.writeTestJobSummary(
+        results,
+        0,
+        platformId: 'test-runner',
+        writeSummary: (m) => capturedSummary = m,
+      );
+      expect(capturedSummary, isNotNull);
+      expect(capturedSummary!, contains('## Test Results — test-runner'));
+      expect(capturedSummary!, contains('passed'));
     });
 
     test('exits with code 1 when root tests fail', () async {

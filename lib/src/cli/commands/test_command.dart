@@ -19,9 +19,11 @@ typedef _ExitHandler = Future<Never> Function(int code);
 /// Run `dart test` on the root package and all configured sub-packages with
 /// full output capture (two-layer strategy).
 ///
-/// **Layer 1 — Zone-aware reporters:** `--file-reporter json:` captures all
-/// `print()` calls as `PrintEvent` objects with test attribution, and
-/// `--file-reporter expanded:` captures human-readable output.
+/// **Layer 1 — Zone-aware reporter:** `--file-reporter json:` captures all
+/// `print()` calls as `PrintEvent` objects with test attribution.
+///
+/// Note: `dart test` currently applies only the last `--file-reporter` flag,
+/// so this command intentionally configures a single file reporter (JSON).
 ///
 /// **Layer 2 — Shell-level `tee`:** Configured in the CI template to capture
 /// anything that bypasses Dart zones (`stdout.write()`, isolate prints, FFI).
@@ -67,15 +69,15 @@ class TestCommand extends Command<void> {
     Logger.info('Log directory: $logDir');
 
     final jsonPath = p.join(logDir, 'results.json');
-    final expandedPath = p.join(logDir, 'expanded.txt');
-
     // Skip gracefully if no test/ directory exists
     final testDir = Directory(p.join(repoRoot, 'test'));
     if (!testDir.existsSync()) {
       Logger.success('No test/ directory found — skipping root tests');
       StepSummary.write('## Test Results\n\n**No test/ directory found — skipped.**\n');
     } else {
-      // Build test arguments with two file reporters + expanded console output
+      // Build test arguments with a single JSON file reporter.
+      // Human-readable output is still captured by `--reporter expanded`
+      // and shell-level `tee` in CI.
       final testArgs = <String>[
         'test',
         '--exclude-tags',
@@ -85,8 +87,6 @@ class TestCommand extends Command<void> {
         'expanded',
         '--file-reporter',
         'json:$jsonPath',
-        '--file-reporter',
-        'expanded:$expandedPath',
       ];
 
       Logger.info('Running: dart ${testArgs.join(' ')}');
@@ -221,8 +221,6 @@ class TestCommand extends Command<void> {
         continue;
       }
       final spJsonPath = p.join(spLogDir, 'results.json');
-      final spExpandedPath = p.join(spLogDir, 'expanded.txt');
-
       final spTestArgs = <String>[
         'test',
         '--exclude-tags',
@@ -232,8 +230,6 @@ class TestCommand extends Command<void> {
         'expanded',
         '--file-reporter',
         'json:$spJsonPath',
-        '--file-reporter',
-        'expanded:$spExpandedPath',
       ];
 
       final spProcess = await Process.start(Platform.resolvedExecutable, spTestArgs, workingDirectory: dir);
