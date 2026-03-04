@@ -12,13 +12,13 @@
       "lib_paths": [
         "lib/src/cli/"
       ],
-      "output_path": "docs/cli/",
+      "output_path": "docs/cli",
       "generate": [
         "quickstart",
         "api_reference"
       ],
-      "hash": "125efd04f8f781ba540fd34f2ae8908f2d49bc7debfedc88e9ae9e087564a147",
-      "last_updated": "2026-03-04T15:57:32.693766Z"
+      "hash": "50a3d1406933bdd1977764934b096300860ddb72af99f9b6a8a05905d3047a2b",
+      "last_updated": "2026-03-04T22:21:34.550747Z"
     },
     {
       "id": "prompts",
@@ -29,12 +29,12 @@
       "lib_paths": [
         "lib/src/prompts/"
       ],
-      "output_path": "docs/prompts/",
+      "output_path": "docs/prompts",
       "generate": [
         "api_reference"
       ],
-      "hash": "6b81209cbf349342856e8fe6a4f2440f3bca8376f48afeaf905d3c3a4318655e",
-      "last_updated": "2026-02-24T20:10:36.819899Z"
+      "hash": "b4f61f2f1b6d0dfdbd783a7ded65bc495f5c864010caf27ae4f175a45170579a",
+      "last_updated": "2026-03-04T22:21:34.556676Z"
     },
     {
       "id": "triage",
@@ -45,13 +45,13 @@
       "lib_paths": [
         "lib/src/triage/"
       ],
-      "output_path": "docs/triage/",
+      "output_path": "docs/triage",
       "generate": [
         "quickstart",
         "api_reference"
       ],
-      "hash": "14a102f7065f7892fe0cf943918faf999bfd4008d590b05fa910ff844dcd8f00",
-      "last_updated": "2026-03-04T15:57:32.702206Z"
+      "hash": "e12c491a77b6a708216f097ef183d233db8e3b1aa9ab338a2a95f2e6566930db",
+      "last_updated": "2026-03-04T22:21:34.560965Z"
     },
     {
       "id": "utils",
@@ -62,12 +62,12 @@
       "lib_paths": [
         "lib/src/utils/"
       ],
-      "output_path": "docs/utils/",
+      "output_path": "docs/utils",
       "generate": [
         "api_reference"
       ],
-      "hash": "d4b56488defb7a90e22964c314353c5487997ec557cbca51d2cae2f9a9e7f9e5",
-      "last_updated": "2026-02-24T20:10:36.824791Z"
+      "hash": "f38ae078ef14f937851797450f41d60682068a460f50f502111c92f6ae1d38eb",
+      "last_updated": "2026-03-04T22:21:34.561594Z"
     }
   ],
   "templates": {

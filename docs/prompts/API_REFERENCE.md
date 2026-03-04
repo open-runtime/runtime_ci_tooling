@@ -1,130 +1,109 @@
 # Gemini Prompt Templates API Reference
 
-This document provides the API reference for the Gemini Prompt Templates module. These templates are executed as command-line Dart scripts, which generate prompts to pipe into the Gemini CLI for autonomous CI/CD tasks.
+This module contains Dart scripts that generate specialized prompts for Gemini AI models. These prompts are used in the CI/CD pipeline to automatically generate documentation (API references, examples, quickstarts, migration guides), explore repository changes, compose changelogs, write release notes, and triage issues.
 
 ## 1. Classes
 
-### CiConfig
-Reads package name and repo owner from `.runtime_ci/config.json`. Falls back to `runtime_isomorphic_library` / `open-runtime` when config is unavailable (e.g., when running locally outside a properly initialized repo).
+### **CiConfig**
+Reads package name and repo owner from `.runtime_ci/config.json`. Falls back to `runtime_isomorphic_library` / `open-runtime` when the config is unavailable (e.g., when running locally outside a properly initialized repository).
 
-**Fields:**
-- `packageName` (`String`) - The name of the package.
-- `repoOwner` (`String`) - The owner of the repository.
-- `current` (`static CiConfig`) - Singleton getter that reads the configuration once and caches it.
+- **Fields**:
+  - `packageName` (`String`): The package name retrieved from configuration or the fallback value.
+  - `repoOwner` (`String`): The repository owner retrieved from configuration or the fallback value.
+- **Methods/Getters**:
+  - `static CiConfig get current`: Singleton getter that reads the config once and caches it.
 
-**Example Usage:**
+**Example Usage**:
 ```dart
-import '_ci_config.dart';
+import 'package:runtime_ci_tooling/src/prompts/_ci_config.dart';
 
-final pkg = CiConfig.current.packageName;
-final owner = CiConfig.current.repoOwner;
+void main() {
+  final config = CiConfig.current;
+  print('Package: ${config.packageName}');
+  print('Owner: ${config.repoOwner}');
+}
 ```
 
 ## 2. Enums
-*(No public enums in this module)*
+
+*(No public enums are defined in this module)*
 
 ## 3. Extensions
-*(No public extensions in this module)*
 
-## 4. Top-Level Functions
+*(No public extensions are defined in this module)*
 
-The prompt scripts are designed to be executed as Dart executables. Each script contains a top-level `main` function and requires specific command-line arguments.
+## 4. Top-Level Prompt Generators
 
-### main (autodoc_api_reference_prompt.dart)
-Autodoc: `API_REFERENCE.md` generator for a proto module.
-- **Signature:** `void main(List<String> args)`
-- **Parameters:**
-  - `args`: Command-line arguments (`<module_name> <source_dir> [lib_dir]`).
-- **Return Type:** `void`
-- **Example Usage:**
-  ```bash
-  dart run scripts/prompts/autodoc_api_reference_prompt.dart my_module proto/src lib/src | gemini -o json
-  ```
+The following top-level scripts are meant to be executed via `dart run` to generate text prompts. The output is typically piped directly to the `gemini` CLI for autonomous execution.
 
-### main (autodoc_examples_prompt.dart)
-Autodoc: `EXAMPLES.md` generator for a proto module.
-- **Signature:** `void main(List<String> args)`
-- **Parameters:**
-  - `args`: Command-line arguments (`<module_name> <source_dir> [lib_dir]`).
-- **Return Type:** `void`
-- **Example Usage:**
-  ```bash
-  dart run scripts/prompts/autodoc_examples_prompt.dart my_module proto/src lib/src | gemini -o json
-  ```
+### **autodoc_api_reference_prompt.dart**
+- **Description**: Autodoc Stage: Generates a prompt for an AI agent to write an `API_REFERENCE.md` for a proto module. It provides the AI with protobuf source files and generated Dart code context.
+- **Usage**: `dart run scripts/prompts/autodoc_api_reference_prompt.dart <module_name> <source_dir> [lib_dir]`
+- **Parameters**: 
+  - `module_name`: The name of the module to document.
+  - `source_dir`: Path to the directory containing `.proto` files.
+  - `lib_dir` *(Optional)*: Path to the generated Dart code directory.
 
-### main (autodoc_migration_prompt.dart)
-Autodoc: `MIGRATION.md` generator for a proto module.
-- **Signature:** `void main(List<String> args)`
-- **Parameters:**
-  - `args`: Command-line arguments (`<module_name> <source_dir> [prev_hash]`).
-- **Return Type:** `void`
-- **Example Usage:**
-  ```bash
-  dart run scripts/prompts/autodoc_migration_prompt.dart my_module proto/src v1.0.0 | gemini -o json
-  ```
+### **autodoc_examples_prompt.dart**
+- **Description**: Autodoc Stage: Generates a prompt for an AI agent to write an `EXAMPLES.md` with practical, copy-paste-ready code examples based on proto definitions, existing test patterns, and extensions.
+- **Usage**: `dart run scripts/prompts/autodoc_examples_prompt.dart <module_name> <source_dir> [lib_dir]`
+- **Parameters**:
+  - `module_name`: The name of the module.
+  - `source_dir`: Path to `.proto` files.
+  - `lib_dir` *(Optional)*: Path to the generated Dart code (also infers test directories).
 
-### main (autodoc_quickstart_prompt.dart)
-Autodoc: `QUICKSTART.md` generator for a proto module.
-- **Signature:** `void main(List<String> args)`
-- **Parameters:**
-  - `args`: Command-line arguments (`<module_name> <source_dir> [lib_dir]`).
-- **Return Type:** `void`
-- **Example Usage:**
-  ```bash
-  dart run scripts/prompts/autodoc_quickstart_prompt.dart my_module proto/src lib/src | gemini -o json
-  ```
+### **autodoc_migration_prompt.dart**
+- **Description**: Autodoc Stage: Generates a prompt for an AI agent to write a `MIGRATION.md` guide based on `git diff` outputs of `.proto` files, detailing breaking changes, new features, and upgrade steps.
+- **Usage**: `dart run scripts/prompts/autodoc_migration_prompt.dart <module_name> <source_dir> [prev_hash]`
+- **Parameters**:
+  - `module_name`: The name of the module.
+  - `source_dir`: Path to `.proto` files.
+  - `prev_hash` *(Optional)*: The previous Git commit hash to compare against. If omitted, uses recent git history.
 
-### main (gemini_changelog_composer_prompt.dart)
-Stage 2 Changelog Composer Agent prompt generator. Focused ONLY on updating `CHANGELOG.md` with a concise Keep-a-Changelog entry.
-- **Signature:** `void main(List<String> args)`
-- **Parameters:**
-  - `args`: Command-line arguments (`<prev_tag> <new_version>`).
-- **Return Type:** `void`
-- **Example Usage:**
-  ```bash
-  dart run scripts/prompts/gemini_changelog_composer_prompt.dart v0.0.1 0.0.2 | gemini -o json --yolo -s
-  ```
+### **autodoc_quickstart_prompt.dart**
+- **Description**: Autodoc Stage: Generates a prompt for an AI agent to write a `QUICKSTART.md` guide. Provides module structure, services, and key message types to help users get started in under 5 minutes.
+- **Usage**: `dart run scripts/prompts/autodoc_quickstart_prompt.dart <module_name> <source_dir> [lib_dir]`
+- **Parameters**:
+  - `module_name`: The name of the module.
+  - `source_dir`: Path to `.proto` files.
+  - `lib_dir` *(Optional)*: Path to the generated Dart code.
 
-### main (gemini_changelog_prompt.dart)
-Stage 1 Explorer Agent prompt generator. Generates the changelog analysis prompt with interpolated context including project tree, commit messages, diff statistics, and version info. The output is piped to Gemini CLI for autonomous exploration.
-- **Signature:** `void main(List<String> args)`
-- **Parameters:**
-  - `args`: Command-line arguments (`<prev_tag> <new_version>`).
-- **Return Type:** `void`
-- **Example Usage:**
-  ```bash
-  dart run scripts/prompts/gemini_changelog_prompt.dart v0.0.1 0.0.2 |     gemini -o json --yolo -s -m gemini-3-flash-preview
-  ```
+### **gemini_changelog_composer_prompt.dart**
+- **Description**: Stage 2 CI Pipeline: Generates a prompt for the Changelog Composer Agent to securely update `CHANGELOG.md` with a concise Keep-a-Changelog entry based on stage 1 artifacts (`commit_analysis.json`, `pr_data.json`, etc.).
+- **Usage**: `dart run scripts/prompts/gemini_changelog_composer_prompt.dart <prev_tag> <new_version>`
+- **Parameters**:
+  - `prev_tag`: The previous release tag (e.g., `v1.0.0`).
+  - `new_version`: The target version being released (e.g., `1.0.1`).
 
-### main (gemini_documentation_prompt.dart)
-Stage 2 Documentation Update prompt generator. Generates a prompt that instructs Gemini Pro to analyze proto/API changes and update `README.md` sections accordingly.
-- **Signature:** `void main(List<String> args)`
-- **Parameters:**
-  - `args`: Command-line arguments (`<prev_tag> <new_version>`).
-- **Return Type:** `void`
-- **Example Usage:**
-  ```bash
-  dart run scripts/prompts/gemini_documentation_prompt.dart v0.0.1 0.0.2 |     gemini -o json --yolo -s -m gemini-3.1-pro-preview     @.runtime_ci/runs/explore/commit_analysis.json @README.md
-  ```
+### **gemini_changelog_prompt.dart**
+- **Description**: Stage 1 CI Pipeline: Generates a prompt for the Explorer Agent to deeply analyze the repository history (git diffs, commit messages, PRs) and extract structured JSON artifacts (`commit_analysis.json`, `breaking_changes.json`, `pr_data.json`).
+- **Usage**: `dart run scripts/prompts/gemini_changelog_prompt.dart <prev_tag> <new_version>`
+- **Parameters**:
+  - `prev_tag`: The previous release tag.
+  - `new_version`: The target version.
 
-### main (gemini_release_notes_author_prompt.dart)
-Stage 3 Release Notes Author prompt generator. Produces rich, narrative release notes distinct from the CHANGELOG.
-- **Signature:** `void main(List<String> args)`
-- **Parameters:**
-  - `args`: Command-line arguments (`<prev_tag> <new_version> [patch|minor|major]`).
-- **Return Type:** `void`
-- **Example Usage:**
-  ```bash
-  dart run scripts/prompts/gemini_release_notes_author_prompt.dart v0.0.1 0.0.2 minor |     gemini -o json --yolo -s
-  ```
+### **gemini_documentation_prompt.dart**
+- **Description**: Stage 2 CI Pipeline: Generates a prompt for a Documentation Update Agent to safely target and update the `README.md` file corresponding to changes extracted during Stage 1.
+- **Usage**: `dart run scripts/prompts/gemini_documentation_prompt.dart <prev_tag> <new_version>`
+- **Parameters**:
+  - `prev_tag`: The previous release tag.
+  - `new_version`: The target version.
 
-### main (gemini_triage_prompt.dart)
-Issue Triage prompt generator. Generates a prompt for Gemini Pro to analyze a GitHub issue and perform comprehensive triage: type classification, priority assignment, duplicate detection, area classification, and helpful comment generation.
-- **Signature:** `void main(List<String> args)`
-- **Parameters:**
-  - `args`: Command-line arguments (`<issue_number> <issue_title> <issue_author> <existing_labels> <issue_body> <open_issues_list>`).
-- **Return Type:** `void`
-- **Example Usage:**
-  ```bash
-  dart run scripts/prompts/gemini_triage_prompt.dart 42 "Bug in login" "user1" "bug" "Body text" "12,13" |     gemini -o json --yolo -s
-  ```
+### **gemini_release_notes_author_prompt.dart**
+- **Description**: Stage 3 CI Pipeline: Generates a prompt for the Release Notes Author to write detailed, user-friendly release notes (`release_notes.md`), migration guides, highlights, and issue cross-references to be published on the GitHub Release page.
+- **Usage**: `dart run scripts/prompts/gemini_release_notes_author_prompt.dart <prev_tag> <new_version> [bump_type]`
+- **Parameters**:
+  - `prev_tag`: The previous release tag.
+  - `new_version`: The target version.
+  - `bump_type` *(Optional)*: One of `patch`, `minor`, or `major`. If omitted, the script infers the bump type from the version change.
+
+### **gemini_triage_prompt.dart**
+- **Description**: GitHub Actions Issue Triage: Generates a prompt to instruct an Issue Triage Agent to analyze new issues, determining their type, priority, and functional area. It also attempts duplicate detection and drafts an initial helpful response.
+- **Usage**: `dart run scripts/prompts/gemini_triage_prompt.dart <issue_number> <issue_title> <issue_author> <existing_labels> <issue_body> <open_issues_list>`
+- **Parameters**:
+  - `issue_number`: GitHub issue number.
+  - `issue_title`: Title of the issue.
+  - `issue_author`: GitHub username of the reporter.
+  - `existing_labels`: Existing labels on the issue.
+  - `issue_body`: The content of the issue body.
+  - `open_issues_list`: A formatted string representing open issues for duplicate checking.
