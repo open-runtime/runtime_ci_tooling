@@ -1,0 +1,25 @@
+{
+  "version": "0.16.0",
+  "previous_version": "v0.15.0",
+  "total_commits": 4,
+  "categories": {
+    "added": [
+      {"description": "Add `manage_cicd update --diff` preview support and configurable CI Git URL rewrite orgs via `ci.git_orgs`", "pr": "#36", "commits": ["a8d587313261a04fb46d5e1c2e5f387f64fe1f74"]},
+      {"description": "Add multi-package hierarchical context/instructions for `documentation` and `autodoc`, including package-aware autodoc output pathing and a generated `docs/README.md` index", "pr": "#36", "commits": ["a8d587313261a04fb46d5e1c2e5f387f64fe1f74"]}
+    ],
+    "changed": [
+      {"description": "Deduplicate shared CI workflow setup/analysis/proto blocks via mustache partials to keep generated workflows consistent and maintainable", "pr": "#36", "commits": ["4f4d7434c3e3f7e7b27004e28f4adb5b10fb0d53"]},
+      {"description": "Apply dart format --line-length 120", "pr": "#36", "commits": ["e6f35ae87b1c5767215aac044c8d7d58d368d8f8"]}
+    ],
+    "deprecated": [],
+    "removed": [],
+    "fixed": [
+      {"description": "Fix autodoc output path drift", "pr": "#36", "commits": ["4f4d7434c3e3f7e7b27004e28f4adb5b10fb0d53"]},
+      {"description": "Ensure update `--diff` previews on local-customization skips", "pr": "#36", "commits": ["4f4d7434c3e3f7e7b27004e28f4adb5b10fb0d53"]},
+      {"description": "Move hierarchical autodoc index output to a non-destructive generated file", "pr": "#36", "commits": ["4f4d7434c3e3f7e7b27004e28f4adb5b10fb0d53"]},
+      {"description": "Expand regression coverage for `TestCommand` timeout/failure edge paths and add tests for new workflow generator and sub-package utility behaviors", "pr": "#36", "commits": ["a8d587313261a04fb46d5e1c2e5f387f64fe1f74"]},
+      {"description": "Confirm issue #30 is already resolved on main (streaming NDJSON parse in TestResultsUtil)", "pr": "#36", "commits": ["a8d587313261a04fb46d5e1c2e5f387f64fe1f74"]}
+    ],
+    "security": []
+  }
+}

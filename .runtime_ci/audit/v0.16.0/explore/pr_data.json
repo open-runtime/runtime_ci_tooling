@@ -1,0 +1,17 @@
+{
+  "pull_requests": [
+    {
+      "number": 36,
+      "title": "feat: address runtime_ci_tooling open-issue backlog",
+      "author": "tsavo-at-pieces",
+      "labels": [],
+      "summary": "Addresses the open issue backlog by adding `update --diff` preview support, configurable CI git orgs, multi-package support for autodoc and documentation, and deduping CI step templates.",
+      "commits": [
+        "a8d587313261a04fb46d5e1c2e5f387f64fe1f74",
+        "4f4d7434c3e3f7e7b27004e28f4adb5b10fb0d53",
+        "e6f35ae87b1c5767215aac044c8d7d58d368d8f8",
+        "527eeeb5f9c79e7e6e21c67639bd1f2c1eeea491"
+      ]
+    }
+  ]
+}
