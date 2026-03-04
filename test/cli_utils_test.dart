@@ -49,10 +49,7 @@ void main() {
     });
 
     test('returns default path when TEST_LOG_DIR is unset', () {
-      final resolved = RepoUtils.resolveTestLogDir(
-        repoRoot,
-        environment: const <String, String>{},
-      );
+      final resolved = RepoUtils.resolveTestLogDir(repoRoot, environment: const <String, String>{});
       expect(resolved, equals(p.join(repoRoot, '.dart_tool', 'test-logs')));
     });
 
@@ -76,10 +73,8 @@ void main() {
 
     test('throws when TEST_LOG_DIR is relative', () {
       expect(
-        () => RepoUtils.resolveTestLogDir(
-          repoRoot,
-          environment: const <String, String>{'TEST_LOG_DIR': 'relative/path'},
-        ),
+        () =>
+            RepoUtils.resolveTestLogDir(repoRoot, environment: const <String, String>{'TEST_LOG_DIR': 'relative/path'}),
         throwsA(isA<StateError>()),
       );
     });
@@ -88,10 +83,7 @@ void main() {
       final runnerTemp = p.join(repoRoot, 'runner-temp');
       final outside = p.join(repoRoot, 'outside', 'logs');
       expect(
-        () => RepoUtils.resolveTestLogDir(
-          repoRoot,
-          environment: {'RUNNER_TEMP': runnerTemp, 'TEST_LOG_DIR': outside},
-        ),
+        () => RepoUtils.resolveTestLogDir(repoRoot, environment: {'RUNNER_TEMP': runnerTemp, 'TEST_LOG_DIR': outside}),
         throwsA(isA<StateError>()),
       );
     });
@@ -111,10 +103,7 @@ void main() {
       expect(
         () => RepoUtils.resolveTestLogDir(
           repoRoot,
-          environment: {
-            'RUNNER_TEMP': '/tmp/runner\nbad',
-            'TEST_LOG_DIR': inside,
-          },
+          environment: {'RUNNER_TEMP': '/tmp/runner\nbad', 'TEST_LOG_DIR': inside},
         ),
         throwsA(isA<StateError>()),
       );
@@ -154,35 +143,19 @@ void main() {
       expect(File(filePath).readAsStringSync(), equals('hello world'));
     });
 
-    test(
-      'ensureSafeDirectory rejects symlink-backed directories',
-      skip: !symlinksSupported,
-      () {
-        final targetDir = Directory(p.join(tempDir.path, 'target'))
-          ..createSync(recursive: true);
-        final linkDirPath = p.join(tempDir.path, 'linked');
-        Link(linkDirPath).createSync(targetDir.path);
-        expect(
-          () => RepoUtils.ensureSafeDirectory(linkDirPath),
-          throwsA(isA<FileSystemException>()),
-        );
-      },
-    );
+    test('ensureSafeDirectory rejects symlink-backed directories', skip: !symlinksSupported, () {
+      final targetDir = Directory(p.join(tempDir.path, 'target'))..createSync(recursive: true);
+      final linkDirPath = p.join(tempDir.path, 'linked');
+      Link(linkDirPath).createSync(targetDir.path);
+      expect(() => RepoUtils.ensureSafeDirectory(linkDirPath), throwsA(isA<FileSystemException>()));
+    });
 
-    test(
-      'writeFileSafely rejects symlink file targets',
-      skip: !symlinksSupported,
-      () {
-        final targetFile = File(p.join(tempDir.path, 'target.txt'))
-          ..writeAsStringSync('base');
-        final linkPath = p.join(tempDir.path, 'linked.txt');
-        Link(linkPath).createSync(targetFile.path);
-        expect(
-          () => RepoUtils.writeFileSafely(linkPath, 'new content'),
-          throwsA(isA<FileSystemException>()),
-        );
-      },
-    );
+    test('writeFileSafely rejects symlink file targets', skip: !symlinksSupported, () {
+      final targetFile = File(p.join(tempDir.path, 'target.txt'))..writeAsStringSync('base');
+      final linkPath = p.join(tempDir.path, 'linked.txt');
+      Link(linkPath).createSync(targetFile.path);
+      expect(() => RepoUtils.writeFileSafely(linkPath, 'new content'), throwsA(isA<FileSystemException>()));
+    });
   });
 
   group('TestResultsUtil.parseTestResultsJson', () {
@@ -219,35 +192,27 @@ void main() {
       expect(results.failures, isEmpty);
     });
 
-    test(
-      'returns unparsed results when NDJSON file has only blank lines',
-      () async {
-        final jsonPath = p.join(tempDir.path, 'blank.json');
-        File(jsonPath).writeAsStringSync('\n  \n\t\n');
-        final results = await TestResultsUtil.parseTestResultsJson(jsonPath);
-        expect(results.parsed, isFalse);
-        expect(results.passed, equals(0));
-        expect(results.failed, equals(0));
-        expect(results.skipped, equals(0));
-        expect(results.failures, isEmpty);
-      },
-    );
+    test('returns unparsed results when NDJSON file has only blank lines', () async {
+      final jsonPath = p.join(tempDir.path, 'blank.json');
+      File(jsonPath).writeAsStringSync('\n  \n\t\n');
+      final results = await TestResultsUtil.parseTestResultsJson(jsonPath);
+      expect(results.parsed, isFalse);
+      expect(results.passed, equals(0));
+      expect(results.failed, equals(0));
+      expect(results.skipped, equals(0));
+      expect(results.failures, isEmpty);
+    });
 
-    test(
-      'returns unparsed results when file has valid JSON but no structured events',
-      () async {
-        final jsonPath = p.join(tempDir.path, 'no_events.json');
-        File(
-          jsonPath,
-        ).writeAsStringSync('{"type":"unknown","data":1}\n{"other":"value"}\n');
-        final results = await TestResultsUtil.parseTestResultsJson(jsonPath);
-        expect(results.parsed, isFalse);
-        expect(results.passed, equals(0));
-        expect(results.failed, equals(0));
-        expect(results.skipped, equals(0));
-        expect(results.failures, isEmpty);
-      },
-    );
+    test('returns unparsed results when file has valid JSON but no structured events', () async {
+      final jsonPath = p.join(tempDir.path, 'no_events.json');
+      File(jsonPath).writeAsStringSync('{"type":"unknown","data":1}\n{"other":"value"}\n');
+      final results = await TestResultsUtil.parseTestResultsJson(jsonPath);
+      expect(results.parsed, isFalse);
+      expect(results.passed, equals(0));
+      expect(results.failed, equals(0));
+      expect(results.skipped, equals(0));
+      expect(results.failures, isEmpty);
+    });
 
     test('parses pass/fail/skipped counts and failure details', () async {
       final jsonPath = p.join(tempDir.path, 'results.json');
@@ -377,12 +342,7 @@ void main() {
   });
 
   group('TestResultsUtil.writeTestJobSummary', () {
-    TestResults _parsed({
-      required int passed,
-      required int failed,
-      required int skipped,
-      int durationMs = 500,
-    }) {
+    TestResults _parsed({required int passed, required int failed, required int skipped, int durationMs = 500}) {
       final results = TestResults()
         ..parsed = true
         ..passed = passed
@@ -392,50 +352,39 @@ void main() {
       return results;
     }
 
-    test(
-      'emits NOTE when parsed results are successful and exit code is 0',
-      () {
-        String? summary;
-        final results = _parsed(passed: 3, failed: 0, skipped: 1);
+    test('emits NOTE when parsed results are successful and exit code is 0', () {
+      String? summary;
+      final results = _parsed(passed: 3, failed: 0, skipped: 1);
 
-        TestResultsUtil.writeTestJobSummary(
-          results,
-          0,
-          platformId: 'linux-x64',
-          writeSummary: (markdown) => summary = markdown,
-        );
+      TestResultsUtil.writeTestJobSummary(
+        results,
+        0,
+        platformId: 'linux-x64',
+        writeSummary: (markdown) => summary = markdown,
+      );
 
-        expect(summary, isNotNull);
-        expect(summary!, contains('## Test Results — linux-x64'));
-        expect(summary!, contains('> [!NOTE]'));
-        expect(summary!, contains('All 4 tests passed'));
-      },
-    );
+      expect(summary, isNotNull);
+      expect(summary!, contains('## Test Results — linux-x64'));
+      expect(summary!, contains('> [!NOTE]'));
+      expect(summary!, contains('All 4 tests passed'));
+    });
 
-    test(
-      'emits CAUTION when exit code is non-zero even if failed count is zero',
-      () {
-        String? summary;
-        final results = _parsed(passed: 2, failed: 0, skipped: 0);
+    test('emits CAUTION when exit code is non-zero even if failed count is zero', () {
+      String? summary;
+      final results = _parsed(passed: 2, failed: 0, skipped: 0);
 
-        TestResultsUtil.writeTestJobSummary(
-          results,
-          1,
-          platformId: 'linux <x64>',
-          writeSummary: (markdown) => summary = markdown,
-        );
+      TestResultsUtil.writeTestJobSummary(
+        results,
+        1,
+        platformId: 'linux <x64>',
+        writeSummary: (markdown) => summary = markdown,
+      );
 
-        expect(summary, isNotNull);
-        expect(summary!, contains('## Test Results — linux &lt;x64&gt;'));
-        expect(summary!, contains('> [!CAUTION]'));
-        expect(
-          summary!,
-          contains(
-            'Tests exited with code 1 despite no structured test failures.',
-          ),
-        );
-      },
-    );
+      expect(summary, isNotNull);
+      expect(summary!, contains('## Test Results — linux &lt;x64&gt;'));
+      expect(summary!, contains('> [!CAUTION]'));
+      expect(summary!, contains('Tests exited with code 1 despite no structured test failures.'));
+    });
 
     test('emits CAUTION for unparsed results with non-zero exit code', () {
       String? summary;
@@ -450,12 +399,7 @@ void main() {
 
       expect(summary, isNotNull);
       expect(summary!, contains('> [!CAUTION]'));
-      expect(
-        summary!,
-        contains(
-          'Tests failed (exit code 7) — no structured results available.',
-        ),
-      );
+      expect(summary!, contains('Tests failed (exit code 7) — no structured results available.'));
     });
 
     test('emits NOTE for unparsed results with zero exit code', () {
@@ -471,25 +415,14 @@ void main() {
 
       expect(summary, isNotNull);
       expect(summary!, contains('> [!NOTE]'));
-      expect(
-        summary!,
-        contains(
-          'Tests passed (exit code 0) — no structured results available.',
-        ),
-      );
+      expect(summary!, contains('Tests passed (exit code 0) — no structured results available.'));
     });
 
     test('emits CAUTION when parsed results contain failures', () {
       String? summary;
       final results = _parsed(passed: 1, failed: 1, skipped: 0);
       results.failures.add(
-        TestFailure(
-          name: 'failing test',
-          error: 'boom',
-          stackTrace: 'trace',
-          printOutput: '',
-          durationMs: 12,
-        ),
+        TestFailure(name: 'failing test', error: 'boom', stackTrace: 'trace', printOutput: '', durationMs: 12),
       );
 
       TestResultsUtil.writeTestJobSummary(
@@ -529,12 +462,7 @@ void main() {
       );
 
       expect(summary, isNotNull);
-      expect(
-        summary!,
-        contains(
-          '_...and 5 more failures. See test logs artifact for full details._',
-        ),
-      );
+      expect(summary!, contains('_...and 5 more failures. See test logs artifact for full details._'));
       expect(summary!, isNot(contains('failing test 24')));
     });
 
@@ -594,10 +522,7 @@ void main() {
 
   group('Utf8BoundedBuffer', () {
     test('appends full content when under byte limit', () {
-      final buffer = Utf8BoundedBuffer(
-        maxBytes: 20,
-        truncationSuffix: '...[truncated]',
-      );
+      final buffer = Utf8BoundedBuffer(maxBytes: 20, truncationSuffix: '...[truncated]');
       buffer.append('hello');
       buffer.append(' world');
       expect(buffer.isTruncated, isFalse);
@@ -614,18 +539,12 @@ void main() {
       expect(buffer.byteLength, equals(9));
     });
 
-    test(
-      'never exceeds maxBytes even when suffix is longer than remaining budget',
-      () {
-        final buffer = Utf8BoundedBuffer(
-          maxBytes: 4,
-          truncationSuffix: '...[truncated]',
-        );
-        buffer.append('abcdefgh');
-        expect(buffer.isTruncated, isTrue);
-        expect(utf8.encode(buffer.toString()).length, lessThanOrEqualTo(4));
-      },
-    );
+    test('never exceeds maxBytes even when suffix is longer than remaining budget', () {
+      final buffer = Utf8BoundedBuffer(maxBytes: 4, truncationSuffix: '...[truncated]');
+      buffer.append('abcdefgh');
+      expect(buffer.isTruncated, isTrue);
+      expect(utf8.encode(buffer.toString()).length, lessThanOrEqualTo(4));
+    });
   });
 
   group('StepSummary', () {
@@ -642,10 +561,7 @@ void main() {
         File(summaryPath).writeAsStringSync('x' * (maxBytes - 2));
         expect(File(summaryPath).lengthSync(), equals(maxBytes - 2));
 
-        StepSummary.write(
-          '語',
-          environment: {'GITHUB_STEP_SUMMARY': summaryPath},
-        );
+        StepSummary.write('語', environment: {'GITHUB_STEP_SUMMARY': summaryPath});
         // Should skip append (would exceed); file size unchanged
         expect(File(summaryPath).lengthSync(), equals(maxBytes - 2));
       } finally {
@@ -681,9 +597,7 @@ void main() {
 
     void _writeConfig(Map<String, dynamic> ci) {
       final configDir = Directory('${tempDir.path}/.runtime_ci')..createSync();
-      File(
-        '${configDir.path}/config.json',
-      ).writeAsStringSync(json.encode({'ci': ci}));
+      File('${configDir.path}/config.json').writeAsStringSync(json.encode({'ci': ci}));
     }
 
     test('returns empty when no sub_packages', () {
@@ -778,59 +692,45 @@ void main() {
       {'name': 'api', 'path': 'packages/api'},
     ];
 
-    test(
-      'buildHierarchicalDocumentationInstructions includes package structure',
-      () {
-        final instructions =
-            SubPackageUtils.buildHierarchicalDocumentationInstructions(
-              newVersion: '1.2.3',
-              subPackages: subPackages,
-            );
+    test('buildHierarchicalDocumentationInstructions includes package structure', () {
+      final instructions = SubPackageUtils.buildHierarchicalDocumentationInstructions(
+        newVersion: '1.2.3',
+        subPackages: subPackages,
+      );
 
-        expect(instructions, contains('Hierarchical Documentation Format'));
-        expect(instructions, contains('core'));
-        expect(instructions, contains('api'));
-        expect(instructions, contains('top-level overview'));
-      },
-    );
+      expect(instructions, contains('Hierarchical Documentation Format'));
+      expect(instructions, contains('core'));
+      expect(instructions, contains('api'));
+      expect(instructions, contains('top-level overview'));
+    });
 
-    test(
-      'buildHierarchicalAutodocInstructions includes module and package context',
-      () {
-        final instructions =
-            SubPackageUtils.buildHierarchicalAutodocInstructions(
-              moduleName: 'Analyzer Engine',
-              subPackages: subPackages,
-              moduleSubPackage: 'core',
-            );
+    test('buildHierarchicalAutodocInstructions includes module and package context', () {
+      final instructions = SubPackageUtils.buildHierarchicalAutodocInstructions(
+        moduleName: 'Analyzer Engine',
+        subPackages: subPackages,
+        moduleSubPackage: 'core',
+      );
 
-        expect(instructions, contains('Multi-Package Autodoc Context'));
-        expect(instructions, contains('Analyzer Engine'));
-        expect(instructions, contains('"core"'));
-        expect(instructions, contains('core, api'));
-      },
-    );
+      expect(instructions, contains('Multi-Package Autodoc Context'));
+      expect(instructions, contains('Analyzer Engine'));
+      expect(instructions, contains('"core"'));
+      expect(instructions, contains('core, api'));
+    });
 
-    test(
-      'hierarchical instruction builders return empty for single-package repos',
-      () {
-        expect(
-          SubPackageUtils.buildHierarchicalDocumentationInstructions(
-            newVersion: '1.2.3',
-            subPackages: const [],
-          ),
-          isEmpty,
-        );
-        expect(
-          SubPackageUtils.buildHierarchicalAutodocInstructions(
-            moduleName: 'Any',
-            subPackages: const [],
-            moduleSubPackage: null,
-          ),
-          isEmpty,
-        );
-      },
-    );
+    test('hierarchical instruction builders return empty for single-package repos', () {
+      expect(
+        SubPackageUtils.buildHierarchicalDocumentationInstructions(newVersion: '1.2.3', subPackages: const []),
+        isEmpty,
+      );
+      expect(
+        SubPackageUtils.buildHierarchicalAutodocInstructions(
+          moduleName: 'Any',
+          subPackages: const [],
+          moduleSubPackage: null,
+        ),
+        isEmpty,
+      );
+    });
   });
 
   group('autodoc index path', () {
@@ -848,65 +748,35 @@ void main() {
 
   group('resolveAutodocOutputPath', () {
     test('returns configured path unchanged when no moduleSubPackage', () {
-      expect(
-        resolveAutodocOutputPath(
-          configuredOutputPath: 'docs/foo',
-          moduleSubPackage: null,
-        ),
-        equals('docs/foo'),
-      );
-      expect(
-        resolveAutodocOutputPath(
-          configuredOutputPath: 'docs',
-          moduleSubPackage: null,
-        ),
-        equals('docs'),
-      );
+      expect(resolveAutodocOutputPath(configuredOutputPath: 'docs/foo', moduleSubPackage: null), equals('docs/foo'));
+      expect(resolveAutodocOutputPath(configuredOutputPath: 'docs', moduleSubPackage: null), equals('docs'));
     });
 
     test('treats docs/<sub_package> as already scoped (no duplication)', () {
       expect(
-        resolveAutodocOutputPath(
-          configuredOutputPath: 'docs/my_pkg',
-          moduleSubPackage: 'my_pkg',
-        ),
+        resolveAutodocOutputPath(configuredOutputPath: 'docs/my_pkg', moduleSubPackage: 'my_pkg'),
         equals('docs/my_pkg'),
       );
     });
 
     test('treats docs/<sub_package>/nested as already scoped', () {
       expect(
-        resolveAutodocOutputPath(
-          configuredOutputPath: 'docs/my_pkg/api',
-          moduleSubPackage: 'my_pkg',
-        ),
+        resolveAutodocOutputPath(configuredOutputPath: 'docs/my_pkg/api', moduleSubPackage: 'my_pkg'),
         equals('docs/my_pkg/api'),
       );
     });
 
     test('scopes unscoped path when moduleSubPackage present', () {
+      expect(resolveAutodocOutputPath(configuredOutputPath: 'docs', moduleSubPackage: 'my_pkg'), equals('docs/my_pkg'));
       expect(
-        resolveAutodocOutputPath(
-          configuredOutputPath: 'docs',
-          moduleSubPackage: 'my_pkg',
-        ),
-        equals('docs/my_pkg'),
-      );
-      expect(
-        resolveAutodocOutputPath(
-          configuredOutputPath: 'docs/other',
-          moduleSubPackage: 'my_pkg',
-        ),
+        resolveAutodocOutputPath(configuredOutputPath: 'docs/other', moduleSubPackage: 'my_pkg'),
         equals('docs/my_pkg/other'),
       );
     });
 
     test('preserves sub-package scoped docs paths outside root docs/', () {
       expect(
-        resolveAutodocOutputPath(
-          configuredOutputPath: 'packages/core/docs/utils/',
-          moduleSubPackage: 'core',
-        ),
+        resolveAutodocOutputPath(configuredOutputPath: 'packages/core/docs/utils/', moduleSubPackage: 'core'),
         equals('packages/core/docs/utils'),
       );
     });
@@ -914,69 +784,43 @@ void main() {
     test('normalization is idempotent (no drift across runs)', () {
       const path = 'docs/my_pkg';
       const subPkg = 'my_pkg';
-      final first = resolveAutodocOutputPath(
-        configuredOutputPath: path,
-        moduleSubPackage: subPkg,
-      );
-      final second = resolveAutodocOutputPath(
-        configuredOutputPath: first,
-        moduleSubPackage: subPkg,
-      );
+      final first = resolveAutodocOutputPath(configuredOutputPath: path, moduleSubPackage: subPkg);
+      final second = resolveAutodocOutputPath(configuredOutputPath: first, moduleSubPackage: subPkg);
       expect(first, equals(second));
       expect(first, equals('docs/my_pkg'));
     });
   });
 
   group('CiProcessRunner.exec', () {
-    test(
-      'fatal path exits with process exit code after flushing stdout/stderr',
-      () async {
-        final scriptPath = p.join(
-          p.current,
-          'test',
-          'scripts',
-          'fatal_exit_probe.dart',
-        );
-        final result = Process.runSync(Platform.resolvedExecutable, [
-          'run',
-          scriptPath,
-        ], runInShell: false);
-        final expectedCode = Platform.isWindows ? 7 : 1;
-        expect(
-          result.exitCode,
-          equals(expectedCode),
-          reason: 'fatal exec should exit with failing command exit code',
-        );
-      },
-    );
+    test('fatal path exits with process exit code after flushing stdout/stderr', () async {
+      final scriptPath = p.join(p.current, 'test', 'scripts', 'fatal_exit_probe.dart');
+      final result = Process.runSync(Platform.resolvedExecutable, ['run', scriptPath], runInShell: false);
+      final expectedCode = Platform.isWindows ? 7 : 1;
+      expect(result.exitCode, equals(expectedCode), reason: 'fatal exec should exit with failing command exit code');
+    });
   });
 
   group('CiProcessRunner.runWithTimeout', () {
     test('completes normally when process finishes within timeout', () async {
-      final result = await CiProcessRunner.runWithTimeout(
-        Platform.resolvedExecutable,
-        ['--version'],
-        timeout: const Duration(seconds: 10),
-      );
+      final result = await CiProcessRunner.runWithTimeout(Platform.resolvedExecutable, [
+        '--version',
+      ], timeout: const Duration(seconds: 10));
       expect(result.exitCode, equals(0));
       expect(result.stdout, contains('Dart'));
     });
 
-    test(
-      'returns timeout result and kills process when timeout exceeded',
-      () async {
-        final executable = Platform.isWindows ? 'ping' : 'sleep';
-        final args = Platform.isWindows ? ['127.0.0.1', '-n', '60'] : ['60'];
-        final result = await CiProcessRunner.runWithTimeout(
-          executable,
-          args,
-          timeout: const Duration(milliseconds: 500),
-          timeoutExitCode: 124,
-          timeoutMessage: 'Timed out',
-        );
-        expect(result.exitCode, equals(124));
-        expect(result.stderr, equals('Timed out'));
-      },
-    );
+    test('returns timeout result and kills process when timeout exceeded', () async {
+      final executable = Platform.isWindows ? 'ping' : 'sleep';
+      final args = Platform.isWindows ? ['127.0.0.1', '-n', '60'] : ['60'];
+      final result = await CiProcessRunner.runWithTimeout(
+        executable,
+        args,
+        timeout: const Duration(milliseconds: 500),
+        timeoutExitCode: 124,
+        timeoutMessage: 'Timed out',
+      );
+      expect(result.exitCode, equals(124));
+      expect(result.stderr, equals('Timed out'));
+    });
   });
 }
