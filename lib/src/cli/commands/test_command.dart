@@ -56,13 +56,14 @@ class TestCommand extends Command<void> {
     Duration processTimeout = const Duration(minutes: 45),
     Duration pubGetTimeout = const Duration(minutes: 5),
     _ExitHandler exitHandler = exitWithCode,
+    Map<String, String>? environment,
   }) async {
     Logger.header('Running dart test');
 
     final failures = <String>[];
 
     // Determine log directory: TEST_LOG_DIR (CI) or .dart_tool/test-logs/ (local)
-    final logDir = await _resolveLogDirOrExit(repoRoot, exitHandler);
+    final logDir = await _resolveLogDirOrExit(repoRoot, exitHandler, environment: environment);
     Logger.info('Log directory: $logDir');
 
     final jsonPath = p.join(logDir, 'results.json');
@@ -380,9 +381,13 @@ class TestCommand extends Command<void> {
     return -1;
   }
 
-  static Future<String> _resolveLogDirOrExit(String repoRoot, _ExitHandler exitHandler) async {
+  static Future<String> _resolveLogDirOrExit(
+    String repoRoot,
+    _ExitHandler exitHandler, {
+    Map<String, String>? environment,
+  }) async {
     try {
-      final logDir = RepoUtils.resolveTestLogDir(repoRoot);
+      final logDir = RepoUtils.resolveTestLogDir(repoRoot, environment: environment);
       RepoUtils.ensureSafeDirectory(logDir);
       return logDir;
     } on StateError catch (e) {

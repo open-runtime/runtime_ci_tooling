@@ -1494,9 +1494,11 @@ void main() {
 
     // ---- render(existingContent) / _preserveUserSections ----
     group('render(existingContent) preserves user sections', () {
+      String _normalizeLf(String input) => input.replaceAll('\r\n', '\n');
+
       test('user section content is preserved when existingContent has custom lines in a user block', () {
         final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
-        final base = gen.render();
+        final base = _normalizeLf(gen.render());
         // Append a user block with content so extraction finds it (first occurrence is empty)
         const customBlock = '''
 # --- BEGIN USER: pre-test ---
@@ -1514,7 +1516,7 @@ void main() {
 
       test('CRLF normalization: existing content with \\r\\n still preserves sections', () {
         final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
-        final base = gen.render();
+        final base = _normalizeLf(gen.render());
         const customContent = '\r\n      - run: echo "crlf-test"\r\n';
         final existing = base.replaceFirst(
           '# --- BEGIN USER: pre-test ---\n# --- END USER: pre-test ---',
@@ -1527,7 +1529,7 @@ void main() {
 
       test('multiple user sections preserve independently', () {
         final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
-        final base = gen.render();
+        final base = _normalizeLf(gen.render());
         var existing = base;
         existing = existing.replaceFirst(
           '# --- BEGIN USER: pre-test ---\n# --- END USER: pre-test ---',
@@ -1550,7 +1552,7 @@ void main() {
 
       test('empty/whitespace-only existing user section does not overwrite rendered section', () {
         final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
-        final base = gen.render();
+        final base = _normalizeLf(gen.render());
         // Existing has pre-test with only whitespace; post-test has real content
         final existing = base
             .replaceFirst(
@@ -1570,7 +1572,7 @@ void main() {
 
       test('unknown section name in existing content is silently ignored', () {
         final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
-        final base = gen.render();
+        final base = _normalizeLf(gen.render());
         // Add a user section that doesn't exist in the skeleton
         final existing = '$base\n# --- BEGIN USER: nonexistent ---\n  custom: stuff\n# --- END USER: nonexistent ---\n';
         final rendered = gen.render(existingContent: existing);
@@ -1583,7 +1585,7 @@ void main() {
 
       test('malformed section markers (missing END) are ignored', () {
         final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
-        final base = gen.render();
+        final base = _normalizeLf(gen.render());
         // Inject a BEGIN without matching END — regex won't match, so it's ignored
         final existing = base.replaceFirst(
           '# --- BEGIN USER: pre-test ---\n# --- END USER: pre-test ---',
@@ -1596,7 +1598,7 @@ void main() {
 
       test('mismatched section names (BEGIN X / END Y) are ignored', () {
         final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
-        final base = gen.render();
+        final base = _normalizeLf(gen.render());
         final existing = base.replaceFirst(
           '# --- BEGIN USER: pre-test ---\n# --- END USER: pre-test ---',
           '# --- BEGIN USER: pre-test ---\n      - run: echo mismatch\n# --- END USER: post-test ---',
@@ -1608,7 +1610,7 @@ void main() {
 
       test('section content with regex-special characters is preserved verbatim', () {
         final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
-        final base = gen.render();
+        final base = _normalizeLf(gen.render());
         // Content with regex special chars: $, (), *, +, ?, |, ^, {, }
         const specialContent = r'      - run: echo "${{ matrix.os }}" && test [[ "$(whoami)" == "ci" ]]';
         final existing = base.replaceFirst(
@@ -1621,7 +1623,7 @@ void main() {
 
       test('duplicate user section markers in existing content: last matched section wins', () {
         final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
-        final base = gen.render();
+        final base = _normalizeLf(gen.render());
         final existing =
             '''
 $base
@@ -1646,9 +1648,9 @@ $base
 
       test('existingContent with no user sections produces same output as fresh render', () {
         final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
-        final fresh = gen.render();
+        final fresh = _normalizeLf(gen.render());
         // Use a completely unrelated string as existing content
-        final rendered = gen.render(existingContent: 'name: SomeOtherWorkflow\non: push');
+        final rendered = _normalizeLf(gen.render(existingContent: 'name: SomeOtherWorkflow\non: push'));
         expect(rendered, equals(fresh));
       });
     });

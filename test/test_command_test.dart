@@ -57,14 +57,14 @@ void main() {
 
       // Completes without throwing or exit(1); StepSummary.write is no-op when
       // GITHUB_STEP_SUMMARY is unset (local runs).
-      await TestCommand.runWithRoot(tempDir.path);
+      await TestCommand.runWithRoot(tempDir.path, environment: const {});
     });
 
     test('uses passed repoRoot for log directory resolution', () async {
       // Create minimal repo
       writeRootPubspec();
 
-      await TestCommand.runWithRoot(tempDir.path);
+      await TestCommand.runWithRoot(tempDir.path, environment: const {});
 
       // Log dir should be under repoRoot when TEST_LOG_DIR is unset
       final expectedLogDir = p.join(tempDir.path, '.dart_tool', 'test-logs');
@@ -86,7 +86,7 @@ void main() {
       final pubGet = await Process.run('dart', ['pub', 'get'], workingDirectory: tempDir.path);
       expect(pubGet.exitCode, equals(0), reason: 'dart pub get must succeed');
 
-      await TestCommand.runWithRoot(tempDir.path);
+      await TestCommand.runWithRoot(tempDir.path, environment: const {});
 
       final logDir = p.join(tempDir.path, '.dart_tool', 'test-logs');
       expect(Directory(logDir).existsSync(), isTrue, reason: 'log dir should be created');
@@ -132,7 +132,11 @@ void main() {
       expect(pubGet.exitCode, equals(0), reason: 'dart pub get must succeed');
 
       await expectLater(
-        () => TestCommand.runWithRoot(tempDir.path, exitHandler: _throwingExit),
+        () => TestCommand.runWithRoot(
+          tempDir.path,
+          exitHandler: _throwingExit,
+          environment: const {},
+        ),
         throwsA(isA<_TestExit>().having((e) => e.code, 'code', 1)),
       );
     });
@@ -145,7 +149,11 @@ void main() {
       Directory(p.join(tempDir.path, 'packages', 'pkg_a')).createSync(recursive: true);
 
       await expectLater(
-        () => TestCommand.runWithRoot(tempDir.path, exitHandler: _throwingExit),
+        () => TestCommand.runWithRoot(
+          tempDir.path,
+          exitHandler: _throwingExit,
+          environment: const {},
+        ),
         throwsA(isA<_TestExit>().having((e) => e.code, 'code', 1)),
       );
     });
@@ -174,7 +182,12 @@ void main() {
 ''');
 
       await expectLater(
-        () => TestCommand.runWithRoot(tempDir.path, pubGetTimeout: Duration.zero, exitHandler: _throwingExit),
+        () => TestCommand.runWithRoot(
+          tempDir.path,
+          pubGetTimeout: Duration.zero,
+          exitHandler: _throwingExit,
+          environment: const {},
+        ),
         throwsA(isA<_TestExit>().having((e) => e.code, 'code', 1)),
       );
     });
