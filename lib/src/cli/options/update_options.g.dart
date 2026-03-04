@@ -13,6 +13,7 @@ UpdateOptions _$parseUpdateOptionsResult(ArgResults result) => UpdateOptions(
   workflows: result['workflows'] as bool,
   autodoc: result['autodoc'] as bool,
   backup: result['backup'] as bool,
+  diff: result['diff'] as bool,
 );
 
 ArgParser _$populateUpdateOptionsParser(ArgParser parser) => parser
@@ -21,7 +22,8 @@ ArgParser _$populateUpdateOptionsParser(ArgParser parser) => parser
   ..addFlag('config', help: 'Only merge new keys into .runtime_ci/config.json')
   ..addFlag('workflows', help: 'Only update GitHub workflow files (.github/workflows/)')
   ..addFlag('autodoc', help: 'Re-scan lib/src/ and update autodoc.json modules')
-  ..addFlag('backup', help: 'Write .bak backup before overwriting files');
+  ..addFlag('backup', help: 'Write .bak backup before overwriting files')
+  ..addFlag('diff', help: 'Show unified diffs for updated files');
 
 final _$parserForUpdateOptions = _$populateUpdateOptionsParser(ArgParser());
 

@@ -6,9 +6,14 @@ part of 'update_all_options.dart';
 // CliGenerator
 // **************************************************************************
 
+T _$badNumberFormat<T extends num>(String source, String type, String argName) =>
+    throw FormatException('Cannot parse "$source" into `$type` for option "$argName".');
+
 UpdateAllOptions _$parseUpdateAllOptionsResult(ArgResults result) => UpdateAllOptions(
   scanRoot: result['scan-root'] as String?,
-  concurrency: int.parse(result['concurrency'] as String),
+  concurrency:
+      int.tryParse(result['concurrency'] as String) ??
+      _$badNumberFormat(result['concurrency'] as String, 'int', 'concurrency'),
   force: result['force'] as bool,
   workflows: result['workflows'] as bool,
   templates: result['templates'] as bool,

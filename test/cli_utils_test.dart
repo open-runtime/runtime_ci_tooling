@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart' hide TestFailure;
 
+import 'package:runtime_ci_tooling/src/cli/utils/autodoc_scaffold.dart'
+    show kAutodocIndexPath, resolveAutodocOutputPath;
 import 'package:runtime_ci_tooling/src/cli/utils/process_runner.dart';
 import 'package:runtime_ci_tooling/src/cli/utils/repo_utils.dart';
 import 'package:runtime_ci_tooling/src/cli/utils/step_summary.dart';
@@ -681,6 +683,111 @@ void main() {
       expect(result.length, equals(1));
       expect(result[0]['name'], equals('good'));
       expect(result[0]['path'], equals('packages/good'));
+    });
+  });
+
+  group('SubPackageUtils hierarchical instruction builders', () {
+    final subPackages = <Map<String, dynamic>>[
+      {'name': 'core', 'path': 'packages/core'},
+      {'name': 'api', 'path': 'packages/api'},
+    ];
+
+    test('buildHierarchicalDocumentationInstructions includes package structure', () {
+      final instructions = SubPackageUtils.buildHierarchicalDocumentationInstructions(
+        newVersion: '1.2.3',
+        subPackages: subPackages,
+      );
+
+      expect(instructions, contains('Hierarchical Documentation Format'));
+      expect(instructions, contains('core'));
+      expect(instructions, contains('api'));
+      expect(instructions, contains('top-level overview'));
+    });
+
+    test('buildHierarchicalAutodocInstructions includes module and package context', () {
+      final instructions = SubPackageUtils.buildHierarchicalAutodocInstructions(
+        moduleName: 'Analyzer Engine',
+        subPackages: subPackages,
+        moduleSubPackage: 'core',
+      );
+
+      expect(instructions, contains('Multi-Package Autodoc Context'));
+      expect(instructions, contains('Analyzer Engine'));
+      expect(instructions, contains('"core"'));
+      expect(instructions, contains('core, api'));
+    });
+
+    test('hierarchical instruction builders return empty for single-package repos', () {
+      expect(
+        SubPackageUtils.buildHierarchicalDocumentationInstructions(newVersion: '1.2.3', subPackages: const []),
+        isEmpty,
+      );
+      expect(
+        SubPackageUtils.buildHierarchicalAutodocInstructions(
+          moduleName: 'Any',
+          subPackages: const [],
+          moduleSubPackage: null,
+        ),
+        isEmpty,
+      );
+    });
+  });
+
+  group('autodoc index path', () {
+    test('uses dedicated file under docs, not README.md', () {
+      expect(kAutodocIndexPath, isNot(equals('docs/README.md')));
+      expect(kAutodocIndexPath, startsWith('docs/'));
+      expect(kAutodocIndexPath, endsWith('.md'));
+    });
+
+    test('path indicates auto-generated content', () {
+      expect(kAutodocIndexPath, contains('AUTODOC'));
+      expect(kAutodocIndexPath, contains('INDEX'));
+    });
+  });
+
+  group('resolveAutodocOutputPath', () {
+    test('returns configured path unchanged when no moduleSubPackage', () {
+      expect(resolveAutodocOutputPath(configuredOutputPath: 'docs/foo', moduleSubPackage: null), equals('docs/foo'));
+      expect(resolveAutodocOutputPath(configuredOutputPath: 'docs', moduleSubPackage: null), equals('docs'));
+    });
+
+    test('treats docs/<sub_package> as already scoped (no duplication)', () {
+      expect(
+        resolveAutodocOutputPath(configuredOutputPath: 'docs/my_pkg', moduleSubPackage: 'my_pkg'),
+        equals('docs/my_pkg'),
+      );
+    });
+
+    test('treats docs/<sub_package>/nested as already scoped', () {
+      expect(
+        resolveAutodocOutputPath(configuredOutputPath: 'docs/my_pkg/api', moduleSubPackage: 'my_pkg'),
+        equals('docs/my_pkg/api'),
+      );
+    });
+
+    test('scopes unscoped path when moduleSubPackage present', () {
+      expect(resolveAutodocOutputPath(configuredOutputPath: 'docs', moduleSubPackage: 'my_pkg'), equals('docs/my_pkg'));
+      expect(
+        resolveAutodocOutputPath(configuredOutputPath: 'docs/other', moduleSubPackage: 'my_pkg'),
+        equals('docs/my_pkg/other'),
+      );
+    });
+
+    test('preserves sub-package scoped docs paths outside root docs/', () {
+      expect(
+        resolveAutodocOutputPath(configuredOutputPath: 'packages/core/docs/utils/', moduleSubPackage: 'core'),
+        equals('packages/core/docs/utils'),
+      );
+    });
+
+    test('normalization is idempotent (no drift across runs)', () {
+      const path = 'docs/my_pkg';
+      const subPkg = 'my_pkg';
+      final first = resolveAutodocOutputPath(configuredOutputPath: path, moduleSubPackage: subPkg);
+      final second = resolveAutodocOutputPath(configuredOutputPath: first, moduleSubPackage: subPkg);
+      expect(first, equals(second));
+      expect(first, equals('docs/my_pkg'));
     });
   });
 

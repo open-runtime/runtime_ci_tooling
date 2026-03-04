@@ -13,6 +13,7 @@ Map<String, dynamic> _validConfig({
   List<String>? platforms,
   Map<String, dynamic>? secrets,
   String? pat,
+  List<dynamic>? gitOrgs,
   dynamic lineLength,
   List<dynamic>? subPackages,
   Map<String, dynamic>? runnerOverrides,
@@ -24,6 +25,7 @@ Map<String, dynamic> _validConfig({
     if (platforms != null) 'platforms': platforms,
     if (secrets != null) 'secrets': secrets,
     if (pat != null) 'personal_access_token_secret': pat,
+    if (gitOrgs != null) 'git_orgs': gitOrgs,
     if (lineLength != null) 'line_length': lineLength,
     if (subPackages != null) 'sub_packages': subPackages,
     if (runnerOverrides != null) 'runner_overrides': runnerOverrides,
@@ -319,6 +321,41 @@ void main() {
       test('pat with lowercase produces error (uppercase only)', () {
         final errors = WorkflowGenerator.validate(_validConfig(pat: 'my_pat'));
         expect(errors, anyElement(contains('safe identifier')));
+      });
+    });
+
+    // ---- git_orgs ----
+    group('git_orgs', () {
+      test('non-list git_orgs produces error', () {
+        final config = _validConfig();
+        config['git_orgs'] = 'open-runtime';
+        final errors = WorkflowGenerator.validate(config);
+        expect(errors, anyElement(contains('git_orgs must be an array')));
+      });
+
+      test('empty git_orgs list produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(gitOrgs: []));
+        expect(errors, anyElement(contains('git_orgs must not be empty')));
+      });
+
+      test('git_orgs entry with whitespace produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(gitOrgs: [' open-runtime ']));
+        expect(errors, anyElement(contains('leading/trailing whitespace')));
+      });
+
+      test('git_orgs entry with unsupported characters produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(gitOrgs: ['open/runtime']));
+        expect(errors, anyElement(contains('unsupported characters')));
+      });
+
+      test('git_orgs duplicate entries produce error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(gitOrgs: ['open-runtime', 'open-runtime']));
+        expect(errors, anyElement(contains('duplicate org "open-runtime"')));
+      });
+
+      test('valid git_orgs list passes', () {
+        final errors = WorkflowGenerator.validate(_validConfig(gitOrgs: ['open-runtime', 'pieces-app', 'acme']));
+        expect(errors.where((e) => e.contains('git_orgs')), isEmpty);
       });
     });
 
@@ -1687,6 +1724,22 @@ $base
         expect(rendered, isNot(contains('TOKEN="\${{ secrets.')));
       });
 
+      test('custom git_orgs render configurable org rewrite rules', () {
+        final config = _minimalValidConfig()
+          ..['git_orgs'] = ['acme-runtime']
+          ..['personal_access_token_secret'] = 'GITHUB_TOKEN';
+        final gen = WorkflowGenerator(ciConfig: config, toolingVersion: '0.0.0-test');
+        final rendered = gen.render();
+        expect(
+          rendered,
+          contains(
+            'git config --global url."https://x-access-token:\${GH_PAT}@github.com/acme-runtime/".insteadOf "git@github.com:acme-runtime/"',
+          ),
+        );
+        expect(rendered, isNot(contains('git@github.com:open-runtime/')));
+        expect(rendered, isNot(contains('git@github.com:pieces-app/')));
+      });
+
       test('web_test without format_check: web-test needs omits auto-format', () {
         final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(webTest: true), toolingVersion: '0.0.0-test');
         final rendered = gen.render();
@@ -1916,6 +1969,42 @@ $base
         expect(rendered, contains('env.LOCALAPPDATA'));
         expect(rendered, contains("'~/.pub-cache'"));
         expect(rendered, contains("runner.os == 'Windows'"));
+      });
+
+      // Issue #12: shared step partials — verify dedup behavior
+      test('shared partials are resolved (no raw partial tags in output)', () {
+        final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
+        final rendered = gen.render();
+        expect(rendered, isNot(contains('<%> shared_')));
+        expect(rendered, isNot(contains('shared_setup_through_build')));
+        expect(rendered, isNot(contains('shared_analysis_block')));
+      });
+
+      test('shared step markers from partials appear in rendered output', () {
+        final gen = WorkflowGenerator(ciConfig: _minimalValidConfig(), toolingVersion: '0.0.0-test');
+        final rendered = gen.render();
+        expect(rendered, contains('# ── shared:checkout ──'));
+        expect(rendered, contains('# ── shared:git-config ──'));
+        expect(rendered, contains('# ── shared:dart-setup ──'));
+        expect(rendered, contains('# ── shared:pub-cache ──'));
+      });
+
+      test('multi-platform jobs use same shared setup partial (analyze and test)', () {
+        final gen = WorkflowGenerator(
+          ciConfig: _minimalValidConfig(platforms: ['ubuntu', 'macos']),
+          toolingVersion: '0.0.0-test',
+        );
+        final rendered = gen.render();
+        final analyzeIdx = rendered.indexOf('  analyze:');
+        final testIdx = rendered.indexOf('  test:');
+        expect(analyzeIdx, isNot(-1));
+        expect(testIdx, isNot(-1));
+        final analyzeSection = rendered.substring(analyzeIdx, testIdx);
+        final testSection = rendered.substring(testIdx);
+        expect(analyzeSection, contains('Configure Git for HTTPS with Token'));
+        expect(testSection, contains('Configure Git for HTTPS with Token'));
+        expect(analyzeSection, contains('Cache Dart pub dependencies'));
+        expect(testSection, contains('Cache Dart pub dependencies'));
       });
     });
   });

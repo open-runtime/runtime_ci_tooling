@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
+import 'package:path/path.dart' as p;
 
 import '../../triage/utils/config.dart';
 import '../../triage/utils/run_context.dart';
@@ -46,6 +47,7 @@ class UpdateCommand extends Command<void> {
     final dryRun = global.dryRun;
     final verbose = global.verbose;
     final force = opts.force;
+    final diff = opts.diff;
 
     Logger.header('Update Runtime CI Tooling Templates');
 
@@ -99,6 +101,7 @@ class UpdateCommand extends Command<void> {
           dryRun: dryRun,
           verbose: verbose,
           backup: opts.backup,
+          diff: diff,
         ),
         'cautious' => _processCautious(
           repoRoot,
@@ -110,6 +113,7 @@ class UpdateCommand extends Command<void> {
           dryRun: dryRun,
           verbose: verbose,
           backup: opts.backup,
+          diff: diff,
         ),
         'templated' => _processTemplated(
           repoRoot,
@@ -120,6 +124,7 @@ class UpdateCommand extends Command<void> {
           dryRun: dryRun,
           verbose: verbose,
           backup: opts.backup,
+          diff: diff,
         ),
         'mergeable' => _processMergeable(
           repoRoot,
@@ -130,8 +135,9 @@ class UpdateCommand extends Command<void> {
           force: force,
           dryRun: dryRun,
           verbose: verbose,
+          diff: diff,
         ),
-        'regeneratable' => _processRegeneratable(repoRoot, entry, dryRun: dryRun, verbose: verbose),
+        'regeneratable' => _processRegeneratable(repoRoot, entry, dryRun: dryRun, verbose: verbose, diff: diff),
         _ => _UpdateResult(entry.id, 'skipped', reason: 'unknown category: ${entry.category}'),
       };
 
@@ -203,10 +209,12 @@ class UpdateCommand extends Command<void> {
     required bool dryRun,
     required bool verbose,
     required bool backup,
+    required bool diff,
   }) {
     final templatePath = '$templatesDir/${entry.source}';
     final destPath = '$repoRoot/${entry.destination}';
     final templateHash = computeFileHash(templatePath);
+    final templateContent = File(templatePath).readAsStringSync();
     final installedHash = tracker.getInstalledHash(entry.id);
 
     if (templateHash == installedHash && !force) {
@@ -216,9 +224,12 @@ class UpdateCommand extends Command<void> {
 
     final destFile = File(destPath);
     if (!destFile.existsSync()) {
+      if (diff) {
+        _emitUnifiedDiff(destination: entry.destination, before: '', after: templateContent);
+      }
       if (!dryRun) {
         Directory(destFile.parent.path).createSync(recursive: true);
-        File(templatePath).copySync(destPath);
+        destFile.writeAsStringSync(templateContent);
         tracker.recordUpdate(
           entry.id,
           templateHash: templateHash,
@@ -236,16 +247,22 @@ class UpdateCommand extends Command<void> {
     final hasLocalChanges = previousConsumerHash != null && currentDestHash != previousConsumerHash;
 
     if (hasLocalChanges && !force) {
+      if (diff) {
+        _emitUnifiedDiff(destination: entry.destination, before: destFile.readAsStringSync(), after: templateContent);
+      }
       Logger.warn('  ${entry.id}: local customizations detected, skipping (use --force to overwrite)');
       return _UpdateResult(entry.id, 'warning', reason: 'local customizations -- use --force');
     }
 
+    if (diff) {
+      _emitUnifiedDiff(destination: entry.destination, before: destFile.readAsStringSync(), after: templateContent);
+    }
     if (!dryRun) {
       if (backup) {
         destFile.copySync('$destPath.bak');
         Logger.info('  ${entry.id}: backed up to ${entry.destination}.bak');
       }
-      File(templatePath).copySync(destPath);
+      destFile.writeAsStringSync(templateContent);
       tracker.recordUpdate(
         entry.id,
         templateHash: templateHash,
@@ -267,10 +284,12 @@ class UpdateCommand extends Command<void> {
     required bool dryRun,
     required bool verbose,
     required bool backup,
+    required bool diff,
   }) {
     final templatePath = '$templatesDir/${entry.source}';
     final destPath = '$repoRoot/${entry.destination}';
     final templateHash = computeFileHash(templatePath);
+    final templateContent = File(templatePath).readAsStringSync();
     final installedHash = tracker.getInstalledHash(entry.id);
 
     if (templateHash == installedHash && !force) {
@@ -280,9 +299,12 @@ class UpdateCommand extends Command<void> {
 
     final destFile = File(destPath);
     if (!destFile.existsSync()) {
+      if (diff) {
+        _emitUnifiedDiff(destination: entry.destination, before: '', after: templateContent);
+      }
       if (!dryRun) {
         Directory(destFile.parent.path).createSync(recursive: true);
-        File(templatePath).copySync(destPath);
+        destFile.writeAsStringSync(templateContent);
         tracker.recordUpdate(
           entry.id,
           templateHash: templateHash,
@@ -300,16 +322,22 @@ class UpdateCommand extends Command<void> {
         'Review manually or use --force to overwrite: ${entry.destination}',
       );
       Logger.info('    Compare with: $templatePath');
+      if (diff) {
+        _emitUnifiedDiff(destination: entry.destination, before: destFile.readAsStringSync(), after: templateContent);
+      }
       return _UpdateResult(entry.id, 'warning', reason: 'template changed -- review or use --force');
     }
 
     // --force: overwrite
+    if (diff) {
+      _emitUnifiedDiff(destination: entry.destination, before: destFile.readAsStringSync(), after: templateContent);
+    }
     if (!dryRun) {
       if (backup) {
         destFile.copySync('$destPath.bak');
         Logger.info('  ${entry.id}: backed up to ${entry.destination}.bak');
       }
-      File(templatePath).copySync(destPath);
+      destFile.writeAsStringSync(templateContent);
       tracker.recordUpdate(
         entry.id,
         templateHash: templateHash,
@@ -330,6 +358,7 @@ class UpdateCommand extends Command<void> {
     required bool force,
     required bool dryRun,
     required bool verbose,
+    required bool diff,
   }) {
     final destPath = '$repoRoot/${entry.destination}';
     final destFile = File(destPath);
@@ -346,8 +375,9 @@ class UpdateCommand extends Command<void> {
       return _UpdateResult(entry.id, 'skipped', reason: 'no reference template');
     }
 
+    final originalContent = destFile.readAsStringSync();
     final refConfig = json.decode(refFile.readAsStringSync()) as Map<String, dynamic>;
-    final consumerConfig = json.decode(destFile.readAsStringSync()) as Map<String, dynamic>;
+    final consumerConfig = json.decode(originalContent) as Map<String, dynamic>;
 
     final addedKeys = <String>[];
     _deepMergeNewKeys(refConfig, consumerConfig, addedKeys, prefix: '');
@@ -362,8 +392,12 @@ class UpdateCommand extends Command<void> {
       Logger.info('    + $key');
     }
 
+    final mergedContent = '${const JsonEncoder.withIndent('  ').convert(consumerConfig)}\n';
+    if (diff) {
+      _emitUnifiedDiff(destination: entry.destination, before: originalContent, after: mergedContent);
+    }
     if (!dryRun) {
-      destFile.writeAsStringSync('${const JsonEncoder.withIndent('  ').convert(consumerConfig)}\n');
+      destFile.writeAsStringSync(mergedContent);
       tracker.recordUpdate(
         entry.id,
         templateHash: computeFileHash(refPath),
@@ -381,6 +415,7 @@ class UpdateCommand extends Command<void> {
     TemplateEntry entry, {
     required bool dryRun,
     required bool verbose,
+    required bool diff,
   }) {
     final destPath = '$repoRoot/${entry.destination}';
     final destFile = File(destPath);
@@ -390,7 +425,8 @@ class UpdateCommand extends Command<void> {
       return _UpdateResult(entry.id, 'warning', reason: 'file missing -- run init');
     }
 
-    final autodocConfig = json.decode(destFile.readAsStringSync()) as Map<String, dynamic>;
+    final originalContent = destFile.readAsStringSync();
+    final autodocConfig = json.decode(originalContent) as Map<String, dynamic>;
     final existingModules = (autodocConfig['modules'] as List).cast<Map<String, dynamic>>();
     final existingIds = existingModules.map((m) => m['id'] as String).toSet();
 
@@ -427,8 +463,12 @@ class UpdateCommand extends Command<void> {
       return _UpdateResult(entry.id, 'skipped', reason: 'no new modules');
     }
 
+    final regeneratedContent = '${const JsonEncoder.withIndent('  ').convert(autodocConfig)}\n';
+    if (diff) {
+      _emitUnifiedDiff(destination: entry.destination, before: originalContent, after: regeneratedContent);
+    }
     if (!dryRun) {
-      destFile.writeAsStringSync('${const JsonEncoder.withIndent('  ').convert(autodocConfig)}\n');
+      destFile.writeAsStringSync(regeneratedContent);
     }
 
     Logger.success('  ${entry.id}: added $newModuleCount new module(s)');
@@ -444,6 +484,7 @@ class UpdateCommand extends Command<void> {
     required bool dryRun,
     required bool verbose,
     required bool backup,
+    required bool diff,
   }) {
     // Templated entries require a source skeleton
     if (entry.source == null) {
@@ -492,6 +533,9 @@ class UpdateCommand extends Command<void> {
       return _UpdateResult(entry.id, 'skipped', reason: 'output unchanged');
     }
 
+    if (diff) {
+      _emitUnifiedDiff(destination: entry.destination, before: existingContent ?? '', after: rendered);
+    }
     if (!dryRun) {
       if (backup && destFile.existsSync()) {
         destFile.copySync('$destPath.bak');
@@ -517,6 +561,46 @@ class UpdateCommand extends Command<void> {
   // ═══════════════════════════════════════════════════════════════════════════
   // Utilities
   // ═══════════════════════════════════════════════════════════════════════════
+
+  void _emitUnifiedDiff({required String destination, required String before, required String after}) {
+    if (before == after) return;
+    Directory? tempDir;
+    try {
+      tempDir = Directory.systemTemp.createTempSync('runtime_ci_diff_');
+      final beforeFile = File(p.join(tempDir.path, 'before.txt'))..writeAsStringSync(before);
+      final afterFile = File(p.join(tempDir.path, 'after.txt'))..writeAsStringSync(after);
+
+      final result = Process.runSync('git', [
+        '--no-pager',
+        'diff',
+        '--no-index',
+        '--',
+        beforeFile.path,
+        afterFile.path,
+      ]);
+      var diffText = '${result.stdout ?? ''}${result.stderr ?? ''}'.trimRight();
+      if (diffText.isEmpty) {
+        Logger.info('  [diff] ${entryPath(destination)} changed');
+        return;
+      }
+
+      final normalizedPath = entryPath(destination);
+      diffText = diffText.replaceAll('a${beforeFile.path}', 'a/$normalizedPath');
+      diffText = diffText.replaceAll('b${afterFile.path}', 'b/$normalizedPath');
+      diffText = diffText.replaceAll(beforeFile.path, 'a/$normalizedPath');
+      diffText = diffText.replaceAll(afterFile.path, 'b/$normalizedPath');
+      Logger.info('  [diff] ${entryPath(destination)}');
+      Logger.info(diffText);
+    } catch (e) {
+      Logger.warn('  [diff] Could not render unified diff for ${entryPath(destination)}: $e');
+    } finally {
+      if (tempDir != null && tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    }
+  }
+
+  String entryPath(String destination) => destination.replaceAll(RegExp(r'^/+'), '');
 
   /// Recursively merge keys from [source] into [target] that don't exist in
   /// target. Records added key paths to [addedKeys].

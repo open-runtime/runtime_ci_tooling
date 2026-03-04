@@ -68,6 +68,8 @@
     "_comment_artifact_retention_days": "Optional: retention for uploaded test artifacts in days (1-90).",
     "artifact_retention_days": 7,
     "personal_access_token_secret": "GITHUB_TOKEN",
+    "_comment_git_orgs": "Optional: organizations to rewrite SSH git URLs for in CI checkout/pub get steps.",
+    "git_orgs": ["open-runtime", "pieces-app"],
     "features": {
       "proto": false,
       "lfs": false,

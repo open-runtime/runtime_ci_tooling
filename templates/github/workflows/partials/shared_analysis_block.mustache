@@ -1,0 +1,45 @@
+{{=<% %>=}}
+      # ── shared:analysis-cache ──
+<%#analysis_cache%>
+      - name: Cache Dart analysis
+        uses: actions/cache@v5.0.3
+        with:
+          path: ~/.dartServer
+          key: ${{ runner.os }}-${{ runner.arch }}-dart-analysis-${{ hashFiles('**/*.dart', '**/pubspec.yaml') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-dart-analysis-
+
+<%/analysis_cache%>
+      # ── shared:proto-verify ──
+<%#proto%>
+      - name: Verify proto files
+        run: dart run runtime_ci_tooling:manage_cicd verify-protos
+
+<%/proto%>
+      # ── shared:analyze ──
+<%#managed_analyze%>
+      - name: Analyze
+        run: dart run runtime_ci_tooling:manage_cicd analyze
+<%/managed_analyze%>
+<%^managed_analyze%>
+      - name: Analyze
+        run: |
+          dart analyze 2>&1 | tee "$RUNNER_TEMP/analysis.txt"
+          if grep -q "^  error -" "$RUNNER_TEMP/analysis.txt"; then
+            echo "::error::Analysis errors found"
+            exit 1
+          fi
+<%/managed_analyze%>
+
+      # ── shared:sub-packages ──
+<%#sub_packages%>
+      - name: Analyze (<%name%>)
+        working-directory: <%path%>
+        run: |
+          GIT_LFS_SKIP_SMUDGE=1 dart pub get
+          dart analyze 2>&1 | tee "$RUNNER_TEMP/sub_analysis.txt"
+          if grep -q "^  error -" "$RUNNER_TEMP/sub_analysis.txt"; then
+            echo "::error::Errors found in <%name%>"
+            exit 1
+          fi
+
+<%/sub_packages%>

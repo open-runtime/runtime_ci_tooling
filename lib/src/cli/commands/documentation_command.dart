@@ -13,6 +13,7 @@ import '../utils/logger.dart';
 import '../utils/process_runner.dart';
 import '../utils/prompt_resolver.dart';
 import '../utils/repo_utils.dart';
+import '../utils/sub_package_utils.dart';
 import '../utils/version_detection.dart';
 
 const String _kGeminiProModel = 'gemini-3.1-pro-preview';
@@ -68,6 +69,16 @@ class DocumentationCommand extends Command<void> {
       exit(1);
     }
     ctx.savePrompt('documentation', prompt);
+
+    // Enrich prompt with sub-package context for multi-package repos.
+    SubPackageUtils.enrichPromptWithSubPackages(
+      repoRoot: repoRoot,
+      prevTag: prevTag,
+      promptFilePath: ctx.artifactPath('documentation', 'prompt.txt'),
+      buildInstructions: SubPackageUtils.buildHierarchicalDocumentationInstructions,
+      newVersion: newVersion,
+      verbose: global.verbose,
+    );
 
     if (global.dryRun) {
       Logger.info('[DRY-RUN] Would run Gemini for documentation update (${prompt.length} chars)');

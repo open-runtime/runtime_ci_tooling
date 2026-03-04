@@ -93,106 +93,8 @@ jobs:
 <%/secrets_list%>
 <%/has_secrets%>
     steps:
-      # ── shared:checkout ── keep in sync with multi_platform ──
-      - uses: actions/checkout@v6.0.2
-        with:
-<%#format_check%>
-          ref: ${{ needs.auto-format.outputs.sha }}
-<%/format_check%>
-          fetch-depth: 1
-          persist-credentials: false
-<%#lfs%>
-          lfs: true
-<%/lfs%>
-
-      # ── shared:git-config ── keep in sync with multi_platform ──
-      - name: Configure Git for HTTPS with Token
-        shell: bash
-        env:
-          GH_PAT: ${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}
-        run: |
-          echo "::add-mask::${GH_PAT}"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "git@github.com:"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
-
-      # ── shared:dart-setup ── keep in sync with multi_platform ──
-      - uses: dart-lang/setup-dart@v1.7.1
-        with:
-          sdk: "<%dart_sdk%>"
-
-      # ── shared:pub-cache ── keep in sync with multi_platform ──
-      # Windows: %LOCALAPPDATA%\Pub\Cache (Dart default). Unix: ~/.pub-cache
-      - name: Cache Dart pub dependencies
-        uses: actions/cache@v5.0.3
-        with:
-          path: ${{ runner.os == 'Windows' && format('{0}\\Pub\\Cache', env.LOCALAPPDATA) || '~/.pub-cache' }}
-          key: ${{ runner.os }}-${{ runner.arch }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
-          restore-keys: ${{ runner.os }}-${{ runner.arch }}-dart-pub-
-
-      # ── shared:proto-setup ── keep in sync with multi_platform ──
-<%#proto%>
-      - name: Install protoc
-        uses: arduino/setup-protoc@v3.0.0
-
-      - run: dart pub global activate protoc_plugin 25.0.0
-
-<%/proto%>
-      # ── shared:pub-get ── keep in sync with multi_platform ──
-      - run: dart pub get
-        env:
-          GIT_LFS_SKIP_SMUDGE: "1"
-
-<%#build_runner%>
-      - name: Run build_runner
-        run: dart run build_runner build --delete-conflicting-outputs
-
-<%/build_runner%>
-      # ── shared:analysis-cache ── keep in sync with multi_platform ──
-<%#analysis_cache%>
-      - name: Cache Dart analysis
-        uses: actions/cache@v5.0.3
-        with:
-          path: ~/.dartServer
-          key: ${{ runner.os }}-${{ runner.arch }}-dart-analysis-${{ hashFiles('**/*.dart', '**/pubspec.yaml') }}
-          restore-keys: ${{ runner.os }}-${{ runner.arch }}-dart-analysis-
-
-<%/analysis_cache%>
-      # ── shared:proto-verify ── keep in sync with multi_platform ──
-<%#proto%>
-      - name: Verify proto files
-        run: dart run runtime_ci_tooling:manage_cicd verify-protos
-
-<%/proto%>
-      # ── shared:analyze ── keep in sync with multi_platform ──
-<%#managed_analyze%>
-      - name: Analyze
-        run: dart run runtime_ci_tooling:manage_cicd analyze
-<%/managed_analyze%>
-<%^managed_analyze%>
-      - name: Analyze
-        run: |
-          dart analyze 2>&1 | tee "$RUNNER_TEMP/analysis.txt"
-          if grep -q "^  error -" "$RUNNER_TEMP/analysis.txt"; then
-            echo "::error::Analysis errors found"
-            exit 1
-          fi
-<%/managed_analyze%>
-
-      # ── shared:sub-packages ── keep in sync with multi_platform ──
-<%#sub_packages%>
-      - name: Analyze (<%name%>)
-        working-directory: <%path%>
-        run: |
-          GIT_LFS_SKIP_SMUDGE=1 dart pub get
-          dart analyze 2>&1 | tee "$RUNNER_TEMP/sub_analysis.txt"
-          if grep -q "^  error -" "$RUNNER_TEMP/sub_analysis.txt"; then
-            echo "::error::Errors found in <%name%>"
-            exit 1
-          fi
-
-<%/sub_packages%>
+<%> shared_setup_through_build %>
+<%> shared_analysis_block %>
 # --- BEGIN USER: pre-test ---
 # --- END USER: pre-test ---
 
@@ -249,106 +151,8 @@ jobs:
 <%/secrets_list%>
 <%/has_secrets%>
     steps:
-      # ── shared:checkout ── keep in sync with single_platform ──
-      - uses: actions/checkout@v6.0.2
-        with:
-<%#format_check%>
-          ref: ${{ needs.auto-format.outputs.sha }}
-<%/format_check%>
-          fetch-depth: 1
-          persist-credentials: false
-<%#lfs%>
-          lfs: true
-<%/lfs%>
-
-      # ── shared:git-config ── keep in sync with single_platform ──
-      - name: Configure Git for HTTPS with Token
-        shell: bash
-        env:
-          GH_PAT: ${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}
-        run: |
-          echo "::add-mask::${GH_PAT}"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "git@github.com:"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
-
-      # ── shared:dart-setup ── keep in sync with single_platform ──
-      - uses: dart-lang/setup-dart@v1.7.1
-        with:
-          sdk: "<%dart_sdk%>"
-
-      # ── shared:pub-cache ── keep in sync with single_platform ──
-      # Windows: %LOCALAPPDATA%\Pub\Cache (Dart default). Unix: ~/.pub-cache
-      - name: Cache Dart pub dependencies
-        uses: actions/cache@v5.0.3
-        with:
-          path: ${{ runner.os == 'Windows' && format('{0}\\Pub\\Cache', env.LOCALAPPDATA) || '~/.pub-cache' }}
-          key: ${{ runner.os }}-${{ runner.arch }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
-          restore-keys: ${{ runner.os }}-${{ runner.arch }}-dart-pub-
-
-      # ── shared:proto-setup ── keep in sync with single_platform ──
-<%#proto%>
-      - name: Install protoc
-        uses: arduino/setup-protoc@v3.0.0
-
-      - run: dart pub global activate protoc_plugin 25.0.0
-
-<%/proto%>
-      # ── shared:pub-get ── keep in sync with single_platform ──
-      - run: dart pub get
-        env:
-          GIT_LFS_SKIP_SMUDGE: "1"
-
-<%#build_runner%>
-      - name: Run build_runner
-        run: dart run build_runner build --delete-conflicting-outputs
-
-<%/build_runner%>
-      # ── shared:analysis-cache ── keep in sync with single_platform ──
-<%#analysis_cache%>
-      - name: Cache Dart analysis
-        uses: actions/cache@v5.0.3
-        with:
-          path: ~/.dartServer
-          key: ${{ runner.os }}-${{ runner.arch }}-dart-analysis-${{ hashFiles('**/*.dart', '**/pubspec.yaml') }}
-          restore-keys: ${{ runner.os }}-${{ runner.arch }}-dart-analysis-
-
-<%/analysis_cache%>
-      # ── shared:proto-verify ── keep in sync with single_platform ──
-<%#proto%>
-      - name: Verify proto files
-        run: dart run runtime_ci_tooling:manage_cicd verify-protos
-
-<%/proto%>
-      # ── shared:analyze ── keep in sync with single_platform ──
-<%#managed_analyze%>
-      - name: Analyze
-        run: dart run runtime_ci_tooling:manage_cicd analyze
-<%/managed_analyze%>
-<%^managed_analyze%>
-      - name: Analyze
-        run: |
-          dart analyze 2>&1 | tee "$RUNNER_TEMP/analysis.txt"
-          if grep -q "^  error -" "$RUNNER_TEMP/analysis.txt"; then
-            echo "::error::Analysis errors found"
-            exit 1
-          fi
-<%/managed_analyze%>
-
-      # ── shared:sub-packages ── keep in sync with single_platform ──
-<%#sub_packages%>
-      - name: Analyze (<%name%>)
-        working-directory: <%path%>
-        run: |
-          GIT_LFS_SKIP_SMUDGE=1 dart pub get
-          dart analyze 2>&1 | tee "$RUNNER_TEMP/sub_analysis.txt"
-          if grep -q "^  error -" "$RUNNER_TEMP/sub_analysis.txt"; then
-            echo "::error::Errors found in <%name%>"
-            exit 1
-          fi
-
-<%/sub_packages%>
+<%> shared_setup_through_build %>
+<%> shared_analysis_block %>
   test:
     needs: [pre-check, analyze<%#format_check%>, auto-format<%/format_check%>]
     if: needs.pre-check.outputs.should_run == 'true'
@@ -364,66 +168,11 @@ jobs:
 <%/secrets_list%>
 <%/has_secrets%>
     steps:
-      # ── shared:checkout ── keep in sync with single_platform ──
-      - uses: actions/checkout@v6.0.2
-        with:
-<%#format_check%>
-          ref: ${{ needs.auto-format.outputs.sha }}
-<%/format_check%>
-          fetch-depth: 1
-          persist-credentials: false
-<%#lfs%>
-          lfs: true
-<%/lfs%>
-
-      # ── shared:git-config ── keep in sync with single_platform ──
-      - name: Configure Git for HTTPS with Token
-        shell: bash
-        env:
-          GH_PAT: ${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}
-        run: |
-          echo "::add-mask::${GH_PAT}"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "git@github.com:"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
-
-      # ── shared:dart-setup ── keep in sync with single_platform ──
-      - uses: dart-lang/setup-dart@v1.7.1
-        with:
-          sdk: "<%dart_sdk%>"
-
-      # ── shared:pub-cache ── keep in sync with single_platform ──
-      # Windows: %LOCALAPPDATA%\Pub\Cache (Dart default). Unix: ~/.pub-cache
-      - name: Cache Dart pub dependencies
-        uses: actions/cache@v5.0.3
-        with:
-          path: ${{ runner.os == 'Windows' && format('{0}\\Pub\\Cache', env.LOCALAPPDATA) || '~/.pub-cache' }}
-          key: ${{ runner.os }}-${{ runner.arch }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
-          restore-keys: ${{ runner.os }}-${{ runner.arch }}-dart-pub-
-
-      # ── shared:proto-setup ── keep in sync with single_platform ──
-<%#proto%>
-      - name: Install protoc
-        uses: arduino/setup-protoc@v3.0.0
-
-      - run: dart pub global activate protoc_plugin 25.0.0
-
-<%/proto%>
-      # ── shared:pub-get ── keep in sync with single_platform ──
-      - run: dart pub get
-        env:
-          GIT_LFS_SKIP_SMUDGE: "1"
-
-<%#build_runner%>
-      - name: Run build_runner
-        run: dart run build_runner build --delete-conflicting-outputs
-
-<%/build_runner%>
+<%> shared_setup_through_build %>
 # --- BEGIN USER: pre-test ---
 # --- END USER: pre-test ---
 
-      # ── shared:test ── keep in sync with single_platform ──
+      # ── shared:test ──
 <%#managed_test%>
       - name: Test
         shell: bash
@@ -476,68 +225,8 @@ jobs:
 <%/secrets_list%>
 <%/has_secrets%>
     steps:
-      # ── shared:checkout ── keep in sync with single_platform / multi_platform ──
-      - uses: actions/checkout@v6.0.2
-        with:
-<%#format_check%>
-          ref: ${{ needs.auto-format.outputs.sha }}
-<%/format_check%>
-          fetch-depth: 1
-          persist-credentials: false
-<%#lfs%>
-          lfs: true
-<%/lfs%>
-
-      # ── shared:git-config ── keep in sync with single_platform / multi_platform ──
-      - name: Configure Git for HTTPS with Token
-        shell: bash
-        env:
-          GH_PAT: ${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}
-        run: |
-          echo "::add-mask::${GH_PAT}"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "git@github.com:"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
-
-      # ── shared:dart-setup ── keep in sync with single_platform / multi_platform ──
-      - uses: dart-lang/setup-dart@v1.7.1
-        with:
-          sdk: "<%dart_sdk%>"
-
-      # ── shared:pub-cache ── keep in sync with single_platform / multi_platform ──
-      # Windows: %LOCALAPPDATA%\Pub\Cache (Dart default). Unix: ~/.pub-cache
-      - name: Cache Dart pub dependencies
-        uses: actions/cache@v5.0.3
-        with:
-          path: ${{ runner.os == 'Windows' && format('{0}\\Pub\\Cache', env.LOCALAPPDATA) || '~/.pub-cache' }}
-          key: ${{ runner.os }}-${{ runner.arch }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
-          restore-keys: ${{ runner.os }}-${{ runner.arch }}-dart-pub-
-
-      # ── shared:proto-setup ── keep in sync with single_platform / multi_platform ──
-<%#proto%>
-      - name: Install protoc
-        uses: arduino/setup-protoc@v3.0.0
-
-      - run: dart pub global activate protoc_plugin 25.0.0
-
-<%/proto%>
-      # ── shared:pub-get ── keep in sync with single_platform / multi_platform ──
-      - run: dart pub get
-        env:
-          GIT_LFS_SKIP_SMUDGE: "1"
-
-<%#build_runner%>
-      - name: Run build_runner
-        run: dart run build_runner build --delete-conflicting-outputs
-
-<%/build_runner%>
-      # ── shared:proto-verify ── keep in sync with single_platform / multi_platform ──
-<%#proto%>
-      - name: Verify proto files
-        run: dart run runtime_ci_tooling:manage_cicd verify-protos
-
-<%/proto%>
+<%> shared_setup_through_build %>
+<%> shared_proto_verify %>
       - name: Setup Chrome
         id: setup-chrome
         uses: browser-actions/setup-chrome@4f8e94349a351df0f048634f25fec36c3c91eded # v2.1.1

@@ -1,0 +1,58 @@
+{{=<% %>=}}
+      # ── shared:checkout ──
+      - uses: actions/checkout@v6.0.2
+        with:
+<%#format_check%>
+          ref: ${{ needs.auto-format.outputs.sha }}
+<%/format_check%>
+          fetch-depth: 1
+          persist-credentials: false
+<%#lfs%>
+          lfs: true
+<%/lfs%>
+
+      # ── shared:git-config ──
+      - name: Configure Git for HTTPS with Token
+        shell: bash
+        env:
+          GH_PAT: ${{ secrets.<%pat_secret%> || secrets.GITHUB_TOKEN }}
+        run: |
+          echo "::add-mask::${GH_PAT}"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "git@github.com:"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "ssh://git@github.com/"
+<%#git_orgs%>
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/<%org%>/".insteadOf "git@github.com:<%org%>/"
+<%/git_orgs%>
+
+      # ── shared:dart-setup ──
+      - uses: dart-lang/setup-dart@v1.7.1
+        with:
+          sdk: "<%dart_sdk%>"
+
+      # ── shared:pub-cache ──
+      # Windows: %LOCALAPPDATA%\Pub\Cache (Dart default). Unix: ~/.pub-cache
+      - name: Cache Dart pub dependencies
+        uses: actions/cache@v5.0.3
+        with:
+          path: ${{ runner.os == 'Windows' && format('{0}\\Pub\\Cache', env.LOCALAPPDATA) || '~/.pub-cache' }}
+          key: ${{ runner.os }}-${{ runner.arch }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-dart-pub-
+
+      # ── shared:proto-setup ──
+<%#proto%>
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3.0.0
+
+      - run: dart pub global activate protoc_plugin 25.0.0
+
+<%/proto%>
+      # ── shared:pub-get ──
+      - run: dart pub get
+        env:
+          GIT_LFS_SKIP_SMUDGE: "1"
+
+<%#build_runner%>
+      - name: Run build_runner
+        run: dart run build_runner build --delete-conflicting-outputs
+
+<%/build_runner%>
