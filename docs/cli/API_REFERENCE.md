@@ -1,364 +1,683 @@
 # CI/CD CLI API Reference
 
-This document provides a comprehensive API reference for the CI/CD CLI module.
-
 ## 1. Classes
 
-### CLI Engine & Commands
+### Core Usage Example
 
+```dart
+import 'package:runtime_ci_tooling/src/cli/manage_cicd_cli.dart';
+
+void main(List<String> args) async {
+  final runner = ManageCicdCli();
+  await runner.run(args);
+}
+```
+
+
+### Commands
 **ManageCicdCli** -- CLI entry point for CI/CD Automation.
-- **Methods:**
-  - `Future<void> run(Iterable<String> args)`: Runs the command runner.
-  - `static GlobalOptions parseGlobalOptions(ArgResults? results)`: Parses global options from ArgResults.
-  - `static bool isVerbose(ArgResults? results)`: Returns true if verbose mode is enabled.
-  - `static bool isDryRun(ArgResults? results)`: Returns true if dry-run mode is enabled.
+- **Methods**:
+  - `run(Iterable<String> args) -> Future<void>`: Runs the command with arguments. Intercepts and rewrites shorthand `triage <number>`.
+  - `parseGlobalOptions(ArgResults? results) -> GlobalOptions`: Parses global options from ArgResults.
+  - `isVerbose(ArgResults? results) -> bool`: Returns true if verbose mode is enabled.
+  - `isDryRun(ArgResults? results) -> bool`: Returns true if dry-run mode is enabled.
 
 **AnalyzeCommand** -- Run `dart analyze` on the root package and all configured sub-packages.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
+
+  **Example:**
+  ```dart
+  import 'package:runtime_ci_tooling/src/cli/commands/analyze_command.dart';
+
+  final command = AnalyzeCommand();
+  // Typically invoked via ManageCicdCli, but can be run directly.
+  ```
+
 
 **ArchiveRunCommand** -- Archive a CI/CD run to `.runtime_ci/audit/vX.X.X/` for permanent storage.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
-**AuditAllCommand** -- Recursively audit all `pubspec.yaml` files under a directory against the package registry.
+**AuditAllCommand** -- Recursively audit all pubspec.yaml files under a directory against the package registry.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
-**AuditCommand** -- Audit a `pubspec.yaml` against the package registry for dependency issues.
+**AuditCommand** -- Audit a pubspec.yaml against the package registry for dependency issues.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
 **AutodocCommand** -- Generate/update documentation for proto modules using Gemini Pro.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
 **ComposeCommand** -- Run Stage 2 Changelog Composer (Gemini Pro).
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
 **ConfigureMcpCommand** -- Set up MCP servers (GitHub, Sentry).
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
 **ConsumersCommand** -- Discover runtime_ci_tooling consumers and sync latest release data.
-- **Methods:**
-  - `static int computeNextDiscoveryIndexFromNames(Iterable<String> fileNames)`: Computes the next discovery index.
-  - `static String buildDiscoverySnapshotName({required int index, required DateTime localTime})`: Builds a discovery filename.
-  - `static String resolveVersionFolderName(String tagName)`: Keeps release folder names aligned with tag names.
-  - `static String snapshotIdentityFromPath(String path)`: Filename identity used for resume across workspaces.
-  - `static bool isSnapshotSourceCompatible(...)`: Checks snapshot source compatibility.
-  - `static bool isReleaseSummaryReusable(...)`: Checks if release summary is reusable.
-  - `static String buildReleaseOutputPath(...)`: Returns the expected release output path.
-  - `static String? selectTagFromReleaseList(...)`: Selects the latest matching tag.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `computeNextDiscoveryIndexFromNames(Iterable<String> fileNames) -> int`
+  - `buildDiscoverySnapshotName({required int index, required DateTime localTime}) -> String`
+  - `resolveVersionFolderName(String tagName) -> String`
+  - `snapshotIdentityFromPath(String path) -> String`
+  - `isSnapshotSourceCompatible({required String? sourceSnapshotPath, required String? sourceSnapshotIdentity, required String expectedSnapshotPath}) -> bool`
+  - `isReleaseSummaryReusable({required String status, required String outputPath, required String? tag, required String? exactTag}) -> bool`
+  - `buildReleaseOutputPath({required String outputDir, required String repoName, required String tagName}) -> String`
+  - `selectTagFromReleaseList({required List<Map<String, dynamic>> releases, required bool includePrerelease, RegExp? tagPattern}) -> String?`
+  - `run() -> Future<void>`
 
 **CreateReleaseCommand** -- Create git tag, GitHub Release, commit all changes.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
 **DetermineVersionCommand** -- Determine SemVer bump via Gemini + regex.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
 **DocumentationCommand** -- Run documentation update via Gemini 3 Pro Preview.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
 **ExploreCommand** -- Run Stage 1 Explorer Agent (Gemini 3 Pro Preview).
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
-**InitCommand** -- Scan repo and generate `.runtime_ci/config.json` + `autodoc.json` + scaffold workflows.
+**InitCommand** -- Scan repo and generate config files + scaffold workflows.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
 **MergeAuditTrailsCommand** -- Merge CI/CD audit artifacts from multiple jobs.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
 **ReleaseCommand** -- Run the full local release pipeline.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
 **ReleaseNotesCommand** -- Run Stage 3 Release Notes Author (Gemini 3 Pro Preview).
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
-**SetupCommand** -- Install all prerequisites (Node.js, Gemini CLI, gh, jq, tree).
+**SetupCommand** -- Install all prerequisites.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
 **StatusCommand** -- Show current CI/CD configuration status.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
-**TestCommand** -- Run `dart test`.
+**TestCommand** -- Run `dart test` with full output capture and job summary.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
+  - `runWithRoot(String repoRoot, {Duration processTimeout, Duration pubGetTimeout, _ExitHandler exitHandler, Map<String, String>? environment}) -> Future<void>`
 
 **TriageCommand** -- Issue triage pipeline with AI-powered investigation.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
 
 **TriageAutoCommand** -- Auto-triage all untriaged open issues.
-
-**TriageSingleCommand** -- Triage a single issue by number.
-- **Methods:**
-  - `static Future<void> runSingle(int issueNumber, ArgResults? globalResults)`: Shared logic for triaging a single issue.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
 **TriagePostReleaseCommand** -- Close loop after release.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
 **TriagePreReleaseCommand** -- Scan issues for upcoming release.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
 **TriageResumeCommand** -- Resume a previously interrupted triage run.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+  - `invocation`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
+
+**TriageSingleCommand** -- Triage a single issue by number.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+  - `invocation`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
+  - `runSingle(int issueNumber, ArgResults? globalResults) -> Future<void>`
 
 **TriageStatusCommand** -- Show triage pipeline status.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
-**UpdateAllCommand** -- Discover and update all `runtime_ci_tooling` packages under a root directory.
+**UpdateAllCommand** -- Discover and update all runtime_ci_tooling packages under a root directory.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
-**UpdateCommand** -- Update templates, configs, and workflows from `runtime_ci_tooling`.
+**UpdateCommand** -- Update templates, configs, and workflows from runtime_ci_tooling.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
 **ValidateCommand** -- Validate all configuration files.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
 **VerifyProtosCommand** -- Verify proto source and generated files exist.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
-**VersionCommand** -- Show the next SemVer version (no side effects).
+**VersionCommand** -- Show the next SemVer version.
+- **Fields**:
+  - `name`: `String`
+  - `description`: `String`
+- **Methods**:
+  - `run() -> Future<void>`
 
-=== CLI Options
+### Options Classes
 
-**ArchiveRunOptions** -- CLI options for the `archive-run` command.
-- **Fields:**
-  - `String? runDir`: Directory containing the CI run to archive.
-- **Constructors:**
-  - `const ArchiveRunOptions({this.runDir})`
+Options classes are used to type-safely parse arguments using `build_cli`.
+
+**Example:**
+```dart
+import 'package:runtime_ci_tooling/src/cli/options/global_options.dart';
+import 'package:args/args.dart';
+
+void parseArgs(List<String> args) {
+  final parser = ArgParser();
+  GlobalOptionsArgParser.populateParser(parser);
+  
+  final results = parser.parse(args);
+  final options = GlobalOptions.fromArgResults(results);
+  
+  if (options.verbose) {
+    print('Verbose mode enabled');
+  }
+}
+```
+
+
+**ArchiveRunOptions** -- CLI options for the archive-run command.
+- **Fields**:
+  - `runDir`: `String?`
+- **Constructors**:
+  - `ArchiveRunOptions({this.runDir})`
   - `factory ArchiveRunOptions.fromArgResults(ArgResults results)`
 
-**AutodocOptions** -- CLI options for the `autodoc` command.
-- **Fields:**
-  - `bool init`: Scan repo and create initial autodoc.json.
-  - `bool force`: Regenerate all docs regardless of hash.
-  - `String? module`: Only generate for a specific module.
-- **Constructors:**
-  - `const AutodocOptions({this.init = false, this.force = false, this.module})`
+**AutodocOptions** -- CLI options for the autodoc command.
+- **Fields**:
+  - `init`: `bool`
+  - `force`: `bool`
+  - `module`: `String?`
+- **Constructors**:
+  - `AutodocOptions({this.init = false, this.force = false, this.module})`
   - `factory AutodocOptions.fromArgResults(ArgResults results)`
 
-**CreateReleaseOptions** -- CLI options for the `create-release` command.
-- **Fields:**
-  - `String? artifactsDir`: Directory containing downloaded CI artifacts.
-  - `String? repo`: GitHub repository slug (owner/repo).
-- **Constructors:**
-  - `const CreateReleaseOptions({this.artifactsDir, this.repo})`
+**CreateReleaseOptions** -- CLI options for the create-release command.
+- **Fields**:
+  - `artifactsDir`: `String?`
+  - `repo`: `String?`
+- **Constructors**:
+  - `CreateReleaseOptions({this.artifactsDir, this.repo})`
   - `factory CreateReleaseOptions.fromArgResults(ArgResults results)`
 
-**DetermineVersionOptions** -- CLI options for the `determine-version` command.
-- **Fields:**
-  - `bool outputGithubActions`: Write version outputs to `$GITHUB_OUTPUT`.
-- **Constructors:**
-  - `const DetermineVersionOptions({this.outputGithubActions = false})`
+**DetermineVersionOptions** -- CLI options for the determine-version command.
+- **Fields**:
+  - `outputGithubActions`: `bool`
+- **Constructors**:
+  - `DetermineVersionOptions({this.outputGithubActions = false})`
   - `factory DetermineVersionOptions.fromArgResults(ArgResults results)`
 
 **GlobalOptions** -- Global CLI options available to all commands.
-- **Fields:**
-  - `bool dryRun`: Show what would be done without executing.
-  - `bool verbose`: Show detailed command output.
-- **Constructors:**
-  - `const GlobalOptions({this.dryRun = false, this.verbose = false})`
+- **Fields**:
+  - `dryRun`: `bool`
+  - `verbose`: `bool`
+- **Constructors**:
+  - `GlobalOptions({this.dryRun = false, this.verbose = false})`
   - `factory GlobalOptions.fromArgResults(ArgResults results)`
 
-**ManageCicdOptions** -- Combined CLI options for the `manage_cicd` entry point.
-- **Fields:**
-  - `bool dryRun`, `bool verbose`, `String? prevTag`, `String? version`, `bool outputGithubActions`, `String? artifactsDir`, `String? repo`, `String? releaseTag`, `String? releaseUrl`, `String? manifest`.
-- **Constructors:**
-  - `const ManageCicdOptions(...)`
+**ManageCicdOptions** -- Combined CLI options for manage_cicd.dart entry point.
+- **Fields**:
+  - `dryRun`: `bool`
+  - `verbose`: `bool`
+  - `prevTag`: `String?`
+  - `version`: `String?`
+  - `outputGithubActions`: `bool`
+  - `artifactsDir`: `String?`
+  - `repo`: `String?`
+  - `releaseTag`: `String?`
+  - `releaseUrl`: `String?`
+  - `manifest`: `String?`
+- **Constructors**:
+  - `ManageCicdOptions({...})`
 
-**MergeAuditTrailsOptions** -- CLI options for the `merge-audit-trails` command.
-- **Fields:**
-  - `String? incomingDir`: Directory containing incoming audit trail artifacts.
-  - `String? outputDir`: Output directory for merged audit trails.
-- **Constructors:**
-  - `const MergeAuditTrailsOptions({this.incomingDir, this.outputDir})`
+**MergeAuditTrailsOptions** -- CLI options for the merge-audit-trails command.
+- **Fields**:
+  - `incomingDir`: `String?`
+  - `outputDir`: `String?`
+- **Constructors**:
+  - `MergeAuditTrailsOptions({this.incomingDir, this.outputDir})`
   - `factory MergeAuditTrailsOptions.fromArgResults(ArgResults results)`
 
-**PostReleaseTriageOptions** -- CLI options for the `post-release-triage` command.
-- **Fields:**
-  - `String? releaseTag`: Git tag for the release.
-  - `String? releaseUrl`: URL of the GitHub release page.
-  - `String? manifest`: Path to issue_manifest.json.
-- **Constructors:**
-  - `const PostReleaseTriageOptions({this.releaseTag, this.releaseUrl, this.manifest})`
+**PostReleaseTriageOptions** -- CLI options for the post-release-triage command.
+- **Fields**:
+  - `releaseTag`: `String?`
+  - `releaseUrl`: `String?`
+  - `manifest`: `String?`
+- **Constructors**:
+  - `PostReleaseTriageOptions({this.releaseTag, this.releaseUrl, this.manifest})`
   - `factory PostReleaseTriageOptions.fromArgResults(ArgResults results)`
 
-**TriageCliOptions** -- Combined CLI options for the `triage_cli` entry point.
-- **Fields:**
-  - `bool dryRun`, `bool verbose`, `bool auto`, `bool status`, `bool force`, `bool preRelease`, `bool postRelease`, `String? resume`, `String? prevTag`, `String? version`, `String? releaseTag`, `String? releaseUrl`, `String? manifest`.
-- **Constructors:**
-  - `const TriageCliOptions(...)`
+**TriageCliOptions** -- Combined CLI options for triage_cli.dart entry point.
+- **Fields**:
+  - `dryRun`: `bool`
+  - `verbose`: `bool`
+  - `auto`: `bool`
+  - `status`: `bool`
+  - `force`: `bool`
+  - `preRelease`: `bool`
+  - `postRelease`: `bool`
+  - `resume`: `String?`
+  - `prevTag`: `String?`
+  - `version`: `String?`
+  - `releaseTag`: `String?`
+  - `releaseUrl`: `String?`
+  - `manifest`: `String?`
+- **Constructors**:
+  - `TriageCliOptions({...})`
+  - `factory TriageCliOptions.fromArgResults(ArgResults results)`
 
 **TriageOptions** -- CLI options shared by triage subcommands that acquire a lock.
-- **Fields:**
-  - `bool force`: Override an existing triage lock.
-- **Constructors:**
-  - `const TriageOptions({this.force = false})`
+- **Fields**:
+  - `force`: `bool`
+- **Constructors**:
+  - `TriageOptions({this.force = false})`
   - `factory TriageOptions.fromArgResults(ArgResults results)`
 
-**UpdateAllOptions** -- CLI options for the `update-all` command.
-- **Fields:**
-  - `String? scanRoot`, `int concurrency`, `bool force`, `bool workflows`, `bool templates`, `bool config`, `bool autodoc`, `bool backup`.
-- **Constructors:**
-  - `const UpdateAllOptions(...)`
+**UpdateAllOptions** -- CLI options for the update-all command.
+- **Fields**:
+  - `scanRoot`: `String?`
+  - `concurrency`: `int`
+  - `force`: `bool`
+  - `workflows`: `bool`
+  - `templates`: `bool`
+  - `config`: `bool`
+  - `autodoc`: `bool`
+  - `backup`: `bool`
+- **Constructors**:
+  - `UpdateAllOptions({...})`
   - `factory UpdateAllOptions.fromArgResults(ArgResults results)`
 
-**UpdateOptions** -- CLI options for the `update` command.
-- **Fields:**
-  - `bool force`, `bool templates`, `bool config`, `bool workflows`, `bool autodoc`, `bool backup`.
-- **Constructors:**
-  - `const UpdateOptions(...)`
+**UpdateOptions** -- CLI options for the update command.
+- **Fields**:
+  - `force`: `bool`
+  - `templates`: `bool`
+  - `config`: `bool`
+  - `workflows`: `bool`
+  - `autodoc`: `bool`
+  - `backup`: `bool`
+  - `diff`: `bool`
+- **Methods**:
+  - `updateAll`: `bool` (getter)
+- **Constructors**:
+  - `UpdateOptions({...})`
   - `factory UpdateOptions.fromArgResults(ArgResults results)`
 
-**VersionOptions** -- Version-related CLI options shared by multiple commands.
-- **Fields:**
-  - `String? prevTag`: Override previous tag detection.
-  - `String? version`: Override version (skip auto-detection).
-- **Constructors:**
-  - `const VersionOptions({this.prevTag, this.version})`
+**VersionOptions** -- Version-related CLI options.
+- **Fields**:
+  - `prevTag`: `String?`
+  - `version`: `String?`
+- **Constructors**:
+  - `VersionOptions({this.prevTag, this.version})`
   - `factory VersionOptions.fromArgResults(ArgResults results)`
 
-### Audit Utilities
+### Utilities & Core
 
-**AuditFinding** -- A single finding from auditing a pubspec dependency against the package registry.
-- **Fields:**
-  - `String pubspecPath`: Absolute path to the pubspec.yaml that was audited.
-  - `String dependencyName`: The dependency name that triggered this finding.
-  - `AuditSeverity severity`: How severe this finding is.
-  - `AuditCategory category`: Which audit rule was violated.
-  - `String message`: Human-readable description of the issue.
-  - `String? currentValue`: The current value in the pubspec.
-  - `String? expectedValue`: The expected value from the registry.
-- **Constructors:**
-  - `const AuditFinding(...)`
+**AuditFinding** -- A single finding from auditing a pubspec dependency.
+- **Fields**:
+  - `pubspecPath`: `String`
+  - `dependencyName`: `String`
+  - `severity`: `AuditSeverity`
+  - `category`: `AuditCategory`
+  - `message`: `String`
+  - `currentValue`: `String?`
+  - `expectedValue`: `String?`
 
-**RegistryEntry** -- A single entry from the external workspace packages registry.
-- **Fields:**
-  - `String githubOrg`, `String githubRepo`, `String version`, `String tagPattern`, `String localPath`, `String? packageName`, `String? gitPath`.
-  - `String expectedGitUrl`: The expected SSH git URL for this package (getter).
-- **Constructors:**
-  - `const RegistryEntry(...)`
-
-**PackageRegistry** -- Loads the external workspace packages YAML and provides O(1) lookup by dependency name.
-- **Constructors:**
-  - `factory PackageRegistry.load(String yamlPath)`
-- **Methods:**
-  - `static PackageRegistry? loadFromFile(String yamlPath)`
-  - `static PackageRegistry? loadFromString(String yamlContent)`
-  - `RegistryEntry? lookup(String packageName)`: Look up a registry entry by dependency name.
-- **Fields/Getters:**
-  - `Iterable<String> names`: All registered dependency names.
-  - `Map<String, RegistryEntry> entries`: All entries as an unmodifiable map.
-  - `int length`: Total number of unique entries.
+**PackageRegistry** -- Registry of git-sourced workspace packages.
+- **Fields**:
+  - `names`: `Iterable<String>`
+  - `entries`: `Map<String, RegistryEntry>`
+  - `length`: `int`
+- **Methods**:
+  - `lookup(String packageName) -> RegistryEntry?`
+  - `load(String yamlPath) -> PackageRegistry` (factory)
+  - `loadFromFile(String yamlPath) -> PackageRegistry?` (static)
+  - `loadFromString(String yamlContent) -> PackageRegistry?` (static)
 
 **PubspecAuditor** -- Audits pubspec.yaml dependency declarations against a PackageRegistry.
-- **Fields:**
-  - `PackageRegistry registry`: The package registry to validate against.
-- **Constructors:**
-  - `const PubspecAuditor({required this.registry})`
-- **Methods:**
-  - `List<AuditFinding> auditPubspec(String pubspecPath)`: Audit a single pubspec.yaml file and return all findings.
-  - `bool fixPubspec(String pubspecPath, List<AuditFinding> findings)`: Apply fixes for the given findings to the pubspec.
+- **Fields**:
+  - `registry`: `PackageRegistry`
+- **Methods**:
+  - `auditPubspec(String pubspecPath) -> List<AuditFinding>`
+  - `fixPubspec(String pubspecPath, List<AuditFinding> findings) -> bool`
 
-### Core Utilities
+**RegistryEntry** -- A single entry from the external workspace packages registry.
+- **Fields**:
+  - `githubOrg`: `String`
+  - `githubRepo`: `String`
+  - `version`: `String`
+  - `tagPattern`: `String`
+  - `localPath`: `String`
+  - `packageName`: `String?`
+  - `gitPath`: `String?`
+  - `expectedGitUrl`: `String`
 
-**FileUtils** -- File system utilities for CI/CD operations.
-- **Methods:**
-  - `static void copyDirRecursive(Directory src, Directory dst)`
-  - `static int countFiles(Directory dir)`
-  - `static String readFileOr(String path, [String fallback = "(not available)"])`
+**FileUtils** -- File system utilities.
+- **Methods**:
+  - `copyDirRecursive(Directory src, Directory dst) -> void` (static)
+  - `countFiles(Directory dir) -> int` (static)
+  - `readFileOr(String path, [String fallback = '(not available)']) -> String` (static)
 
 **GeminiPrerequisiteError** -- Exception thrown when Gemini CLI prerequisites are not met.
-- **Fields:**
-  - `String message`
+- **Fields**:
+  - `message`: `String`
+- **Methods**:
+  - `toString() -> String`
 
 **GeminiUtils** -- Utilities for Gemini CLI integration.
-- **Methods:**
-  - `static bool geminiAvailable({bool warnOnly = false})`
-  - `static void requireGeminiCli()`
-  - `static void requireApiKey()`
-  - `static String extractJson(String rawOutput)`
-  - `static String? extractJsonObject(String text)`
+- **Methods**:
+  - `geminiAvailable({bool warnOnly = false}) -> bool` (static)
+  - `requireGeminiCli() -> void` (static)
+  - `requireApiKey() -> void` (static)
+  - `extractJson(String rawOutput) -> String` (static)
+  - `extractJsonObject(String text) -> String?` (static)
+
+  **Example:**
+  ```dart
+  import 'package:runtime_ci_tooling/src/cli/utils/gemini_utils.dart';
+
+  if (GeminiUtils.geminiAvailable(warnOnly: true)) {
+    GeminiUtils.requireApiKey();
+    final jsonOutput = GeminiUtils.extractJson('{"foo": "bar"}');
+  }
+  ```
+
 
 **HookInstaller** -- Installs and manages git pre-commit hooks for Dart repos.
-- **Methods:**
-  - `static bool install(String repoRoot, {int lineLength = 120, bool dryRun = false})`
+- **Methods**:
+  - `install(String repoRoot, {int lineLength = 120, bool dryRun = false}) -> bool` (static)
 
-**Logger** -- ANSI-styled console logging for CI/CD commands.
-- **Methods:**
-  - `static void header(String msg)`
-  - `static void info(String msg)`
-  - `static void success(String msg)`
-  - `static void warn(String msg)`
-  - `static void error(String msg)`
+**Logger** -- ANSI-styled console logging.
+- **Methods**:
+  - `header(String msg) -> void` (static)
+  - `info(String msg) -> void` (static)
+  - `success(String msg) -> void` (static)
+  - `warn(String msg) -> void` (static)
+  - `error(String msg) -> void` (static)
 
 **CiProcessRunner** -- Utilities for running external processes.
-- **Methods:**
-  - `static bool commandExists(String command)`
-  - `static String runSync(String command, String workingDirectory, {bool verbose = false})`
-  - `static void exec(String executable, List<String> args, {String? cwd, bool fatal = false, bool verbose = false})`
+- **Methods**:
+  - `commandExists(String command) -> bool` (static)
+  - `runSync(String command, String workingDirectory, {bool verbose = false}) -> String` (static)
+  - `exec(String executable, List<String> args, {String? cwd, bool fatal = false, bool verbose = false}) -> Future<void>` (static)
+  - `runWithTimeout(String executable, List<String> arguments, {String? workingDirectory, Duration timeout = const Duration(minutes: 5), int timeoutExitCode = 124, String timeoutMessage = 'Timed out'}) -> Future<ProcessResult>` (static)
+  - `killAndAwaitExit(Process process) -> Future<void>` (static)
 
-**PromptResolver** -- Resolves paths to prompt scripts within the runtime_ci_tooling package.
-- **Methods:**
-  - `static String promptScript(String scriptName)`
-  - `static String resolveToolingPackageRoot()`
+**PromptResolver** -- Resolves paths to prompt scripts.
+- **Methods**:
+  - `promptScript(String scriptName) -> String` (static)
+  - `resolveToolingPackageRoot() -> String` (static)
 
 **ReleaseUtils** -- Utilities for release management.
-- **Methods:**
-  - `static String buildReleaseCommitMessage(...)`
-  - `static List<Map<String, String>> gatherVerifiedContributors(String repoRoot, String prevTag)`
-  - `static String buildFallbackReleaseNotes(String repoRoot, String version, String prevTag)`
-  - `static void addChangelogReferenceLinks(String repoRoot, String content)`
+- **Methods**:
+  - `buildReleaseCommitMessage({required String repoRoot, required String version, required String prevTag, required Directory releaseDir, bool verbose = false}) -> String` (static)
+  - `gatherVerifiedContributors(String repoRoot, String prevTag) -> List<Map<String, String>>` (static)
+  - `buildFallbackReleaseNotes(String repoRoot, String version, String prevTag) -> String` (static)
+  - `addChangelogReferenceLinks(String repoRoot, String content) -> void` (static)
 
-**RepoUtils** -- Utilities for finding and working with the required repository root.
-- **Methods:**
-  - `static String? findRepoRoot()`
+**RepoUtils** -- Utilities for repository roots and paths.
+- **Methods**:
+  - `findRepoRoot() -> String?` (static)
+  - `resolveTestLogDir(String repoRoot, {Map<String, String>? environment}) -> String` (static)
+  - `isSymlinkPath(String path) -> bool` (static)
+  - `ensureSafeDirectory(String dirPath) -> void` (static)
+  - `writeFileSafely(String filePath, String content, {FileMode mode = FileMode.write}) -> void` (static)
+
+  **Example:**
+  ```dart
+  import 'package:runtime_ci_tooling/src/cli/utils/repo_utils.dart';
+
+  final root = RepoUtils.findRepoRoot();
+  if (root != null) {
+    final logDir = RepoUtils.resolveTestLogDir(root);
+    RepoUtils.ensureSafeDirectory(logDir);
+  }
+  ```
+
 
 **StepSummary** -- Step summary utilities for GitHub Actions.
-- **Methods:**
-  - `static void write(String markdown)`
-  - `static String artifactLink([String label = "View all artifacts"])`
-  - `static String compareLink(String prevTag, String newTag, [String? label])`
-  - `static String ghLink(String label, String path)`
-  - `static String releaseLink(String tag)`
-  - `static String collapsible(String title, String content, {bool open = false})`
+- **Methods**:
+  - `write(String markdown, {Map<String, String>? environment}) -> void` (static)
+  - `artifactLink([String label = 'View all artifacts']) -> String` (static)
+  - `compareLink(String prevTag, String newTag, [String? label]) -> String` (static)
+  - `ghLink(String label, String path) -> String` (static)
+  - `releaseLink(String tag) -> String` (static)
+  - `collapsible(String title, String content, {bool open = false}) -> String` (static)
+  - `escapeHtml(String input) -> String` (static)
 
-**SubPackageUtils** -- Utilities for loading and working with sub-packages defined in `.runtime_ci/config.json`.
-- **Methods:**
-  - `static List<Map<String, dynamic>> loadSubPackages(String repoRoot)`
-  - `static String buildSubPackageDiffContext(...)`
-  - `static String buildHierarchicalChangelogInstructions(...)`
-  - `static String buildHierarchicalReleaseNotesInstructions(...)`
-  - `static List<Map<String, dynamic>> enrichPromptWithSubPackages(...)`
-  - `static int convertSiblingDepsForRelease(...)`
-  - `static void logSubPackages(List<Map<String, dynamic>> subPackages)`
+**SubPackageUtils** -- Utilities for working with sub-packages.
+- **Methods**:
+  - `loadSubPackages(String repoRoot) -> List<Map<String, dynamic>>` (static)
+  - `buildSubPackageDiffContext({required String repoRoot, required String prevTag, required List<Map<String, dynamic>> subPackages, bool verbose = false}) -> String` (static)
+  - `buildHierarchicalChangelogInstructions({required String newVersion, required List<Map<String, dynamic>> subPackages}) -> String` (static)
+  - `buildHierarchicalReleaseNotesInstructions({required String newVersion, required List<Map<String, dynamic>> subPackages}) -> String` (static)
+  - `buildHierarchicalDocumentationInstructions({required String newVersion, required List<Map<String, dynamic>> subPackages}) -> String` (static)
+  - `buildHierarchicalAutodocInstructions({required String moduleName, required List<Map<String, dynamic>> subPackages, String? moduleSubPackage}) -> String` (static)
+  - `enrichPromptWithSubPackages({required String repoRoot, required String prevTag, required String promptFilePath, required Function buildInstructions, required String newVersion, bool verbose = false}) -> List<Map<String, dynamic>>` (static)
+  - `convertSiblingDepsForRelease({required String repoRoot, required String newVersion, required String effectiveRepo, required List<Map<String, dynamic>> subPackages, bool verbose = false}) -> int` (static)
+  - `logSubPackages(List<Map<String, dynamic>> subPackages) -> void` (static)
 
 **TemplateEntry** -- Represents one template entry from manifest.json.
-- **Fields:**
-  - `String id`, `String? source`, `String destination`, `String category`, `String description`.
-- **Constructors:**
-  - `TemplateEntry({required this.id, required this.source, required this.destination, required this.category, required this.description})`
+- **Fields**:
+  - `id`: `String`
+  - `source`: `String?`
+  - `destination`: `String`
+  - `category`: `String`
+  - `description`: `String`
+- **Constructors**:
   - `factory TemplateEntry.fromJson(Map<String, dynamic> json)`
 
 **TemplateVersionTracker** -- Tracks which template versions a consumer repo has installed.
-- **Constructors:**
+- **Fields**:
+  - `lastToolingVersion`: `String?`
+- **Methods**:
+  - `getInstalledHash(String templateId) -> String?`
+  - `getConsumerHash(String templateId) -> String?`
+  - `recordUpdate(String templateId, {required String templateHash, required String consumerFileHash, required String toolingVersion}) -> void`
+  - `save(String repoRoot) -> void`
+- **Constructors**:
   - `factory TemplateVersionTracker.load(String repoRoot)`
-- **Methods:**
-  - `String? getInstalledHash(String templateId)`
-  - `String? getConsumerHash(String templateId)`
-  - `void recordUpdate(String templateId, {required String templateHash, required String consumerFileHash, required String toolingVersion})`
-  - `void save(String repoRoot)`
-- **Fields/Getters:**
-  - `String? lastToolingVersion`
 
 **TemplateResolver** -- Resolves paths within the runtime_ci_tooling package.
-- **Methods:**
-  - `static String resolvePackageRoot()`
-  - `static String resolveTemplatesDir()`
-  - `static String resolveTemplatePath(String relativePath)`
-  - `static Map<String, dynamic> readManifest()`
-  - `static String resolveToolingVersion()`
+- **Methods**:
+  - `resolvePackageRoot() -> String` (static)
+  - `resolveTemplatesDir() -> String` (static)
+  - `resolveTemplatePath(String relativePath) -> String` (static)
+  - `readManifest() -> Map<String, dynamic>` (static)
+  - `resolveToolingVersion() -> String` (static)
+
+**TestFailure** -- A single failed test record.
+- **Fields**:
+  - `name`: `String`
+  - `error`: `String`
+  - `stackTrace`: `String`
+  - `printOutput`: `String`
+  - `durationMs`: `int`
+
+**TestResults** -- Parsed aggregate test results.
+- **Fields**:
+  - `passed`: `int`
+  - `failed`: `int`
+  - `skipped`: `int`
+  - `totalDurationMs`: `int`
+  - `failures`: `List<TestFailure>`
+  - `parsed`: `bool`
+
+**TestResultsUtil** -- Test-results parsing and step-summary writing.
+- **Methods**:
+  - `parseTestResultsJson(String jsonPath) -> Future<TestResults>` (static)
+  - `writeTestJobSummary(TestResults results, int exitCode, {String? platformId, void Function(String markdown)? writeSummary}) -> void` (static)
 
 **ToolInstallers** -- Cross-platform tool installation utilities.
-- **Methods:**
-  - `static Future<void> installTool(String tool, {bool dryRun = false})`
-  - `static Future<void> installNodeJs()`
-  - `static Future<void> installGeminiCli()`
-  - `static Future<void> installGitHubCli()`
-  - `static Future<void> installJq()`
-  - `static Future<void> installTree()`
+- **Methods**:
+  - `installTool(String tool, {bool dryRun = false}) -> Future<void>` (static)
+  - `installNodeJs() -> Future<void>` (static)
+  - `installGeminiCli() -> Future<void>` (static)
+  - `installGitHubCli() -> Future<void>` (static)
+  - `installJq() -> Future<void>` (static)
+  - `installTree() -> Future<void>` (static)
 
-**VersionDetection** -- Version detection and semantic versioning utilities.
-- **Methods:**
-  - `static String detectPrevTag(String repoRoot, {String? excludeTag, bool verbose = false})`
-  - `static String detectNextVersion(String repoRoot, String prevTag, {bool verbose = false})`
-  - `static int compareVersions(String a, String b)`
+**Utf8BoundedBuffer** -- Collects text while enforcing a strict UTF-8 byte budget.
+- **Fields**:
+  - `maxBytes`: `int`
+  - `truncationSuffix`: `String`
+  - `byteLength`: `int`
+  - `isTruncated`: `bool`
+  - `isEmpty`: `bool`
+- **Methods**:
+  - `append(String data) -> void`
+  - `truncateToUtf8Bytes(String input, int maxBytes) -> String` (static)
 
-**WorkflowGenerator** -- Renders CI workflow YAML from a Mustache skeleton template and config.json.
-- **Fields:**
-  - `Map<String, dynamic> ciConfig`
-  - `String toolingVersion`
-- **Constructors:**
-  - `WorkflowGenerator({required this.ciConfig, required this.toolingVersion})`
-- **Methods:**
-  - `static Map<String, dynamic>? loadCiConfig(String repoRoot)`
-  - `String render({String? existingContent})`
-  - `static List<String> validate(Map<String, dynamic> ciConfig)`
-  - `void logConfig()`
+**VersionDetection** -- Semantic versioning utilities.
+- **Methods**:
+  - `detectPrevTag(String repoRoot, {String? excludeTag, bool verbose = false}) -> String` (static)
+  - `detectNextVersion(String repoRoot, String prevTag, {bool verbose = false}) -> String` (static)
+  - `compareVersions(String a, String b) -> int` (static)
+
+  **Example:**
+  ```dart
+  import 'package:runtime_ci_tooling/src/cli/utils/version_detection.dart';
+
+  final prevTag = VersionDetection.detectPrevTag(repoRoot);
+  final nextVersion = VersionDetection.detectNextVersion(repoRoot, prevTag);
+  print('Upgrading from $prevTag to $nextVersion');
+  ```
+
+
+**WorkflowGenerator** -- Renders CI workflow YAML from Mustache templates.
+- **Fields**:
+  - `ciConfig`: `Map<String, dynamic>`
+  - `toolingVersion`: `String`
+- **Methods**:
+  - `render({String? existingContent}) -> String`
+  - `logConfig() -> void`
+  - `validateSubPackageEntry(Map<String, dynamic> sp, Set<String> seenNames, Set<String> seenPaths) -> String?` (static)
+
+  **Example:**
+  ```dart
+  import 'package:runtime_ci_tooling/src/cli/utils/workflow_generator.dart';
+
+  final ciConfig = WorkflowGenerator.loadCiConfig(repoRoot);
+  if (ciConfig != null && WorkflowGenerator.validate(ciConfig).isEmpty) {
+    final generator = WorkflowGenerator(ciConfig: ciConfig, toolingVersion: '1.0.0');
+    final yaml = generator.render();
+    print(yaml);
+  }
+  ```
+
+  - `loadCiConfig(String repoRoot) -> Map<String, dynamic>?` (static)
+  - `validate(Map<String, dynamic> ciConfig) -> List<String>` (static)
 
 ## 2. Enums
 
 **AuditSeverity** -- Severity of an audit finding.
-- `error`: Error level severity.
-- `warning`: Warning level severity.
-- `info`: Information level severity.
+- `error`
+- `warning`
+- `info`
 
 **AuditCategory** -- Category of a pubspec audit issue.
 - `bareDependency`: The dep is just `name: ^version` with no git source.
@@ -367,78 +686,90 @@ This document provides a comprehensive API reference for the CI/CD CLI module.
 - `missingTagPattern`: Git dep doesn't have a `tag_pattern` field.
 - `wrongTagPattern`: `tag_pattern` doesn't match the registry value.
 - `staleVersion`: Version constraint doesn't match the registry version.
-- `wrongUrlFormat`: Git URL isn't using SSH format (`git@github.com:org/repo.git`).
+- `wrongUrlFormat`: Git URL isn't using SSH format.
 
 ## 3. Extensions
 
-**ArchiveRunOptionsArgParser** on **ArchiveRunOptions** -- Helper to populate the argument parser.
-- **Methods:** `static void populateParser(ArgParser parser)`
+**ArchiveRunOptionsArgParser** on `ArchiveRunOptions` -- Helper for CLI arguments.
+- `populateParser(ArgParser parser) -> void`
 
-**AutodocOptionsArgParser** on **AutodocOptions** -- Helper to populate the argument parser.
-- **Methods:** `static void populateParser(ArgParser parser)`
+**AutodocOptionsArgParser** on `AutodocOptions` -- Helper for CLI arguments.
+- `populateParser(ArgParser parser) -> void`
 
-**CreateReleaseOptionsArgParser** on **CreateReleaseOptions** -- Helper to populate the argument parser.
-- **Methods:** `static void populateParser(ArgParser parser)`
+**CreateReleaseOptionsArgParser** on `CreateReleaseOptions` -- Helper for CLI arguments.
+- `populateParser(ArgParser parser) -> void`
 
-**DetermineVersionOptionsArgParser** on **DetermineVersionOptions** -- Helper to populate the argument parser.
-- **Methods:** `static void populateParser(ArgParser parser)`
+**DetermineVersionOptionsArgParser** on `DetermineVersionOptions` -- Helper for CLI arguments.
+- `populateParser(ArgParser parser) -> void`
 
-**GlobalOptionsArgParser** on **GlobalOptions** -- Helper to populate the argument parser.
-- **Methods:** `static void populateParser(ArgParser parser)`
+**GlobalOptionsArgParser** on `GlobalOptions` -- Helper for CLI arguments.
+- `populateParser(ArgParser parser) -> void`
 
-**MergeAuditTrailsOptionsArgParser** on **MergeAuditTrailsOptions** -- Helper to populate the argument parser.
-- **Methods:** `static void populateParser(ArgParser parser)`
+**MergeAuditTrailsOptionsArgParser** on `MergeAuditTrailsOptions` -- Helper for CLI arguments.
+- `populateParser(ArgParser parser) -> void`
 
-**PostReleaseTriageOptionsArgParser** on **PostReleaseTriageOptions** -- Helper to populate the argument parser.
-- **Methods:** `static void populateParser(ArgParser parser)`
+**PostReleaseTriageOptionsArgParser** on `PostReleaseTriageOptions` -- Helper for CLI arguments.
+- `populateParser(ArgParser parser) -> void`
 
-**TriageOptionsArgParser** on **TriageOptions** -- Helper to populate the argument parser.
-- **Methods:** `static void populateParser(ArgParser parser)`
+**TriageOptionsArgParser** on `TriageOptions` -- Helper for CLI arguments.
+- `populateParser(ArgParser parser) -> void`
 
-**UpdateAllOptionsArgParser** on **UpdateAllOptions** -- Helper to populate the argument parser.
-- **Methods:** `static void populateParser(ArgParser parser)`
+**UpdateAllOptionsArgParser** on `UpdateAllOptions` -- Helper for CLI arguments.
+- `populateParser(ArgParser parser) -> void`
 
-**UpdateOptionsArgParser** on **UpdateOptions** -- Helper to populate the argument parser.
-- **Methods:** `static void populateParser(ArgParser parser)`
-- **Getters:** `bool updateAll`
+**UpdateOptionsArgParser** on `UpdateOptions` -- Helper for CLI arguments.
+- `populateParser(ArgParser parser) -> void`
+- `updateAll`: `bool` (getter) - Returns true if no specific filter flags are set.
 
-**VersionOptionsArgParser** on **VersionOptions** -- Helper to populate the argument parser.
-- **Methods:** `static void populateParser(ArgParser parser)`
+**VersionOptionsArgParser** on `VersionOptions` -- Helper for CLI arguments.
+- `populateParser(ArgParser parser) -> void`
 
 ## 4. Top-Level Functions
 
-**scaffoldAutodocJson**
-- `bool scaffoldAutodocJson(String repoRoot, {bool overwrite = false})`
-- Scaffold `.runtime_ci/autodoc.json` by scanning `lib/src/` for modules.
+**main(List<String> args)** -- Entry point for the CLI tool.
+- Parameters: `List<String> args`
+- Returns: `void`
 
-**computeFileHash**
-- `String computeFileHash(String filePath)`
-- Compute SHA256 hash of a file's contents.
+**acquireTriageLock(bool force)** -- Acquire a file-based lock for triage runs.
+- Parameters: `bool force`
+- Returns: `bool`
 
-**acquireTriageLock**
-- `bool acquireTriageLock(bool force)`
-- Acquire a file-based lock. Returns true if acquired, false if another run is active.
+**releaseTriageLock()** -- Release the file-based lock.
+- Parameters: None
+- Returns: `void`
 
-**releaseTriageLock**
-- `void releaseTriageLock()`
-- Release the file-based lock.
+**createTriageRunDir(String repoRoot)** -- Create a unique run directory for a triage session.
+- Parameters: `String repoRoot`
+- Returns: `String`
 
-**createTriageRunDir**
-- `String createTriageRunDir(String repoRoot)`
-- Create a unique run directory for this triage session.
+**saveCheckpoint(String runDir, GamePlan plan, String lastPhase)** -- Save a checkpoint so the run can be resumed later.
+- Parameters: `String runDir`, `GamePlan plan`, `String lastPhase`
+- Returns: `void`
 
-**saveCheckpoint**
-- `void saveCheckpoint(String runDir, GamePlan plan, String lastPhase)`
-- Save a checkpoint so the run can be resumed later.
+**loadCachedResults(String runDir, GamePlan plan)** -- Load cached investigation results.
+- Parameters: `String runDir`, `GamePlan plan`
+- Returns: `Map<int, List<InvestigationResult>>`
 
-**loadCachedResults**
-- `Map<int, List<InvestigationResult>> loadCachedResults(String runDir, GamePlan plan)`
-- Load cached investigation results from a game plan.
+**loadCachedDecisions(String runDir)** -- Load cached triage decisions.
+- Parameters: `String runDir`
+- Returns: `List<TriageDecision>`
 
-**loadCachedDecisions**
-- `List<TriageDecision> loadCachedDecisions(String runDir)`
-- Load cached triage decisions from a run directory.
+**findLatestManifest(String repoRoot)** -- Search recent triage runs for the latest issue_manifest.json.
+- Parameters: `String repoRoot`
+- Returns: `String?`
 
-**findLatestManifest**
-- `String? findLatestManifest(String repoRoot)`
-- Search recent triage runs for the latest `issue_manifest.json`.
+**resolveAutodocOutputPath({required String configuredOutputPath, required String? moduleSubPackage})** -- Resolves the output path for an autodoc module.
+- Parameters: `String configuredOutputPath`, `String? moduleSubPackage`
+- Returns: `String`
+
+**scaffoldAutodocJson(String repoRoot, {bool overwrite = false})** -- Scaffold `.runtime_ci/autodoc.json`.
+- Parameters: `String repoRoot`, `bool overwrite`
+- Returns: `bool`
+
+**exitWithCode(int code)** -- Flush stdout and stderr before exiting.
+- Parameters: `int code`
+- Returns: `Future<Never>`
+
+**computeFileHash(String filePath)** -- Compute SHA256 hash of a file's contents.
+- Parameters: `String filePath`
+- Returns: `String`
