@@ -86,10 +86,24 @@ bool _isSafeSubPackageName(String s) {
   return RegExp(r'^[A-Za-z0-9_.-]+$').hasMatch(s);
 }
 
+/// Resolves shared step partials for CI workflow generation.
+/// Partials live in templates/github/workflows/partials/ and eliminate
+/// duplicated step definitions across jobs (single_platform, multi_platform, web_test).
+Template? _resolvePartial(String name) {
+  final path = TemplateResolver.resolveTemplatePath('github/workflows/partials/$name.mustache');
+  final file = File(path);
+  if (!file.existsSync()) return null;
+  final source = file.readAsStringSync();
+  return Template(source, htmlEscapeValues: false, name: 'partial:$name');
+}
+
 /// Renders CI workflow YAML from a Mustache skeleton template and config.json.
 ///
 /// The skeleton uses `<% %>` delimiters (set via `{{=<% %>=}}` at the top)
 /// to avoid conflict with GitHub Actions' `${{ }}` syntax.
+///
+/// Shared step blocks are defined once in partials/ and included via
+/// `{{> partial_name}}` to avoid duplication.
 ///
 /// User-preservable sections are delimited by:
 ///   `# --- BEGIN USER: <name> ---`
@@ -183,7 +197,7 @@ class WorkflowGenerator {
 
     final skeleton = skeletonFile.readAsStringSync();
     final context = _buildContext();
-    final template = Template(skeleton, htmlEscapeValues: false);
+    final template = Template(skeleton, htmlEscapeValues: false, partialResolver: _resolvePartial);
     var rendered = template.renderString(context);
 
     // Re-insert user sections from existing file

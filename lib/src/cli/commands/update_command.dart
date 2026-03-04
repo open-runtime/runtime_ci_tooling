@@ -247,6 +247,9 @@ class UpdateCommand extends Command<void> {
     final hasLocalChanges = previousConsumerHash != null && currentDestHash != previousConsumerHash;
 
     if (hasLocalChanges && !force) {
+      if (diff) {
+        _emitUnifiedDiff(destination: entry.destination, before: destFile.readAsStringSync(), after: templateContent);
+      }
       Logger.warn('  ${entry.id}: local customizations detected, skipping (use --force to overwrite)');
       return _UpdateResult(entry.id, 'warning', reason: 'local customizations -- use --force');
     }
