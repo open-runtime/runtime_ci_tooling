@@ -1,0 +1,2 @@
+- **Extended Pipeline Timeout:** Increased the release pipeline timeout from 60 to 120 minutes to prevent timeouts during extensive documentation generation.
+- **Enhanced Security:** Extracted GitHub tokens and context variables into safe environment variables, mitigating shell injection vulnerabilities.

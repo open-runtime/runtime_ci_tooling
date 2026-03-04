@@ -1,0 +1,31 @@
+{
+  "version": "0.14.3",
+  "previous_version": "v0.14.2",
+  "total_commits": 1,
+  "categories": {
+    "added": [],
+    "changed": [
+      {
+        "description": "Refactor GitHub Actions workflows to pass context variables via env variables rather than command-line string interpolation",
+        "pr": null,
+        "commits": ["13ca3a9"]
+      }
+    ],
+    "deprecated": [],
+    "removed": [],
+    "fixed": [
+      {
+        "description": "Increase release pipeline timeout from 60 to 120 minutes to prevent Autodoc and compose-artifacts from timing out during Gemini-powered documentation generation",
+        "pr": null,
+        "commits": ["13ca3a9"]
+      }
+    ],
+    "security": [
+      {
+        "description": "Extract GitHub tokens and PATs into environment variables instead of inlining them in shell scripts to prevent credential exposure in logs or potential shell injection vulnerabilities",
+        "pr": null,
+        "commits": ["13ca3a9"]
+      }
+    ]
+  }
+}

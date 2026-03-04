@@ -1,0 +1,25 @@
+{
+  "version": "0.14.4",
+  "previous_version": "v0.14.3",
+  "total_commits": 2,
+  "categories": {
+    "added": [],
+    "changed": [
+      {
+        "description": "Updated a comment in create-release to avoid using a CI skip token literal in commit text, allowing follow-up pushes to execute CI verification",
+        "pr": null,
+        "commits": ["9bf646a"]
+      }
+    ],
+    "deprecated": [],
+    "removed": [],
+    "fixed": [
+      {
+        "description": "Added [skip ci] to the fallback merge commit message in create-release to prevent non-fast-forward recovery merges from spawning a new CI/release run that can cancel the active release",
+        "pr": null,
+        "commits": ["f6155c4"]
+      }
+    ],
+    "security": []
+  }
+}

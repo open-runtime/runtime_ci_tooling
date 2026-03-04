@@ -1,0 +1,2 @@
+- Added a `[skip ci]` marker to the fallback merge commit message during releases to prevent accidental self-cancellation of the CI pipeline.
+- Removed CI skip token literals from comments to ensure follow-up pushes reliably trigger CI verification.
