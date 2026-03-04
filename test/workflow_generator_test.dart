@@ -13,6 +13,7 @@ Map<String, dynamic> _validConfig({
   List<String>? platforms,
   Map<String, dynamic>? secrets,
   String? pat,
+  List<dynamic>? gitOrgs,
   dynamic lineLength,
   List<dynamic>? subPackages,
   Map<String, dynamic>? runnerOverrides,
@@ -24,6 +25,7 @@ Map<String, dynamic> _validConfig({
     if (platforms != null) 'platforms': platforms,
     if (secrets != null) 'secrets': secrets,
     if (pat != null) 'personal_access_token_secret': pat,
+    if (gitOrgs != null) 'git_orgs': gitOrgs,
     if (lineLength != null) 'line_length': lineLength,
     if (subPackages != null) 'sub_packages': subPackages,
     if (runnerOverrides != null) 'runner_overrides': runnerOverrides,
@@ -319,6 +321,41 @@ void main() {
       test('pat with lowercase produces error (uppercase only)', () {
         final errors = WorkflowGenerator.validate(_validConfig(pat: 'my_pat'));
         expect(errors, anyElement(contains('safe identifier')));
+      });
+    });
+
+    // ---- git_orgs ----
+    group('git_orgs', () {
+      test('non-list git_orgs produces error', () {
+        final config = _validConfig();
+        config['git_orgs'] = 'open-runtime';
+        final errors = WorkflowGenerator.validate(config);
+        expect(errors, anyElement(contains('git_orgs must be an array')));
+      });
+
+      test('empty git_orgs list produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(gitOrgs: []));
+        expect(errors, anyElement(contains('git_orgs must not be empty')));
+      });
+
+      test('git_orgs entry with whitespace produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(gitOrgs: [' open-runtime ']));
+        expect(errors, anyElement(contains('leading/trailing whitespace')));
+      });
+
+      test('git_orgs entry with unsupported characters produces error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(gitOrgs: ['open/runtime']));
+        expect(errors, anyElement(contains('unsupported characters')));
+      });
+
+      test('git_orgs duplicate entries produce error', () {
+        final errors = WorkflowGenerator.validate(_validConfig(gitOrgs: ['open-runtime', 'open-runtime']));
+        expect(errors, anyElement(contains('duplicate org "open-runtime"')));
+      });
+
+      test('valid git_orgs list passes', () {
+        final errors = WorkflowGenerator.validate(_validConfig(gitOrgs: ['open-runtime', 'pieces-app', 'acme']));
+        expect(errors.where((e) => e.contains('git_orgs')), isEmpty);
       });
     });
 
@@ -1685,6 +1722,22 @@ $base
         expect(rendered, contains('GH_PAT: \${{ secrets.'));
         expect(rendered, contains('echo "::add-mask::\${GH_PAT}"'));
         expect(rendered, isNot(contains('TOKEN="\${{ secrets.')));
+      });
+
+      test('custom git_orgs render configurable org rewrite rules', () {
+        final config = _minimalValidConfig()
+          ..['git_orgs'] = ['acme-runtime']
+          ..['personal_access_token_secret'] = 'GITHUB_TOKEN';
+        final gen = WorkflowGenerator(ciConfig: config, toolingVersion: '0.0.0-test');
+        final rendered = gen.render();
+        expect(
+          rendered,
+          contains(
+            'git config --global url."https://x-access-token:\${GH_PAT}@github.com/acme-runtime/".insteadOf "git@github.com:acme-runtime/"',
+          ),
+        );
+        expect(rendered, isNot(contains('git@github.com:open-runtime/')));
+        expect(rendered, isNot(contains('git@github.com:pieces-app/')));
       });
 
       test('web_test without format_check: web-test needs omits auto-format', () {

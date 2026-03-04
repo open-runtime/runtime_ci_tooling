@@ -250,6 +250,90 @@ Rules:
 ''';
   }
 
+  /// Build hierarchical documentation prompt instructions for multi-package repos.
+  ///
+  /// Used by the `documentation` command to ensure root README updates contain
+  /// both a repo-level narrative and clear per-package sections.
+  static String buildHierarchicalDocumentationInstructions({
+    required String newVersion,
+    required List<Map<String, dynamic>> subPackages,
+  }) {
+    if (subPackages.isEmpty) return '';
+    final packageNames = subPackages.map((p) => p['name']).join(', ');
+
+    final packageExamples = StringBuffer();
+    for (final pkg in subPackages) {
+      packageExamples.writeln('### ${pkg['name']}');
+      packageExamples.writeln('- Purpose: ...');
+      packageExamples.writeln('- Key APIs / entry points: ...');
+      packageExamples.writeln('- Notable changes in this release: ...');
+      packageExamples.writeln();
+    }
+
+    return '''
+
+## Hierarchical Documentation Format (Multi-Package)
+
+Because this is a multi-package repository ($packageNames), the updated
+documentation MUST be hierarchical:
+
+1. A top-level overview that explains the full repository and how packages fit
+   together.
+2. A dedicated section for each changed sub-package.
+3. Explicit cross-links between root documentation and package-specific docs.
+
+Recommended structure:
+```markdown
+# <REPO_NAME>
+
+## Overview
+...
+
+## Package Architecture
+...
+
+${packageExamples.toString().trimRight()}
+```
+
+Rules:
+- Only use valid package names from: $packageNames
+- Do not invent additional sub-packages
+- Keep root docs coherent across all packages
+- Mention package relationships where relevant
+''';
+  }
+
+  /// Build hierarchical autodoc instructions for one module in a multi-package repo.
+  ///
+  /// [moduleSubPackage] is optional. When available, the generated docs should
+  /// explicitly identify the owning package and describe how this module
+  /// relates to sibling packages.
+  static String buildHierarchicalAutodocInstructions({
+    required String moduleName,
+    required List<Map<String, dynamic>> subPackages,
+    String? moduleSubPackage,
+  }) {
+    if (subPackages.isEmpty) return '';
+    final packageNames = subPackages.map((p) => p['name']).join(', ');
+    final owningPackage = moduleSubPackage == null ? 'not explicitly assigned' : '"$moduleSubPackage"';
+
+    return '''
+
+## Multi-Package Autodoc Context
+
+This repository is multi-package ($packageNames).
+
+Current module: "$moduleName"
+Owning package: $owningPackage
+
+Documentation requirements:
+- Call out which package owns this module.
+- Describe how this module integrates with other packages when applicable.
+- Use package-aware wording (avoid implying this module is the entire repo).
+- Keep references and examples aligned with the module's owning package.
+''';
+  }
+
   /// Enrich an existing prompt file with sub-package diff context and
   /// hierarchical formatting instructions.
   ///

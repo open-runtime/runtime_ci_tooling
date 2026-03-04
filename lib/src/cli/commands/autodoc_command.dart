@@ -16,6 +16,8 @@ import '../utils/logger.dart';
 import '../utils/process_runner.dart';
 import '../utils/repo_utils.dart';
 import '../utils/step_summary.dart';
+import '../utils/sub_package_utils.dart';
+import '../utils/version_detection.dart';
 
 const String _kGeminiProModel = 'gemini-3.1-pro-preview';
 
@@ -96,6 +98,24 @@ class AutodocCommand extends Command<void> {
       return;
     }
 
+    final subPackages = SubPackageUtils.loadSubPackages(repoRoot);
+    SubPackageUtils.logSubPackages(subPackages);
+    var subPackageDiffContext = '';
+    if (subPackages.isNotEmpty) {
+      String prevTag;
+      try {
+        prevTag = VersionDetection.detectPrevTag(repoRoot, verbose: global.verbose);
+      } catch (_) {
+        prevTag = '';
+      }
+      subPackageDiffContext = SubPackageUtils.buildSubPackageDiffContext(
+        repoRoot: repoRoot,
+        prevTag: prevTag,
+        subPackages: subPackages,
+        verbose: global.verbose,
+      );
+    }
+
     // Build task queue based on hash comparison
     final tasks = <Future<void> Function()>[];
     final updatedModules = <String>[];
@@ -106,7 +126,30 @@ class AutodocCommand extends Command<void> {
       if (targetModule != null && id != targetModule) continue;
 
       final sourcePaths = (module['source_paths'] as List).cast<String>();
-      final currentHash = _computeModuleHash(repoRoot, sourcePaths);
+      final moduleSubPackage = _resolveModuleSubPackage(
+        module: module,
+        sourcePaths: sourcePaths,
+        subPackages: subPackages,
+      );
+      if (moduleSubPackage != null && module['sub_package'] == null) {
+        module['sub_package'] = moduleSubPackage;
+      }
+
+      final configuredOutputPath = module['output_path'] as String;
+      final normalizedOutputPath = _resolveOutputPathForModule(
+        configuredOutputPath: configuredOutputPath,
+        moduleSubPackage: moduleSubPackage,
+      );
+      if (normalizedOutputPath != configuredOutputPath) {
+        module['output_path'] = normalizedOutputPath;
+      }
+
+      final currentHash = _computeModuleHash(
+        repoRoot,
+        sourcePaths,
+        moduleSubPackage: moduleSubPackage,
+        outputPath: normalizedOutputPath,
+      );
       final previousHash = module['hash'] as String? ?? '';
 
       if (currentHash == previousHash && !force) {
@@ -116,12 +159,15 @@ class AutodocCommand extends Command<void> {
       }
 
       final name = module['name'] as String;
-      final outputPath = '$repoRoot/${module['output_path']}';
+      final outputPath = '$repoRoot/$normalizedOutputPath';
       final libPaths = (module['lib_paths'] as List?)?.cast<String>() ?? [];
       final generateTypes = (module['generate'] as List).cast<String>();
       final libDir = libPaths.isNotEmpty ? '$repoRoot/${libPaths.first}' : '';
+      final packageSuffix = moduleSubPackage == null ? '' : ' [sub-package: $moduleSubPackage]';
 
-      Logger.info('  $id ($name): ${force ? "forced" : "changed"} -> generating ${generateTypes.join(", ")}');
+      Logger.info(
+        '  $id ($name)$packageSuffix: ${force ? "forced" : "changed"} -> generating ${generateTypes.join(", ")}',
+      );
 
       if (dryRun) {
         updatedModules.add(id);
@@ -151,6 +197,13 @@ class AutodocCommand extends Command<void> {
             libDir: libDir,
             outputPath: outputPath,
             previousHash: previousHash,
+            moduleSubPackage: moduleSubPackage,
+            subPackageDiffContext: subPackageDiffContext,
+            hierarchicalAutodocInstructions: SubPackageUtils.buildHierarchicalAutodocInstructions(
+              moduleName: name,
+              subPackages: subPackages,
+              moduleSubPackage: moduleSubPackage,
+            ),
             verbose: global.verbose,
           ),
         );
@@ -183,6 +236,10 @@ class AutodocCommand extends Command<void> {
     Logger.info('Running ${tasks.length} Gemini doc generation tasks (max $maxConcurrent parallel)...');
 
     await _forEachConcurrent(tasks, maxConcurrent);
+
+    if (subPackages.isNotEmpty) {
+      _writeHierarchicalDocsIndex(repoRoot: repoRoot, modules: modules, subPackages: subPackages);
+    }
 
     // Save updated config with new hashes
     File(configPath).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(autodocConfig));
@@ -220,6 +277,9 @@ ${StepSummary.artifactLink()}
     required String libDir,
     required String outputPath,
     required String previousHash,
+    required String? moduleSubPackage,
+    required String subPackageDiffContext,
+    required String hierarchicalAutodocInstructions,
     bool verbose = false,
   }) async {
     final outputFileName = switch (docType) {
@@ -265,6 +325,10 @@ ${StepSummary.artifactLink()}
     final pass1Prompt = File('$outputPath/.${docType}_pass1.txt');
     pass1Prompt.writeAsStringSync('''
 $prompt
+
+${moduleSubPackage == null ? '' : 'This module belongs to sub-package: "$moduleSubPackage".'}
+${subPackageDiffContext.isEmpty ? '' : subPackageDiffContext}
+${hierarchicalAutodocInstructions.isEmpty ? '' : hierarchicalAutodocInstructions}
 
 ## OUTPUT INSTRUCTIONS
 
@@ -321,6 +385,9 @@ Your task is to review and improve the file at:
 This documentation was auto-generated for the **$moduleName** module.
 The proto definitions are in: ${sourceDir.replaceFirst('$repoRoot/', '')}
 ${libDir.isNotEmpty ? 'Generated Dart code is in: ${libDir.replaceFirst('$repoRoot/', '')}' : ''}
+${moduleSubPackage == null ? '' : 'This module belongs to sub-package: "$moduleSubPackage".'}
+${subPackageDiffContext.isEmpty ? '' : subPackageDiffContext}
+${hierarchicalAutodocInstructions.isEmpty ? '' : hierarchicalAutodocInstructions}
 
 ## Review Checklist
 
@@ -457,7 +524,7 @@ Write the corrected file to the same path: $absOutputFile
   }
 
   /// Compute SHA256 hash of all source files in the given paths.
-  String _computeModuleHash(String repoRoot, List<String> sourcePaths) {
+  String _computeModuleHash(String repoRoot, List<String> sourcePaths, {String? moduleSubPackage, String? outputPath}) {
     // Pure-Dart hashing so caching works on macOS/Windows and minimal CI images
     // (no dependency on sha256sum/shasum/xargs/find).
     final filePaths = <String>[];
@@ -485,6 +552,15 @@ Write the corrected file to the same path: $absOutputFile
 
     final builder = BytesBuilder(copy: false);
 
+    if (moduleSubPackage != null) {
+      builder.add(utf8.encode('sub_package:$moduleSubPackage'));
+      builder.addByte(0);
+    }
+    if (outputPath != null) {
+      builder.add(utf8.encode('output_path:$outputPath'));
+      builder.addByte(0);
+    }
+
     for (final path in filePaths) {
       // Include the path name in the digest so renames affect the hash.
       builder.add(utf8.encode(path));
@@ -502,5 +578,92 @@ Write the corrected file to the same path: $absOutputFile
     }
 
     return sha256.convert(builder.takeBytes()).toString();
+  }
+
+  String? _resolveModuleSubPackage({
+    required Map<String, dynamic> module,
+    required List<String> sourcePaths,
+    required List<Map<String, dynamic>> subPackages,
+  }) {
+    if (subPackages.isEmpty) return null;
+
+    final explicit = module['sub_package'];
+    if (explicit is String && explicit.trim().isNotEmpty) {
+      final explicitName = explicit.trim();
+      final exists = subPackages.any((pkg) => (pkg['name'] as String) == explicitName);
+      if (exists) return explicitName;
+    }
+
+    final normalizedSources = sourcePaths.map((s) => p.posix.normalize(s).replaceFirst(RegExp(r'^/+'), '')).toList();
+    for (final pkg in subPackages) {
+      final packagePath = p.posix.normalize(pkg['path'] as String).replaceFirst(RegExp(r'^/+'), '');
+      final packagePrefix = packagePath.endsWith('/') ? packagePath : '$packagePath/';
+      if (normalizedSources.any((src) => src.startsWith(packagePrefix))) {
+        return pkg['name'] as String;
+      }
+    }
+    return null;
+  }
+
+  String _resolveOutputPathForModule({required String configuredOutputPath, required String? moduleSubPackage}) {
+    final normalized = p.posix.normalize(configuredOutputPath).replaceFirst(RegExp(r'^/+'), '');
+    if (moduleSubPackage == null || moduleSubPackage.isEmpty) {
+      return normalized;
+    }
+
+    final docsPrefix = 'docs/';
+    final stripped = normalized.startsWith(docsPrefix) ? normalized.substring(docsPrefix.length) : normalized;
+    if (stripped.startsWith('$moduleSubPackage/')) {
+      return '$docsPrefix$stripped';
+    }
+    return '$docsPrefix$moduleSubPackage/$stripped';
+  }
+
+  void _writeHierarchicalDocsIndex({
+    required String repoRoot,
+    required List<Map<String, dynamic>> modules,
+    required List<Map<String, dynamic>> subPackages,
+  }) {
+    if (subPackages.isEmpty) return;
+
+    final grouped = <String, List<Map<String, dynamic>>>{};
+    for (final pkg in subPackages) {
+      grouped[pkg['name'] as String] = <Map<String, dynamic>>[];
+    }
+
+    for (final module in modules) {
+      final sourcePaths = (module['source_paths'] as List).cast<String>();
+      final resolvedPackage = _resolveModuleSubPackage(
+        module: module,
+        sourcePaths: sourcePaths,
+        subPackages: subPackages,
+      );
+      if (resolvedPackage == null) continue;
+      grouped.putIfAbsent(resolvedPackage, () => <Map<String, dynamic>>[]).add(module);
+    }
+
+    final buf = StringBuffer()
+      ..writeln('# Documentation Index')
+      ..writeln()
+      ..writeln('Generated by `manage_cicd autodoc` for multi-package repositories.')
+      ..writeln();
+
+    for (final pkg in subPackages) {
+      final packageName = pkg['name'] as String;
+      final packageModules = grouped[packageName] ?? <Map<String, dynamic>>[];
+      if (packageModules.isEmpty) continue;
+      buf.writeln('## $packageName');
+      buf.writeln();
+      for (final module in packageModules) {
+        final moduleName = module['name'] as String;
+        final outputPath = (module['output_path'] as String).replaceFirst(RegExp(r'^docs/'), '');
+        buf.writeln('- [$moduleName](./$outputPath)');
+      }
+      buf.writeln();
+    }
+
+    final docsDir = Directory('$repoRoot/docs')..createSync(recursive: true);
+    File('${docsDir.path}/README.md').writeAsStringSync(buf.toString());
+    Logger.info('Updated hierarchical docs index: docs/README.md');
   }
 }

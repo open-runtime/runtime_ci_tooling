@@ -29,6 +29,10 @@ class UpdateOptions {
   @CliOption(help: 'Write .bak backup before overwriting files')
   final bool backup;
 
+  /// Show a unified diff preview for each file that would be updated.
+  @CliOption(help: 'Show unified diffs for updated files')
+  final bool diff;
+
   const UpdateOptions({
     this.force = false,
     this.templates = false,
@@ -36,6 +40,7 @@ class UpdateOptions {
     this.workflows = false,
     this.autodoc = false,
     this.backup = false,
+    this.diff = false,
   });
 
   factory UpdateOptions.fromArgResults(ArgResults results) {

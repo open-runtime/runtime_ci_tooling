@@ -684,6 +684,53 @@ void main() {
     });
   });
 
+  group('SubPackageUtils hierarchical instruction builders', () {
+    final subPackages = <Map<String, dynamic>>[
+      {'name': 'core', 'path': 'packages/core'},
+      {'name': 'api', 'path': 'packages/api'},
+    ];
+
+    test('buildHierarchicalDocumentationInstructions includes package structure', () {
+      final instructions = SubPackageUtils.buildHierarchicalDocumentationInstructions(
+        newVersion: '1.2.3',
+        subPackages: subPackages,
+      );
+
+      expect(instructions, contains('Hierarchical Documentation Format'));
+      expect(instructions, contains('core'));
+      expect(instructions, contains('api'));
+      expect(instructions, contains('top-level overview'));
+    });
+
+    test('buildHierarchicalAutodocInstructions includes module and package context', () {
+      final instructions = SubPackageUtils.buildHierarchicalAutodocInstructions(
+        moduleName: 'Analyzer Engine',
+        subPackages: subPackages,
+        moduleSubPackage: 'core',
+      );
+
+      expect(instructions, contains('Multi-Package Autodoc Context'));
+      expect(instructions, contains('Analyzer Engine'));
+      expect(instructions, contains('"core"'));
+      expect(instructions, contains('core, api'));
+    });
+
+    test('hierarchical instruction builders return empty for single-package repos', () {
+      expect(
+        SubPackageUtils.buildHierarchicalDocumentationInstructions(newVersion: '1.2.3', subPackages: const []),
+        isEmpty,
+      );
+      expect(
+        SubPackageUtils.buildHierarchicalAutodocInstructions(
+          moduleName: 'Any',
+          subPackages: const [],
+          moduleSubPackage: null,
+        ),
+        isEmpty,
+      );
+    });
+  });
+
   group('CiProcessRunner.exec', () {
     test('fatal path exits with process exit code after flushing stdout/stderr', () async {
       final scriptPath = p.join(p.current, 'test', 'scripts', 'fatal_exit_probe.dart');

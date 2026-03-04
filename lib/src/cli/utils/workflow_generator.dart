@@ -71,6 +71,14 @@ bool _isSafeRunnerLabel(String s) {
   return RegExp(r'^[A-Za-z0-9_.-]+$').hasMatch(s);
 }
 
+/// GitHub org segment used in git URL rewrites (e.g. open-runtime).
+///
+/// Keep this conservative: no slashes, no whitespace, no control chars.
+bool _isSafeGitOrgSegment(String s) {
+  if (s.contains(RegExp(r'[\r\n\t\x00-\x1f]'))) return false;
+  return RegExp(r'^[A-Za-z0-9_.-]+$').hasMatch(s);
+}
+
 /// Sub-package names are rendered into YAML and shell-facing messages.
 /// Keep them to a conservative character set.
 bool _isSafeSubPackageName(String s) {
@@ -192,6 +200,7 @@ class WorkflowGenerator {
     final secretsRaw = ciConfig['secrets'];
     final secrets = secretsRaw is Map<String, dynamic> ? secretsRaw : <String, dynamic>{};
     final subPackages = ciConfig['sub_packages'] as List? ?? [];
+    final gitOrgs = _resolveGitOrgs(ciConfig);
 
     // Build secrets list for env block (skip non-string values)
     final secretsList = <Map<String, String>>[];
@@ -261,6 +270,7 @@ class WorkflowGenerator {
       // Secrets / env
       'has_secrets': secretsList.isNotEmpty,
       'secrets_list': secretsList,
+      'git_orgs': gitOrgs.map((org) => {'org': org}).toList(),
 
       // Sub-packages (filter out invalid entries)
       'sub_packages': subPackages
@@ -296,6 +306,25 @@ class WorkflowGenerator {
       if (parsed != null) return '$parsed';
     }
     return '120';
+  }
+
+  static List<String> _resolveGitOrgs(Map<String, dynamic> ciConfig) {
+    final raw = ciConfig['git_orgs'];
+    final resolved = <String>[];
+    if (raw is List) {
+      for (final value in raw) {
+        if (value is! String) continue;
+        final org = value.trim();
+        if (org.isEmpty) continue;
+        if (!_isSafeGitOrgSegment(org)) continue;
+        if (resolved.contains(org)) continue;
+        resolved.add(org);
+      }
+    }
+    if (resolved.isEmpty) {
+      return const ['open-runtime', 'pieces-app'];
+    }
+    return resolved;
   }
 
   static String _resolveArtifactRetentionDays(dynamic raw) {
@@ -445,6 +474,34 @@ class WorkflowGenerator {
       errors.add('ci.personal_access_token_secret must be a non-empty string');
     } else if (pat is String && !_isSafeSecretIdentifier(pat)) {
       errors.add('ci.personal_access_token_secret "$pat" must be a safe identifier (e.g. GITHUB_TOKEN)');
+    }
+    final gitOrgs = ciConfig['git_orgs'];
+    if (gitOrgs != null) {
+      if (gitOrgs is! List) {
+        errors.add('ci.git_orgs must be an array, got ${gitOrgs.runtimeType}');
+      } else if (gitOrgs.isEmpty) {
+        errors.add('ci.git_orgs must not be empty when provided');
+      } else {
+        final seen = <String>{};
+        for (var i = 0; i < gitOrgs.length; i++) {
+          final org = gitOrgs[i];
+          if (org is! String || org.trim().isEmpty) {
+            errors.add('ci.git_orgs[$i] must be a non-empty string');
+            continue;
+          }
+          if (org != org.trim()) {
+            errors.add('ci.git_orgs[$i] must not have leading/trailing whitespace');
+            continue;
+          }
+          if (!_isSafeGitOrgSegment(org)) {
+            errors.add('ci.git_orgs[$i] contains unsupported characters: "$org"');
+            continue;
+          }
+          if (!seen.add(org)) {
+            errors.add('ci.git_orgs contains duplicate org "$org"');
+          }
+        }
+      }
     }
     final lineLength = ciConfig['line_length'];
     if (lineLength != null && lineLength is! int && lineLength is! String) {

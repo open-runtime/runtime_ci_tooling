@@ -114,8 +114,9 @@ jobs:
           echo "::add-mask::${GH_PAT}"
           git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "git@github.com:"
           git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
+<%#git_orgs%>
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/<%org%>/".insteadOf "git@github.com:<%org%>/"
+<%/git_orgs%>
 
       # ── shared:dart-setup ── keep in sync with multi_platform ──
       - uses: dart-lang/setup-dart@v1.7.1
@@ -270,8 +271,9 @@ jobs:
           echo "::add-mask::${GH_PAT}"
           git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "git@github.com:"
           git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
+<%#git_orgs%>
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/<%org%>/".insteadOf "git@github.com:<%org%>/"
+<%/git_orgs%>
 
       # ── shared:dart-setup ── keep in sync with single_platform ──
       - uses: dart-lang/setup-dart@v1.7.1
@@ -385,8 +387,9 @@ jobs:
           echo "::add-mask::${GH_PAT}"
           git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "git@github.com:"
           git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
+<%#git_orgs%>
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/<%org%>/".insteadOf "git@github.com:<%org%>/"
+<%/git_orgs%>
 
       # ── shared:dart-setup ── keep in sync with single_platform ──
       - uses: dart-lang/setup-dart@v1.7.1
@@ -497,8 +500,9 @@ jobs:
           echo "::add-mask::${GH_PAT}"
           git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "git@github.com:"
           git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
-          git config --global url."https://x-access-token:${GH_PAT}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
+<%#git_orgs%>
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/<%org%>/".insteadOf "git@github.com:<%org%>/"
+<%/git_orgs%>
 
       # ── shared:dart-setup ── keep in sync with single_platform / multi_platform ──
       - uses: dart-lang/setup-dart@v1.7.1

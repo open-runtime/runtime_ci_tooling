@@ -178,5 +178,114 @@ void main() {
         throwsA(isA<_TestExit>().having((e) => e.code, 'code', 1)),
       );
     });
+
+    test('exits when root tests exceed process timeout', () async {
+      writeRootPubspec(includeTest: true);
+      Directory(p.join(tempDir.path, 'test')).createSync(recursive: true);
+      File(p.join(tempDir.path, 'test', 'slow_test.dart')).writeAsStringSync('''
+import 'dart:async';
+
+import 'package:test/test.dart';
+
+void main() {
+  test('slow', () async {
+    await Future<void>.delayed(const Duration(seconds: 5));
+    expect(true, isTrue);
+  });
+}
+''');
+
+      final pubGet = await Process.run('dart', ['pub', 'get'], workingDirectory: tempDir.path);
+      expect(pubGet.exitCode, equals(0), reason: 'dart pub get must succeed');
+
+      await expectLater(
+        () => TestCommand.runWithRoot(
+          tempDir.path,
+          processTimeout: const Duration(milliseconds: 1),
+          exitHandler: _throwingExit,
+          environment: const {},
+        ),
+        throwsA(isA<_TestExit>().having((e) => e.code, 'code', 1)),
+      );
+    });
+
+    test('exits when a sub-package test run fails', () async {
+      writeRootPubspec();
+      writeSubPackageConfig([
+        {'name': 'pkg_fail', 'path': 'packages/pkg_fail'},
+      ]);
+
+      final pkgDir = Directory(p.join(tempDir.path, 'packages', 'pkg_fail'))..createSync(recursive: true);
+      File(p.join(pkgDir.path, 'pubspec.yaml')).writeAsStringSync('''
+name: pkg_fail
+version: 0.0.0
+environment:
+  sdk: ^3.0.0
+dev_dependencies:
+  test: ^1.24.0
+''');
+      Directory(p.join(pkgDir.path, 'test')).createSync(recursive: true);
+      File(p.join(pkgDir.path, 'test', 'failing_test.dart')).writeAsStringSync('''
+import 'package:test/test.dart';
+
+void main() {
+  test('fails', () => expect(1, equals(2)));
+}
+''');
+
+      await expectLater(
+        () => TestCommand.runWithRoot(tempDir.path, exitHandler: _throwingExit, environment: const {}),
+        throwsA(isA<_TestExit>().having((e) => e.code, 'code', 1)),
+      );
+    }, timeout: const Timeout(Duration(minutes: 2)));
+
+    test('exits when mixed sub-package outcomes include at least one failure', () async {
+      writeRootPubspec();
+      writeSubPackageConfig([
+        {'name': 'pkg_pass', 'path': 'packages/pkg_pass'},
+        {'name': 'pkg_fail', 'path': 'packages/pkg_fail'},
+      ]);
+
+      final passDir = Directory(p.join(tempDir.path, 'packages', 'pkg_pass'))..createSync(recursive: true);
+      File(p.join(passDir.path, 'pubspec.yaml')).writeAsStringSync('''
+name: pkg_pass
+version: 0.0.0
+environment:
+  sdk: ^3.0.0
+dev_dependencies:
+  test: ^1.24.0
+''');
+      Directory(p.join(passDir.path, 'test')).createSync(recursive: true);
+      File(p.join(passDir.path, 'test', 'passing_test.dart')).writeAsStringSync('''
+import 'package:test/test.dart';
+
+void main() {
+  test('passes', () => expect(2 + 2, equals(4)));
+}
+''');
+
+      final failDir = Directory(p.join(tempDir.path, 'packages', 'pkg_fail'))..createSync(recursive: true);
+      File(p.join(failDir.path, 'pubspec.yaml')).writeAsStringSync('''
+name: pkg_fail
+version: 0.0.0
+environment:
+  sdk: ^3.0.0
+dev_dependencies:
+  test: ^1.24.0
+''');
+      Directory(p.join(failDir.path, 'test')).createSync(recursive: true);
+      File(p.join(failDir.path, 'test', 'failing_test.dart')).writeAsStringSync('''
+import 'package:test/test.dart';
+
+void main() {
+  test('fails', () => expect(true, isFalse));
+}
+''');
+
+      await expectLater(
+        () => TestCommand.runWithRoot(tempDir.path, exitHandler: _throwingExit, environment: const {}),
+        throwsA(isA<_TestExit>().having((e) => e.code, 'code', 1)),
+      );
+    }, timeout: const Timeout(Duration(minutes: 2)));
   });
 }
