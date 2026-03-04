@@ -132,11 +132,7 @@ void main() {
       expect(pubGet.exitCode, equals(0), reason: 'dart pub get must succeed');
 
       await expectLater(
-        () => TestCommand.runWithRoot(
-          tempDir.path,
-          exitHandler: _throwingExit,
-          environment: const {},
-        ),
+        () => TestCommand.runWithRoot(tempDir.path, exitHandler: _throwingExit, environment: const {}),
         throwsA(isA<_TestExit>().having((e) => e.code, 'code', 1)),
       );
     });
@@ -149,11 +145,7 @@ void main() {
       Directory(p.join(tempDir.path, 'packages', 'pkg_a')).createSync(recursive: true);
 
       await expectLater(
-        () => TestCommand.runWithRoot(
-          tempDir.path,
-          exitHandler: _throwingExit,
-          environment: const {},
-        ),
+        () => TestCommand.runWithRoot(tempDir.path, exitHandler: _throwingExit, environment: const {}),
         throwsA(isA<_TestExit>().having((e) => e.code, 'code', 1)),
       );
     });
