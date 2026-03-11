@@ -113,6 +113,7 @@ class AutodocCommand extends Command<void> {
 
       for (final field in ['source_paths', 'lib_paths']) {
         final paths = module[field];
+        if (paths == null && field == 'lib_paths') continue; // lib_paths is optional
         if (paths is! List) {
           errors.add('$field must be a list of strings');
           continue;
