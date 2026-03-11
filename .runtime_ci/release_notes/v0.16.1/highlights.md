@@ -1,0 +1,2 @@
+- Updated all human-readable strings, CLI descriptions, and documentation to correctly reference Gemini 3.1 Pro Preview.
+- Regenerated the CI workflow template to match the current v0.16.0 tooling, successfully fixing the failing golden tests.

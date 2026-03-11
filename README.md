@@ -4,9 +4,9 @@ Shared CI/CD automation tooling for open-runtime or pieces-app packages. Provide
 
 ## Features
 
-- **Gemini-Powered Triage**: Automated issue analysis, labeling, and response generation.
+- **Gemini-Powered Triage**: Automated issue analysis, labeling, and response generation using Gemini 3.1 Pro Preview.
 - **Release Automation**: Automated versioning, changelog generation, and release notes authoring. Support for sibling dependency conversion and per-package tag creation for multi-package releases.
-- **Documentation Generation**: Automated documentation maintenance using Gemini (with parallel execution and automatic retries), including API references, migration guides, quickstarts, and examples. Writes directly to module-scoped paths, with multi-package hierarchical context support and generated `docs/README.md` indexes.
+- **Documentation Generation**: Automated documentation maintenance using Gemini 3.1 Pro Preview (with parallel execution and automatic retries), including API references, migration guides, quickstarts, and examples. Writes directly to module-scoped paths, with multi-package hierarchical context support and generated `docs/README.md` indexes.
 - **Dependency Auditing**: Audit tools (`audit` and `audit-all`) for `pubspec.yaml` dependency validation against a central workspace registry.
 - **Audit Trails**: Comprehensive logging of CI/CD actions and decisions.
 - **MCP Integration**: Configuration for Model Context Protocol servers (GitHub, Sentry).
@@ -28,7 +28,7 @@ Add `runtime_ci_tooling` to your `dev_dependencies`:
 
 ```yaml
 dev_dependencies:
-  runtime_ci_tooling: ^0.16.0
+  runtime_ci_tooling: ^0.16.1
 ```
 
 Or run:
@@ -99,8 +99,8 @@ dart run bin/triage_cli.dart <command> [options]
 **Usage Examples:**
 - **Single Issue**: `dart run bin/triage_cli.dart <issue_number>`
 - **Auto Triage**: `dart run bin/triage_cli.dart --auto`
-- **Pre-Release Scan**: `dart run bin/triage_cli.dart --pre-release --prev-tag v0.15.0 --version 0.16.0`
-- **Post-Release Loop**: `dart run bin/triage_cli.dart --post-release --version 0.16.0 --release-tag v0.16.0`
+- **Pre-Release Scan**: `dart run bin/triage_cli.dart --pre-release --prev-tag v0.16.0 --version 0.16.1`
+- **Post-Release Loop**: `dart run bin/triage_cli.dart --post-release --version 0.16.1 --release-tag v0.16.1`
 
 Run `dart run bin/triage_cli.dart --help` for full usage details.
 

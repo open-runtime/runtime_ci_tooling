@@ -1,0 +1,30 @@
+{
+  "version": "0.16.1",
+  "previous_version": "v0.16.0",
+  "total_commits": 2,
+  "categories": {
+    "added": [],
+    "changed": [
+      {
+        "description": "Updated human-readable display strings, CLI descriptions, and documentation to reference Gemini 3.1 Pro.",
+        "pr": "#40",
+        "commits": ["d6f973221c1d910ab14b438a5b5b3a60064e1e38"]
+      },
+      {
+        "description": "Added Preview suffix to all Gemini 3.1 Pro references in display strings, doc comments, and documentation to match the model ID.",
+        "pr": "#41",
+        "commits": ["0b9cf1dea21035aee81729b2e1a13c8a2f167206"]
+      }
+    ],
+    "deprecated": [],
+    "removed": [],
+    "fixed": [
+      {
+        "description": "Regenerated .github/workflows/ci.yaml to match current v0.16.0 tooling version, fixing the golden file test.",
+        "pr": "#41",
+        "commits": ["0b9cf1dea21035aee81729b2e1a13c8a2f167206"]
+      }
+    ],
+    "security": []
+  }
+}

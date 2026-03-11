@@ -1,0 +1,24 @@
+{
+  "pull_requests": [
+    {
+      "number": 40,
+      "title": "fix: update Gemini model references to 3.1 Pro",
+      "author": "tsavo-at-pieces",
+      "labels": [],
+      "summary": "Updates all human-readable display strings, CLI descriptions, and documentation from Gemini 3 Pro or Gemini Pro to Gemini 3.1 Pro. Model ID constants were already correct.",
+      "commits": [
+        "d6f973221c1d910ab14b438a5b5b3a60064e1e38"
+      ]
+    },
+    {
+      "number": 41,
+      "title": "fix: add Preview suffix to Gemini references and regenerate CI workflow",
+      "author": "tsavo-at-pieces",
+      "labels": [],
+      "summary": "Adds the Preview suffix to Gemini 3.1 Pro references across display strings, doc comments, and documentation to match the gemini-3.1-pro-preview model ID. Also regenerates the CI workflow file.",
+      "commits": [
+        "0b9cf1dea21035aee81729b2e1a13c8a2f167206"
+      ]
+    }
+  ]
+}

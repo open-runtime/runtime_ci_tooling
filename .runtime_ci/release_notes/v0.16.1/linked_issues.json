@@ -1,0 +1,32 @@
+{
+  "version": "0.16.1",
+  "github_issues": [
+    {
+      "number": 40,
+      "title": "fix: update Gemini model references to 3.1 Pro",
+      "status": "fixed",
+      "confidence": 1.0,
+      "referenced_in": ["release_notes", "changelog"]
+    },
+    {
+      "number": 41,
+      "title": "fix: add Preview suffix to Gemini references and regenerate CI workflow",
+      "status": "fixed",
+      "confidence": 1.0,
+      "referenced_in": ["release_notes", "changelog"]
+    }
+  ],
+  "sentry_issues": [],
+  "prs_referenced": [
+    {
+      "number": 40,
+      "title": "fix: update Gemini model references to 3.1 Pro",
+      "author": "tsavo-at-pieces"
+    },
+    {
+      "number": 41,
+      "title": "fix: add Preview suffix to Gemini references and regenerate CI workflow",
+      "author": "tsavo-at-pieces"
+    }
+  ]
+}
