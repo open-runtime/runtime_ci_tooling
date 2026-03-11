@@ -925,10 +925,7 @@ void main() {
       // A valid output_path + evil sub_package should not create traversal.
       // resolveAutodocOutputPath scopes to docs/<sub_package> — verify the
       // result stays within docs/.
-      final result = resolveAutodocOutputPath(
-        configuredOutputPath: 'docs',
-        moduleSubPackage: 'evil_pkg',
-      );
+      final result = resolveAutodocOutputPath(configuredOutputPath: 'docs', moduleSubPackage: 'evil_pkg');
       expect(result, equals('docs/evil_pkg'));
       expect(result, isNot(contains('..')));
     });
