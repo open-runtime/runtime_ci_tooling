@@ -946,10 +946,7 @@ void main() {
     });
 
     test('safe sub_package produces safe output path', () {
-      final result = resolveAutodocOutputPath(
-        configuredOutputPath: 'docs',
-        moduleSubPackage: 'evil_pkg',
-      );
+      final result = resolveAutodocOutputPath(configuredOutputPath: 'docs', moduleSubPackage: 'evil_pkg');
       expect(result, equals('docs/evil_pkg'));
       expect(result, isNot(contains('..')));
     });
