@@ -25,7 +25,7 @@ class DocumentationCommand extends Command<void> {
   final String name = 'documentation';
 
   @override
-  final String description = 'Run documentation update via Gemini 3 Pro Preview.';
+  final String description = 'Run documentation update via Gemini 3.1 Pro Preview.';
 
   DocumentationCommand() {
     VersionOptionsArgParser.populateParser(argParser);
@@ -41,7 +41,7 @@ class DocumentationCommand extends Command<void> {
     final global = ManageCicdCli.parseGlobalOptions(globalResults);
     final versionOpts = VersionOptions.fromArgResults(argResults!);
 
-    Logger.header('Documentation Update (Gemini 3 Pro Preview)');
+    Logger.header('Documentation Update (Gemini 3.1 Pro Preview)');
 
     if (!GeminiUtils.geminiAvailable(warnOnly: true)) {
       Logger.warn('Skipping documentation update (Gemini unavailable).');
@@ -96,7 +96,7 @@ class DocumentationCommand extends Command<void> {
     }
     includes.add('@README.md');
 
-    Logger.info('Running Gemini 3 Pro for documentation updates...');
+    Logger.info('Running Gemini 3.1 Pro for documentation updates...');
     final result = Process.runSync(
       'sh',
       [

@@ -23,7 +23,7 @@ const String _kGeminiProModel = 'gemini-3.1-pro-preview';
 /// Stage 3: Release Notes Author.
 ///
 /// Generates rich, narrative release notes distinct from the CHANGELOG.
-/// Uses Gemini Pro to study source code, issues, and diffs to produce:
+/// Uses Gemini 3.1 Pro to study source code, issues, and diffs to produce:
 /// - release_notes.md (GitHub Release body)
 /// - migration_guide.md (for breaking changes)
 /// - linked_issues.json (structured issue linkage)
@@ -35,7 +35,7 @@ class ReleaseNotesCommand extends Command<void> {
   final String name = 'release-notes';
 
   @override
-  final String description = 'Run Stage 3 Release Notes Author (Gemini 3 Pro Preview).';
+  final String description = 'Run Stage 3 Release Notes Author (Gemini 3.1 Pro Preview).';
 
   ReleaseNotesCommand() {
     VersionOptionsArgParser.populateParser(argParser);
@@ -51,7 +51,7 @@ class ReleaseNotesCommand extends Command<void> {
     final global = ManageCicdCli.parseGlobalOptions(globalResults);
     final versionOpts = VersionOptions.fromArgResults(argResults!);
 
-    Logger.header('Stage 3: Release Notes Author (Gemini 3 Pro Preview)');
+    Logger.header('Stage 3: Release Notes Author (Gemini 3.1 Pro Preview)');
 
     if (!GeminiUtils.geminiAvailable(warnOnly: true)) {
       Logger.warn('Skipping release notes (Gemini unavailable).');
@@ -172,7 +172,7 @@ class ReleaseNotesCommand extends Command<void> {
       includes.add('"@$kVersionBumpsDir/v$newVersion.md"');
     }
 
-    Logger.info('Running Gemini 3 Pro for release notes authoring...');
+    Logger.info('Running Gemini 3.1 Pro for release notes authoring...');
     Logger.info('Bump type: $bumpType');
     Logger.info('File context: ${includes.join(", ")}');
 

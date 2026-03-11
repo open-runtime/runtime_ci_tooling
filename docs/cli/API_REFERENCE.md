@@ -59,14 +59,14 @@ void main(List<String> args) async {
 - **Methods**:
   - `run() -> Future<void>`
 
-**AutodocCommand** -- Generate/update documentation for proto modules using Gemini Pro.
+**AutodocCommand** -- Generate/update documentation for proto modules using Gemini 3.1 Pro.
 - **Fields**:
   - `name`: `String`
   - `description`: `String`
 - **Methods**:
   - `run() -> Future<void>`
 
-**ComposeCommand** -- Run Stage 2 Changelog Composer (Gemini Pro).
+**ComposeCommand** -- Run Stage 2 Changelog Composer (Gemini 3.1 Pro).
 - **Fields**:
   - `name`: `String`
   - `description`: `String`
@@ -109,14 +109,14 @@ void main(List<String> args) async {
 - **Methods**:
   - `run() -> Future<void>`
 
-**DocumentationCommand** -- Run documentation update via Gemini 3 Pro Preview.
+**DocumentationCommand** -- Run documentation update via Gemini 3.1 Pro Preview.
 - **Fields**:
   - `name`: `String`
   - `description`: `String`
 - **Methods**:
   - `run() -> Future<void>`
 
-**ExploreCommand** -- Run Stage 1 Explorer Agent (Gemini 3 Pro Preview).
+**ExploreCommand** -- Run Stage 1 Explorer Agent (Gemini 3.1 Pro Preview).
 - **Fields**:
   - `name`: `String`
   - `description`: `String`
@@ -144,7 +144,7 @@ void main(List<String> args) async {
 - **Methods**:
   - `run() -> Future<void>`
 
-**ReleaseNotesCommand** -- Run Stage 3 Release Notes Author (Gemini 3 Pro Preview).
+**ReleaseNotesCommand** -- Run Stage 3 Release Notes Author (Gemini 3.1 Pro Preview).
 - **Fields**:
   - `name`: `String`
   - `description`: `String`

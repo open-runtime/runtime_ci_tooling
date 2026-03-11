@@ -103,7 +103,7 @@ Future<String> preReleaseTriage({
       (manifest['cross_repo_issues'] as List).length;
 
   if (totalIssues > 0) {
-    print('  Running Gemini Pro to correlate $totalIssues issues with diff...');
+    print('  Running Gemini 3.1 Pro to correlate $totalIssues issues with diff...');
     await _correlateWithGemini(
       manifest: manifest,
       prevTag: prevTag,
@@ -353,7 +353,7 @@ Write valid JSON only.
 // Gemini Correlation
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Use Gemini Pro to assess confidence scores for issue-to-diff correlations.
+/// Use Gemini 3.1 Pro to assess confidence scores for issue-to-diff correlations.
 Future<void> _correlateWithGemini({
   required Map<String, dynamic> manifest,
   required String prevTag,
