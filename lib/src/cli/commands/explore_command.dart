@@ -26,7 +26,7 @@ class ExploreCommand extends Command<void> {
   final String name = 'explore';
 
   @override
-  final String description = 'Run Stage 1 Explorer Agent (Gemini 3 Pro Preview).';
+  final String description = 'Run Stage 1 Explorer Agent (Gemini 3.1 Pro Preview).';
 
   ExploreCommand() {
     VersionOptionsArgParser.populateParser(argParser);
@@ -42,7 +42,7 @@ class ExploreCommand extends Command<void> {
     final global = ManageCicdCli.parseGlobalOptions(globalResults);
     final versionOpts = VersionOptions.fromArgResults(argResults!);
 
-    Logger.header('Stage 1: Explorer Agent (Gemini 3 Pro Preview)');
+    Logger.header('Stage 1: Explorer Agent (Gemini 3.1 Pro Preview)');
 
     if (!GeminiUtils.geminiAvailable(warnOnly: true)) {
       Logger.warn('Skipping explore stage (Gemini unavailable). No changelog data will be generated.');
@@ -85,7 +85,7 @@ class ExploreCommand extends Command<void> {
     // Write prompt to file for piping
     final promptPath = ctx.artifactPath('explore', 'prompt.txt');
 
-    Logger.info('Running Gemini 3 Pro Preview...');
+    Logger.info('Running Gemini 3.1 Pro Preview...');
     final result = Process.runSync(
       'sh',
       [

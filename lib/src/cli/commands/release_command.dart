@@ -90,7 +90,7 @@ class ReleaseCommand extends Command<void> {
 
   /// Inline explore stage (from _runExplore).
   Future<void> _runExplore(String repoRoot, GlobalOptions global, VersionOptions versionOpts) async {
-    Logger.header('Stage 1: Explorer Agent (Gemini 3 Pro Preview)');
+    Logger.header('Stage 1: Explorer Agent (Gemini 3.1 Pro Preview)');
 
     if (!GeminiUtils.geminiAvailable(warnOnly: true)) {
       Logger.warn('Skipping explore stage (Gemini unavailable). No changelog data will be generated.');
@@ -131,7 +131,7 @@ class ReleaseCommand extends Command<void> {
 
     final promptPath = ctx.artifactPath('explore', 'prompt.txt');
 
-    Logger.info('Running Gemini 3 Pro Preview...');
+    Logger.info('Running Gemini 3.1 Pro Preview...');
     final result = Process.runSync(
       'sh',
       [
@@ -234,7 +234,7 @@ ${StepSummary.artifactLink()}
 
   /// Inline compose stage (from _runCompose).
   Future<void> _runCompose(String repoRoot, GlobalOptions global, VersionOptions versionOpts) async {
-    Logger.header('Stage 2: Changelog Composer (Gemini Pro)');
+    Logger.header('Stage 2: Changelog Composer (Gemini 3.1 Pro)');
 
     if (!GeminiUtils.geminiAvailable(warnOnly: true)) {
       Logger.warn('Skipping changelog composition (Gemini unavailable).');
@@ -299,7 +299,7 @@ ${StepSummary.artifactLink()}
     includes.add('@CHANGELOG.md');
     includes.add('@README.md');
 
-    Logger.info('Running Gemini 3 Pro for CHANGELOG composition...');
+    Logger.info('Running Gemini 3.1 Pro for CHANGELOG composition...');
     Logger.info('File context: ${includes.join(", ")}');
 
     final result = Process.runSync(
