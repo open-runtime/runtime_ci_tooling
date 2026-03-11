@@ -10,7 +10,13 @@ import '../../triage/utils/config.dart';
 import '../../triage/utils/run_context.dart';
 import '../manage_cicd_cli.dart';
 import '../options/autodoc_options.dart';
-import '../utils/autodoc_scaffold.dart' show kAutodocIndexPath, resolveAutodocOutputPath, scaffoldAutodocJson;
+import '../utils/autodoc_scaffold.dart'
+    show
+        kAutodocIndexPath,
+        resolveAutodocOutputPath,
+        scaffoldAutodocJson,
+        validateAutodocPath,
+        validateAutodocSubPackage;
 import '../utils/gemini_utils.dart';
 import '../utils/logger.dart';
 import '../utils/process_runner.dart';
@@ -89,9 +95,52 @@ class AutodocCommand extends Command<void> {
     // Load config
     final configContent = File(configPath).readAsStringSync();
     final autodocConfig = json.decode(configContent) as Map<String, dynamic>;
-    final modules = (autodocConfig['modules'] as List).cast<Map<String, dynamic>>();
+    final rawModules = (autodocConfig['modules'] as List).cast<Map<String, dynamic>>();
     final maxConcurrent = (autodocConfig['max_concurrent'] as int?) ?? 4;
     final templates = (autodocConfig['templates'] as Map<String, dynamic>?) ?? {};
+
+    // Validate module paths — skip modules with unsafe paths (traversal, absolute, etc.)
+    final modules = <Map<String, dynamic>>[];
+    for (final module in rawModules) {
+      final id = (module['id'] as String?) ?? '<unknown>';
+      final errors = <String>[];
+
+      final outputErr = validateAutodocPath(module['output_path'], fieldName: 'output_path');
+      if (outputErr != null) errors.add(outputErr);
+
+      final spErr = validateAutodocSubPackage(module['sub_package']);
+      if (spErr != null) errors.add(spErr);
+
+      for (final field in ['source_paths', 'lib_paths']) {
+        final paths = module[field];
+        if (paths == null && field == 'lib_paths') continue; // lib_paths is optional
+        if (paths is! List) {
+          errors.add('$field must be a list of strings');
+          continue;
+        }
+        for (final entry in paths) {
+          final pathErr = validateAutodocPath(entry, fieldName: field);
+          if (pathErr != null) errors.add(pathErr);
+        }
+      }
+
+      if (errors.isNotEmpty) {
+        Logger.warn('Skipping autodoc module "$id": ${errors.join('; ')}');
+        continue;
+      }
+      modules.add(module);
+    }
+
+    if (modules.isEmpty) {
+      if (rawModules.isEmpty) {
+        Logger.warn('No autodoc modules configured; nothing to generate.');
+      } else {
+        Logger.warn(
+          'All ${rawModules.length} configured autodoc module(s) were invalid and have been skipped; nothing to generate.',
+        );
+      }
+      return;
+    }
 
     if (!GeminiUtils.geminiAvailable(warnOnly: true)) {
       Logger.warn('Gemini unavailable -- skipping autodoc generation.');

@@ -5,7 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:test/test.dart' hide TestFailure;
 
 import 'package:runtime_ci_tooling/src/cli/utils/autodoc_scaffold.dart'
-    show kAutodocIndexPath, resolveAutodocOutputPath;
+    show kAutodocIndexPath, resolveAutodocOutputPath, validateAutodocPath, validateAutodocSubPackage;
 import 'package:runtime_ci_tooling/src/cli/utils/process_runner.dart';
 import 'package:runtime_ci_tooling/src/cli/utils/repo_utils.dart';
 import 'package:runtime_ci_tooling/src/cli/utils/step_summary.dart';
@@ -788,6 +788,196 @@ void main() {
       final second = resolveAutodocOutputPath(configuredOutputPath: first, moduleSubPackage: subPkg);
       expect(first, equals(second));
       expect(first, equals('docs/my_pkg'));
+    });
+
+    test('throws ArgumentError on traversal path (defense-in-depth)', () {
+      expect(
+        () => resolveAutodocOutputPath(configuredOutputPath: '../../etc', moduleSubPackage: null),
+        throwsA(isA<ArgumentError>().having((e) => e.message, 'message', contains('traverse'))),
+      );
+      expect(
+        () => resolveAutodocOutputPath(configuredOutputPath: 'docs/../../etc', moduleSubPackage: null),
+        throwsA(isA<ArgumentError>().having((e) => e.message, 'message', contains('traverse'))),
+      );
+    });
+  });
+
+  group('validateAutodocPath', () {
+    test('accepts valid relative paths', () {
+      expect(validateAutodocPath('docs/cli'), isNull);
+      expect(validateAutodocPath('docs/'), isNull);
+      expect(validateAutodocPath('packages/core/docs/utils/'), isNull);
+      expect(validateAutodocPath('lib/src/cli/'), isNull);
+      expect(validateAutodocPath('docs/my_pkg-api'), isNull);
+    });
+
+    test('rejects null, empty, and non-string types', () {
+      expect(validateAutodocPath(null), isNotNull);
+      expect(validateAutodocPath(''), isNotNull);
+      expect(validateAutodocPath('   '), isNotNull);
+      expect(validateAutodocPath(123), isNotNull);
+      expect(validateAutodocPath(true), isNotNull);
+      expect(validateAutodocPath(<String>[]), isNotNull);
+    });
+
+    test('rejects leading/trailing whitespace', () {
+      expect(validateAutodocPath(' docs/cli'), isNotNull);
+      expect(validateAutodocPath('docs/cli '), isNotNull);
+    });
+
+    test('rejects control characters', () {
+      expect(validateAutodocPath('docs/\tcli'), isNotNull);
+      expect(validateAutodocPath('docs/\ncli'), isNotNull);
+      expect(validateAutodocPath('docs/\x00cli'), isNotNull);
+    });
+
+    test('rejects absolute paths', () {
+      expect(validateAutodocPath('/etc/passwd'), isNotNull);
+      expect(validateAutodocPath('~/docs'), isNotNull);
+    });
+
+    test('rejects backslashes', () {
+      expect(validateAutodocPath('docs\\cli'), isNotNull);
+    });
+
+    test('rejects repo root reference and leading dash', () {
+      expect(validateAutodocPath('.'), isNotNull);
+      expect(validateAutodocPath('-flaglike'), isNotNull);
+    });
+
+    test('rejects directory traversal', () {
+      expect(validateAutodocPath('../etc'), isNotNull);
+      expect(validateAutodocPath('docs/../../etc'), isNotNull);
+      expect(validateAutodocPath('a/../../../outside'), isNotNull);
+      expect(validateAutodocPath('../../root'), isNotNull);
+    });
+
+    test('rejects sneaky traversal with redundant segments', () {
+      // docs/./../../etc normalizes to ../etc — must still be caught
+      expect(validateAutodocPath('docs/./../../etc'), isNotNull);
+      // deeply nested traversal that escapes after normalization
+      expect(validateAutodocPath('a/b/c/../../../../outside'), isNotNull);
+      // bare parent reference
+      expect(validateAutodocPath('..'), isNotNull);
+      // trailing /.. after normalization escapes
+      expect(validateAutodocPath('a/b/../../../x'), isNotNull);
+    });
+
+    test('rejects unsafe characters', () {
+      expect(validateAutodocPath('docs/cli;rm -rf /'), isNotNull);
+      expect(validateAutodocPath('docs/\$HOME'), isNotNull);
+      expect(validateAutodocPath('docs/foo bar'), isNotNull);
+    });
+
+    test('rejects shell/YAML injection characters', () {
+      expect(validateAutodocPath('docs/\$(whoami)'), isNotNull);
+      expect(validateAutodocPath('docs/`id`'), isNotNull);
+      expect(validateAutodocPath('docs/{a,b}'), isNotNull);
+      expect(validateAutodocPath("docs/foo'bar"), isNotNull);
+      expect(validateAutodocPath('docs/foo"bar'), isNotNull);
+      expect(validateAutodocPath('docs/foo|bar'), isNotNull);
+      expect(validateAutodocPath('docs/foo&bar'), isNotNull);
+    });
+
+    test('uses custom fieldName in error messages', () {
+      final err = validateAutodocPath('../bad', fieldName: 'output_path');
+      expect(err, contains('output_path'));
+    });
+
+    test('every rejected path explains why', () {
+      // Ensure error messages are non-empty and descriptive
+      for (final Object? bad in ['../x', '/abs', 'a\tb', 'a\\b', 'a b', '', null, 42]) {
+        final err = validateAutodocPath(bad, fieldName: 'test_field');
+        expect(err, isNotNull, reason: 'should reject: $bad');
+        expect(err, isNotEmpty, reason: 'error for "$bad" should be descriptive');
+        expect(err, contains('test_field'), reason: 'error should name the field');
+      }
+    });
+  });
+
+  group('validateAutodocSubPackage', () {
+    test('accepts null and empty (optional field)', () {
+      expect(validateAutodocSubPackage(null), isNull);
+      expect(validateAutodocSubPackage(''), isNull);
+    });
+
+    test('accepts valid simple names', () {
+      expect(validateAutodocSubPackage('my_pkg'), isNull);
+      expect(validateAutodocSubPackage('core'), isNull);
+      expect(validateAutodocSubPackage('my-pkg.v2'), isNull);
+    });
+
+    test('rejects path separators', () {
+      expect(validateAutodocSubPackage('pkg/evil'), isNotNull);
+      expect(validateAutodocSubPackage('pkg\\evil'), isNotNull);
+    });
+
+    test('rejects traversal sequences', () {
+      expect(validateAutodocSubPackage('..'), isNotNull);
+      expect(validateAutodocSubPackage('pkg..evil'), isNotNull);
+    });
+
+    test('rejects control characters', () {
+      expect(validateAutodocSubPackage('pkg\tevil'), isNotNull);
+    });
+
+    test('rejects unsafe characters', () {
+      expect(validateAutodocSubPackage('pkg evil'), isNotNull);
+      expect(validateAutodocSubPackage('pkg;rm'), isNotNull);
+      expect(validateAutodocSubPackage('pkg\$(id)'), isNotNull);
+    });
+
+    test('rejects non-string types', () {
+      expect(validateAutodocSubPackage(123), isNotNull);
+      expect(validateAutodocSubPackage(true), isNotNull);
+    });
+
+    test('resolveAutodocOutputPath throws on traversal in moduleSubPackage', () {
+      // Defense-in-depth: even if validateAutodocSubPackage is bypassed,
+      // resolveAutodocOutputPath rejects path separators and traversal.
+      expect(
+        () => resolveAutodocOutputPath(configuredOutputPath: 'docs', moduleSubPackage: '../../../etc'),
+        throwsA(isA<ArgumentError>()),
+      );
+      expect(
+        () => resolveAutodocOutputPath(configuredOutputPath: 'docs', moduleSubPackage: 'pkg/../../etc'),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('safe sub_package produces safe output path', () {
+      final result = resolveAutodocOutputPath(configuredOutputPath: 'docs', moduleSubPackage: 'evil_pkg');
+      expect(result, equals('docs/evil_pkg'));
+      expect(result, isNot(contains('..')));
+    });
+  });
+
+  group('autodoc path validation integration', () {
+    test('traversal in output_path is caught before resolveAutodocOutputPath', () {
+      // Simulates the validation flow: validate first, then resolve.
+      const maliciousPath = '../../../etc/cron.d';
+      final err = validateAutodocPath(maliciousPath, fieldName: 'output_path');
+      expect(err, isNotNull, reason: 'validation should reject traversal');
+      expect(err, contains('traverse'));
+      // If validation were skipped, resolveAutodocOutputPath would throw
+      expect(
+        () => resolveAutodocOutputPath(configuredOutputPath: maliciousPath, moduleSubPackage: null),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('traversal in source_paths is caught by validateAutodocPath', () {
+      expect(validateAutodocPath('../../.ssh/id_rsa', fieldName: 'source_paths'), isNotNull);
+      expect(validateAutodocPath('/etc/shadow', fieldName: 'source_paths'), isNotNull);
+    });
+
+    test('valid paths pass both validation and resolution', () {
+      const goodPaths = ['docs/cli', 'packages/core/docs/', 'lib/src/', 'docs/my_pkg/api'];
+      for (final path in goodPaths) {
+        expect(validateAutodocPath(path, fieldName: 'output_path'), isNull, reason: 'should accept: $path');
+        // Should not throw
+        resolveAutodocOutputPath(configuredOutputPath: path, moduleSubPackage: null);
+      }
     });
   });
 
