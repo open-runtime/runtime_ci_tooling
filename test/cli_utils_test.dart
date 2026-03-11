@@ -811,10 +811,13 @@ void main() {
       expect(validateAutodocPath('docs/my_pkg-api'), isNull);
     });
 
-    test('rejects null or empty', () {
+    test('rejects null, empty, and non-string types', () {
       expect(validateAutodocPath(null), isNotNull);
       expect(validateAutodocPath(''), isNotNull);
       expect(validateAutodocPath('   '), isNotNull);
+      expect(validateAutodocPath(123), isNotNull);
+      expect(validateAutodocPath(true), isNotNull);
+      expect(validateAutodocPath(<String>[]), isNotNull);
     });
 
     test('rejects leading/trailing whitespace', () {
@@ -835,6 +838,11 @@ void main() {
 
     test('rejects backslashes', () {
       expect(validateAutodocPath('docs\\cli'), isNotNull);
+    });
+
+    test('rejects repo root reference and leading dash', () {
+      expect(validateAutodocPath('.'), isNotNull);
+      expect(validateAutodocPath('-flaglike'), isNotNull);
     });
 
     test('rejects directory traversal', () {
@@ -878,7 +886,7 @@ void main() {
 
     test('every rejected path explains why', () {
       // Ensure error messages are non-empty and descriptive
-      for (final String? bad in ['../x', '/abs', 'a\tb', 'a\\b', 'a b', '', null]) {
+      for (final Object? bad in ['../x', '/abs', 'a\tb', 'a\\b', 'a b', '', null, 42]) {
         final err = validateAutodocPath(bad, fieldName: 'test_field');
         expect(err, isNotNull, reason: 'should reject: $bad');
         expect(err, isNotEmpty, reason: 'error for "$bad" should be descriptive');
@@ -919,13 +927,29 @@ void main() {
       expect(validateAutodocSubPackage('pkg\$(id)'), isNotNull);
     });
 
-    test('malicious sub_package cannot escape via resolveAutodocOutputPath', () {
-      // Even if sub_package validation is bypassed, resolveAutodocOutputPath
-      // should not produce a path that escapes the repo.
-      // A valid output_path + evil sub_package should not create traversal.
-      // resolveAutodocOutputPath scopes to docs/<sub_package> — verify the
-      // result stays within docs/.
-      final result = resolveAutodocOutputPath(configuredOutputPath: 'docs', moduleSubPackage: 'evil_pkg');
+    test('rejects non-string types', () {
+      expect(validateAutodocSubPackage(123), isNotNull);
+      expect(validateAutodocSubPackage(true), isNotNull);
+    });
+
+    test('resolveAutodocOutputPath throws on traversal in moduleSubPackage', () {
+      // Defense-in-depth: even if validateAutodocSubPackage is bypassed,
+      // resolveAutodocOutputPath rejects path separators and traversal.
+      expect(
+        () => resolveAutodocOutputPath(configuredOutputPath: 'docs', moduleSubPackage: '../../../etc'),
+        throwsA(isA<ArgumentError>()),
+      );
+      expect(
+        () => resolveAutodocOutputPath(configuredOutputPath: 'docs', moduleSubPackage: 'pkg/../../etc'),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('safe sub_package produces safe output path', () {
+      final result = resolveAutodocOutputPath(
+        configuredOutputPath: 'docs',
+        moduleSubPackage: 'evil_pkg',
+      );
       expect(result, equals('docs/evil_pkg'));
       expect(result, isNot(contains('..')));
     });

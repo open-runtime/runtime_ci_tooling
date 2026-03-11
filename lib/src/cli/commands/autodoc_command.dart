@@ -105,19 +105,21 @@ class AutodocCommand extends Command<void> {
       final id = (module['id'] as String?) ?? '<unknown>';
       final errors = <String>[];
 
-      final outputErr = validateAutodocPath(module['output_path'] as String?, fieldName: 'output_path');
+      final outputErr = validateAutodocPath(module['output_path'], fieldName: 'output_path');
       if (outputErr != null) errors.add(outputErr);
 
-      final spErr = validateAutodocSubPackage(module['sub_package'] as String?);
+      final spErr = validateAutodocSubPackage(module['sub_package']);
       if (spErr != null) errors.add(spErr);
 
       for (final field in ['source_paths', 'lib_paths']) {
         final paths = module[field];
-        if (paths is List) {
-          for (final p in paths) {
-            final pathErr = validateAutodocPath(p as String?, fieldName: field);
-            if (pathErr != null) errors.add('$field: $pathErr');
-          }
+        if (paths is! List) {
+          errors.add('$field must be a list of strings');
+          continue;
+        }
+        for (final entry in paths) {
+          final pathErr = validateAutodocPath(entry, fieldName: field);
+          if (pathErr != null) errors.add(pathErr);
         }
       }
 
@@ -126,6 +128,17 @@ class AutodocCommand extends Command<void> {
         continue;
       }
       modules.add(module);
+    }
+
+    if (modules.isEmpty) {
+      if (rawModules.isEmpty) {
+        Logger.warn('No autodoc modules configured; nothing to generate.');
+      } else {
+        Logger.warn(
+          'All ${rawModules.length} configured autodoc module(s) were invalid and have been skipped; nothing to generate.',
+        );
+      }
+      return;
     }
 
     if (!GeminiUtils.geminiAvailable(warnOnly: true)) {

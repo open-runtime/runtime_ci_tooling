@@ -12,13 +12,15 @@ import 'sub_package_utils.dart';
 /// Returns `null` when the path is safe, or a human-readable reason string when
 /// it should be rejected.  Mirrors the validation applied to sub-package paths
 /// in [WorkflowGenerator.validateSubPackageEntry].
-String? validateAutodocPath(String? raw, {String fieldName = 'path'}) {
+String? validateAutodocPath(Object? raw, {String fieldName = 'path'}) {
   if (raw is! String || raw.trim().isEmpty) return '$fieldName must be a non-empty string';
   if (raw != raw.trim()) return '$fieldName must not have leading/trailing whitespace';
   if (raw.contains(RegExp(r'[\r\n\t\x00-\x1f]'))) return '$fieldName must not contain control characters';
   if (p.isAbsolute(raw) || raw.startsWith('~')) return '$fieldName must be a relative repo path';
   if (raw.contains('\\')) return '$fieldName must use forward slashes (/)';
   final normalized = p.posix.normalize(raw);
+  if (normalized == '.') return '$fieldName must not refer to the repository root (.)';
+  if (normalized.startsWith('-')) return '$fieldName must not start with "-"';
   if (normalized.startsWith('..') || normalized.contains('/../') || normalized.endsWith('/..')) {
     return '$fieldName must not traverse outside the repo';
   }
@@ -27,8 +29,10 @@ String? validateAutodocPath(String? raw, {String fieldName = 'path'}) {
 }
 
 /// Validate the `sub_package` field on an autodoc module (simple identifier, no path separators).
-String? validateAutodocSubPackage(String? raw) {
-  if (raw == null || raw.trim().isEmpty) return null; // optional field
+String? validateAutodocSubPackage(Object? raw) {
+  if (raw == null) return null; // optional field
+  if (raw is! String) return 'sub_package must be a string';
+  if (raw.trim().isEmpty) return null; // optional field
   if (raw.contains('/') || raw.contains('\\') || raw.contains('..')) {
     return 'sub_package must be a simple name (no path separators or traversal)';
   }
@@ -57,6 +61,10 @@ String resolveAutodocOutputPath({required String configuredOutputPath, required 
   }
   if (moduleSubPackage == null || moduleSubPackage.isEmpty) {
     return normalized;
+  }
+  // Defense-in-depth: reject moduleSubPackage with path separators or traversal.
+  if (moduleSubPackage.contains('/') || moduleSubPackage.contains('\\') || moduleSubPackage.contains('..')) {
+    throw ArgumentError('moduleSubPackage must be a simple name: "$moduleSubPackage"');
   }
 
   final docsPrefix = 'docs/';
