@@ -1,234 +1,225 @@
-# Issue Triage Engine Quickstart
+# Quickstart: Issue Triage Engine
 
 ## 1. Overview
-The Issue Triage Engine is an AI-powered pipeline that automatically investigates, categorizes, links, and acts upon GitHub issues and Sentry errors. It utilizes specialized Gemini agents (Code Analysis, PR Correlation, Duplicate Detection, Sentiment, and Changelog) to process issues through a structured multi-phase pipeline (`plan`, `investigate`, `act`, `verify`, `link`). It supports both day-to-day auto-triaging and comprehensive pre/post-release correlation mapping.
+The Issue Triage Engine automates the lifecycle of GitHub issues by using parallel AI agents to analyze code, detect duplicates, correlate pull requests, and determine community sentiment. It provides a modular 6-phase pipeline (Plan, Investigate, Act, Verify, Link, Cross-Repo) capable of single-issue analysis, bulk auto-triage, and managing pre/post-release documentation traceability.
 
 ## 2. Import
-Import the required phases, utilities, and models from the `src/triage` directory:
+There is no central barrel file for the triage engine, so you should import the specific phases, models, and utilities you need:
 
 ```dart
-// Models
-import 'package:runtime_ci_tooling/src/triage/models/game_plan.dart';
-import 'package:runtime_ci_tooling/src/triage/models/triage_decision.dart';
-import 'package:runtime_ci_tooling/src/triage/models/investigation_result.dart';
+// Phases
+import 'package:runtime_ci_tooling/src/triage/phases/plan.dart';
+import 'package:runtime_ci_tooling/src/triage/phases/investigate.dart';
+import 'package:runtime_ci_tooling/src/triage/phases/act.dart';
+import 'package:runtime_ci_tooling/src/triage/phases/verify.dart';
+import 'package:runtime_ci_tooling/src/triage/phases/link.dart';
+import 'package:runtime_ci_tooling/src/triage/phases/cross_repo_link.dart';
+import 'package:runtime_ci_tooling/src/triage/phases/pre_release.dart';
+import 'package:runtime_ci_tooling/src/triage/phases/post_release.dart';
 
-// Utilities
+// Models & Utils
+import 'package:runtime_ci_tooling/src/triage/models/game_plan.dart';
+import 'package:runtime_ci_tooling/src/triage/models/investigation_result.dart';
+import 'package:runtime_ci_tooling/src/triage/models/triage_decision.dart';
 import 'package:runtime_ci_tooling/src/triage/utils/config.dart';
+import 'package:runtime_ci_tooling/src/triage/utils/gemini_runner.dart';
 import 'package:runtime_ci_tooling/src/triage/utils/run_context.dart';
 import 'package:runtime_ci_tooling/src/triage/utils/mcp_config.dart' as mcp;
-
-// Phases
-import 'package:runtime_ci_tooling/src/triage/phases/plan.dart' as plan_phase;
-import 'package:runtime_ci_tooling/src/triage/phases/investigate.dart' as investigate_phase;
-import 'package:runtime_ci_tooling/src/triage/phases/act.dart' as act_phase;
-import 'package:runtime_ci_tooling/src/triage/phases/verify.dart' as verify_phase;
-import 'package:runtime_ci_tooling/src/triage/phases/link.dart' as link_phase;
-import 'package:runtime_ci_tooling/src/triage/phases/cross_repo_link.dart' as cross_repo_phase;
 ```
 
 ## 3. Setup
-Before executing the triage pipeline, you need to load the configuration, ensure MCP servers are configured properly, and create a `RunContext` to manage the audit trail directory.
+The module relies heavily on `.runtime_ci/config.json` for repository identity and MCP settings in `.gemini/settings.json`. Before running the triage pipeline, ensure configuration and MCP servers are set up:
 
 ```dart
-// 1. Reload configuration from .runtime_ci/config.json
-reloadConfig();
-
-// 2. Ensure GitHub and Sentry MCP servers are configured in .gemini/settings.json
-mcp.ensureMcpConfigured(repoRoot);
-
-// 3. Create a RunContext to manage the scoped audit trail directory
-final runContext = RunContext.create(repoRoot, 'my_triage_command');
-final runDir = runContext.runDir;
-```
-
-## 4. Common Operations
-
-### Running a Full Triage Pipeline for a Single Issue
-Execute the standard 5-phase pipeline on a specific issue.
-
-```dart
-// Phase 1: Create a GamePlan for a specific issue number
-final GamePlan gamePlan = await plan_phase.planSingleIssue(42, repoRoot, runDir: runDir);
-
-// Phase 2: Run parallel Gemini agents to investigate the issue
-final Map<int, List<InvestigationResult>> results = await investigate_phase.investigate(
-  gamePlan, 
-  repoRoot, 
-  runDir: runDir,
-);
-
-// Phase 3: Apply labels, comments, and close actions based on confidence thresholds
-final List<TriageDecision> decisions = await act_phase.act(
-  gamePlan, 
-  results, 
-  repoRoot, 
-  runDir: runDir,
-);
-
-// Phase 4: Verify actions were successfully applied to GitHub
-final VerificationReport report = await verify_phase.verify(
-  gamePlan, 
-  decisions, 
-  repoRoot, 
-  runDir: runDir,
-);
-
-// Phase 5: Create bidirectional links to PRs, release notes, and changelogs
-await link_phase.link(gamePlan, decisions, repoRoot, runDir: runDir);
-
-// Phase 5b: Cross-repo linking
-await cross_repo_phase.crossRepoLink(gamePlan, decisions, repoRoot, runDir: runDir);
-```
-
-### Auto-Triaging All Open Issues
-Discover all open, untriaged issues in the repository and batch process them.
-
-```dart
-// Generates a GamePlan containing all untriaged issues
-final GamePlan autoPlan = await plan_phase.planAutoTriage(repoRoot, runDir: runDir);
-
-if (autoPlan.issues.isNotEmpty) {
-  final results = await investigate_phase.investigate(autoPlan, repoRoot, runDir: runDir);
-  final decisions = await act_phase.act(autoPlan, results, repoRoot, runDir: runDir);
-  await verify_phase.verify(autoPlan, decisions, repoRoot, runDir: runDir);
-  await link_phase.link(autoPlan, decisions, repoRoot, runDir: runDir);
-  await cross_repo_phase.crossRepoLink(autoPlan, decisions, repoRoot, runDir: runDir);
+void setupTriage(String repoRoot) {
+  // Reload the singleton TriageConfig from .runtime_ci/config.json
+  reloadConfig();
+  
+  // Ensure GitHub and Sentry MCP servers are configured in .gemini/settings.json
+  mcp.ensureMcpConfigured(repoRoot);
 }
 ```
 
-### Generating a Pre-Release Issue Manifest
-Scan for issues addressed between a previous tag and the current `HEAD` to feed into changelog generation.
+## 4. Core Models & Enums
+
+The triage pipeline is driven by a series of structured data models.
+
+### GamePlan and IssuePlan
+The `GamePlan` orchestrates the pipeline, containing multiple `IssuePlan` objects. Each `IssuePlan` contains a list of `TriageTask` objects to be executed by specific agents.
 
 ```dart
-import 'package:runtime_ci_tooling/src/triage/phases/pre_release.dart' as pre_release_phase;
+void constructGamePlan() {
+  // Use the builder pattern (cascade notation) to construct complex objects
+  final gamePlan = GamePlan.forIssues([
+    {
+      'number': 123,
+      'title': 'Bug: App crashes on startup',
+      'author': 'octocat',
+      'labels': ['bug'],
+    }
+  ])
+    ..linksToCreate.add(LinkSpec(
+      sourceType: 'issue',
+      sourceId: '123',
+      targetType: 'pr',
+      targetId: '456',
+      description: 'Fixes startup crash',
+    ));
 
-final String manifestPath = await pre_release_phase.preReleaseTriage(
-  prevTag: 'v1.0.0',
-  newVersion: '1.1.0',
-  repoRoot: repoRoot,
-  runDir: runDir,
-  verbose: true,
-);
-// Produces issue_manifest.json containing correlated GitHub and Sentry issues
+  final issuePlan = gamePlan.issues.first;
+  
+  // Enums: TaskStatus.pending, running, completed, failed, skipped
+  // Enums: AgentType.codeAnalysis, prCorrelation, duplicate, sentiment, changelog
+  for (final task in issuePlan.tasks) {
+    print('Task ${task.id} uses agent ${task.agent.name} with status ${task.status.name}');
+  }
+}
 ```
 
-### Executing Post-Release Actions
-Close the loop after a release by commenting on issues, closing resolved ones, and linking Sentry errors.
+### InvestigationResult and TriageDecision
+Agents return an `InvestigationResult`. These are aggregated into a `TriageDecision` to determine actions.
 
 ```dart
-import 'package:runtime_ci_tooling/src/triage/phases/post_release.dart' as post_release_phase;
-
-await post_release_phase.postReleaseTriage(
-  newVersion: '1.1.0',
-  releaseTag: 'v1.1.0',
-  releaseUrl: 'https://github.com/owner/repo/releases/tag/v1.1.0',
-  manifestPath: manifestPath, // Passed from preReleaseTriage
-  repoRoot: repoRoot,
-  runDir: runDir,
-);
-```
-
-## 5. Configuration
-The engine relies on a `.runtime_ci/config.json` file at the repository root. The `TriageConfig` loader requires these keys at minimum:
-- `repository.name` (e.g., `"runtime_ci_tooling"`)
-- `repository.owner` (e.g., `"open-runtime"`)
-
-**Environment Variables Required:**
-- `GEMINI_API_KEY`: A valid Google Gemini API key.
-- `GH_TOKEN`, `GITHUB_TOKEN`, or `GITHUB_PAT`: A GitHub Personal Access Token to authenticate the GitHub CLI and MCP server.
-
-## 6. Data Models and Enums
-Below is a reference of all the core entities and enums used in the Triage pipeline. Construct them using proper camelCase field names.
-
-### Enums
-- **`TaskStatus`**: `pending`, `running`, `completed`, `failed`, `skipped`
-- **`AgentType`**: `codeAnalysis`, `prCorrelation`, `duplicate`, `sentiment`, `changelog`
-- **`RiskLevel`**: `low`, `medium`, `high`
-- **`ActionType`**: `label`, `comment`, `close`, `linkPr`, `linkIssue`, `none`
-
-### Models
-
-**`GamePlan`**
-Orchestrates the entire triage pipeline.
-```dart
-final plan = GamePlan(
-  planId: 'triage-123',
-  createdAt: DateTime.now(),
-  issues: [
-    IssuePlan(
-      number: 42,
-      title: 'Bug with feature X',
-      author: 'johndoe',
-      tasks: [
-        TriageTask(id: 'issue-42-code', agent: AgentType.codeAnalysis),
-      ],
-    )
-    ..decision = null // populated later
-  ],
-)..linksToCreate.add(LinkSpec(
-  sourceType: 'issue',
-  sourceId: '42',
-  targetType: 'pr',
-  targetId: '43',
-  description: 'Related PR',
-));
-```
-
-**`IssuePlan`**
-The triage plan for a single GitHub issue. Fields include `number`, `title`, `author`, `existingLabels`, `tasks`, and `decision`.
-
-**`TriageTask`**
-A single investigation task. Fields: `id`, `agent`, `status`, `error`, and `result`.
-
-**`LinkSpec`**
-A cross-link between two entities. Fields: `sourceType`, `sourceId`, `targetType`, `targetId`, `description`, and `applied`.
-
-**`InvestigationResult`**
-The output from a Gemini agent.
-```dart
-final result = InvestigationResult(
-  agentId: 'code_analysis',
-  issueNumber: 42,
-  confidence: 0.85,
-  summary: 'Code fix was found in main',
-)
-  ..evidence.add('Found commit 123 fixing the bug')
-  ..recommendedLabels.add('bug')
-  ..relatedEntities.add(
-    RelatedEntity(
+void processResults() {
+  final result = InvestigationResult(
+    agentId: 'code_analysis',
+    issueNumber: 123,
+    confidence: 0.85,
+    summary: 'Found fix in recent commits',
+    evidence: ['Commit abcdef mentions #123'],
+    recommendedLabels: ['bug', 'needs-verification'],
+    suggestClose: true,
+  )
+    // Cascade to add related entities
+    ..relatedEntities.add(RelatedEntity(
       type: 'commit',
-      id: 'sha123',
-      description: 'Fix crash in auth',
+      id: 'abcdef',
+      description: 'Fix crash',
       relevance: 0.9,
-    ),
+    ));
+
+  final decision = TriageDecision.fromResults(
+    issueNumber: 123,
+    results: [result],
   );
+
+  // Enums: RiskLevel.low, medium, high
+  print('Risk Level: ${decision.riskLevel.name}'); 
+  
+  // Enums: ActionType.label, comment, close, linkPr, linkIssue, none
+  for (final action in decision.actions) {
+    print('Action: ${action.type.name} - ${action.description}');
+  }
+}
 ```
 
-**`TriageDecision`**
-The aggregated decision formulated from `InvestigationResult`s.
+## 5. Triage Agents
+
+The engine uses 5 distinct AI agents (defined in `lib/src/triage/agents/`):
+- **Code Analysis Agent** (`AgentType.codeAnalysis`): Maps issues to source code and tests.
+- **PR Correlation Agent** (`AgentType.prCorrelation`): Finds related Pull Requests.
+- **Duplicate Agent** (`AgentType.duplicate`): Finds related or duplicate issues.
+- **Sentiment Agent** (`AgentType.sentiment`): Gauges community consensus and blockers.
+- **Changelog Agent** (`AgentType.changelog`): Checks if fixes have reached a release.
+
+## 6. Utilities
+
+`GeminiRunner` handles parallel execution of Gemini tasks, while `RunContext` manages the timestamped audit trails.
+
 ```dart
-final decision = TriageDecision(
-  issueNumber: 42,
-  aggregateConfidence: 0.85,
-  riskLevel: RiskLevel.medium,
-  rationale: 'High confidence from code analysis agent',
-  actions: [
-    TriageAction(
-      type: ActionType.label,
-      description: 'Apply bug label',
-      parameters: {'labels': ['bug']},
-    )
-  ],
-)..investigationResults.addAll(results);
+Future<void> utilsExample(String repoRoot) async {
+  // RunContext manages a timestamped audit trail directory
+  final context = RunContext.create(repoRoot, 'triage');
+  context.saveArtifact('plan', 'plan.json', '{"plan": "data"}');
+
+  // GeminiRunner executes parallel AI tasks
+  final runner = GeminiRunner(
+    maxConcurrent: 2,
+    maxRetries: 3,
+    verbose: true,
+  );
+
+  final task = GeminiTask(
+    id: 'test-task',
+    prompt: 'Summarize this issue...',
+    model: 'gemini-3.1-pro-preview',
+  );
+
+  final results = await runner.executeBatch([task]);
+  if (results.first.success) {
+    print('Response: ${results.first.response}');
+  }
+}
 ```
 
-**`TriageAction`**
-A concrete action to perform on GitHub. Fields: `type` (ActionType), `description`, `parameters`, `executed`, `verified`, and `error`.
+## 7. Common Operations
 
-**`RelatedEntity`**
-A reference to a relevant artifact. Fields: `type`, `id`, `description`, and `relevance`.
+### Auto-Triage All Open Issues
+This performs a full sweep of untriaged issues, investigates them in parallel, and applies labels, comments, or closes them based on confidence thresholds.
 
-## 7. Related Modules
-- **Models**: `GamePlan`, `IssuePlan`, `InvestigationResult`, `TriageDecision` (`lib/src/triage/models/`)
-- **Agents**: `code_analysis_agent.dart`, `changelog_agent.dart`, `duplicate_agent.dart`, `pr_correlation_agent.dart`, `sentiment_agent.dart` (`lib/src/triage/agents/`)
-- **CLI Entrypoint**: `lib/src/triage/triage_cli.dart`
+```dart
+Future<void> runAutoTriage(String repoRoot, String runDir) async {
+  // Phase 1: Discover all untriaged open issues
+  final plan = await planAutoTriage(repoRoot, runDir: runDir);
+  
+  if (plan.issues.isEmpty) return;
+
+  // Phase 2: Run Gemini AI agents (Code Analysis, PR Correlation, etc.)
+  final results = await investigate(plan, repoRoot, runDir: runDir);
+  
+  // Phase 3: Execute decisions (apply labels, post comments, close issues)
+  final decisions = await act(plan, results, repoRoot, runDir: runDir);
+}
+```
+
+### Complete Single-Issue Pipeline
+If you want to run the entire 6-phase pipeline (including verification and linking) on a specific issue:
+
+```dart
+Future<void> runSingleIssueTriage(int issueNumber, String repoRoot, String runDir) async {
+  final plan = await planSingleIssue(issueNumber, repoRoot, runDir: runDir);
+  final results = await investigate(plan, repoRoot, runDir: runDir);
+  final decisions = await act(plan, results, repoRoot, runDir: runDir);
+  
+  // Phase 4: Confirm GitHub state reflects actions taken
+  await verify(plan, decisions, repoRoot, runDir: runDir);
+  
+  // Phase 5 & 5b: Create bidirectional links to artifacts and related cross-repo issues
+  await link(plan, decisions, repoRoot, runDir: runDir);
+  await crossRepoLink(plan, decisions, repoRoot, runDir: runDir);
+}
+```
+
+### Pre-Release & Post-Release Triage
+Scans recent git diffs and commits, queries GitHub and Sentry, and produces an issue manifest. After release, updates the issues.
+
+```dart
+Future<void> generateReleaseManifest(String repoRoot, String runDir) async {
+  // Pre-Release
+  final manifestPath = await preReleaseTriage(
+    prevTag: 'v1.0.0',
+    newVersion: '1.1.0',
+    repoRoot: repoRoot,
+    runDir: runDir,
+    verbose: true,
+  );
+  print('Generated issue_manifest.json at: $manifestPath');
+  
+  // Post-Release
+  await postReleaseTriage(
+    newVersion: '1.1.0',
+    releaseTag: 'v1.1.0',
+    releaseUrl: 'https://github.com/owner/repo/releases/tag/v1.1.0',
+    manifestPath: manifestPath,
+    repoRoot: repoRoot,
+    runDir: runDir,
+  );
+}
+```
+
+## 8. Configuration
+The Triage Engine requires the following configurations:
+- **`GEMINI_API_KEY` Environment Variable**: Needed by the `GeminiRunner` to authenticate against Gemini models.
+- **`GH_TOKEN` / `GITHUB_TOKEN` / `GITHUB_PAT` Environment Variable**: Needed by the GitHub CLI and GitHub MCP server to interact with issues and pull requests.
+- **`.runtime_ci/config.json`**: The global configuration file describing `repository.owner`, `repository.name`, `cross_repo`, Sentry organizations, and AI agent thresholds.
+- **`.gemini/settings.json`**: Updated automatically by `ensureMcpConfigured` to define MCP server executables and endpoints.
