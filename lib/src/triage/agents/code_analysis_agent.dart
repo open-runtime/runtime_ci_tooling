@@ -7,7 +7,7 @@ import '../utils/gemini_runner.dart';
 ///
 /// Investigates whether an issue has been fixed in source code by searching
 /// for relevant commits, code changes, and test additions since the issue
-/// was opened. Uses Gemini 3.1 Pro for deep code reasoning.
+/// was opened. Uses Gemini 3.1 Pro Preview for deep code reasoning.
 
 const String kAgentId = 'code_analysis';
 

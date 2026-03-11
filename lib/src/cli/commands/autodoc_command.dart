@@ -21,7 +21,7 @@ import '../utils/version_detection.dart';
 
 const String _kGeminiProModel = 'gemini-3.1-pro-preview';
 
-/// Generate/update documentation for proto modules using Gemini 3.1 Pro.
+/// Generate/update documentation for proto modules using Gemini 3.1 Pro Preview.
 ///
 /// Uses autodoc.json for configuration, hash-based change detection for
 /// incremental updates, and parallel Gemini execution.

@@ -432,8 +432,8 @@ dart run runtime_ci_tooling:manage_cicd autodoc --init
 **Configuration:** Reads `.runtime_ci/autodoc.json` for module definitions.
 
 **Two-pass pipeline per module per doc type:**
-1. **Pass 1 (Author)**: Gemini 3.1 Pro generates documentation from source analysis
-2. **Pass 2 (Reviewer)**: Gemini 3.1 Pro fact-checks, corrects naming conventions, fills gaps
+1. **Pass 1 (Author)**: Gemini 3.1 Pro Preview generates documentation from source analysis
+2. **Pass 2 (Reviewer)**: Gemini 3.1 Pro Preview fact-checks, corrects naming conventions, fills gaps
 
 **Doc types generated per module:**
 
@@ -1038,8 +1038,8 @@ two-pass Gemini pipeline. Configuration lives in `.runtime_ci/autodoc.json`.
 
 For each changed module and each doc type:
 
-1. **Pass 1 (Author):** Gemini 3.1 Pro analyzes source files and generates documentation
-2. **Pass 2 (Reviewer):** Gemini 3.1 Pro fact-checks the output, corrects Dart naming
+1. **Pass 1 (Author):** Gemini 3.1 Pro Preview analyzes source files and generates documentation
+2. **Pass 2 (Reviewer):** Gemini 3.1 Pro Preview fact-checks the output, corrects Dart naming
    conventions (e.g., `snake_case` -> `camelCase`), and fills gaps
 
 ### Doc types

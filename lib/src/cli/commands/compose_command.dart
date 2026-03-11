@@ -30,7 +30,7 @@ class ComposeCommand extends Command<void> {
   final String name = 'compose';
 
   @override
-  final String description = 'Run Stage 2 Changelog Composer (Gemini 3.1 Pro).';
+  final String description = 'Run Stage 2 Changelog Composer (Gemini 3.1 Pro Preview).';
 
   ComposeCommand() {
     VersionOptionsArgParser.populateParser(argParser);
@@ -46,7 +46,7 @@ class ComposeCommand extends Command<void> {
     final global = ManageCicdCli.parseGlobalOptions(globalResults);
     final versionOpts = VersionOptions.fromArgResults(argResults!);
 
-    Logger.header('Stage 2: Changelog Composer (Gemini 3.1 Pro)');
+    Logger.header('Stage 2: Changelog Composer (Gemini 3.1 Pro Preview)');
 
     if (!GeminiUtils.geminiAvailable(warnOnly: true)) {
       Logger.warn('Skipping changelog composition (Gemini unavailable).');
@@ -124,7 +124,7 @@ class ComposeCommand extends Command<void> {
     includes.add('@CHANGELOG.md');
     includes.add('@README.md');
 
-    Logger.info('Running Gemini 3.1 Pro for CHANGELOG composition...');
+    Logger.info('Running Gemini 3.1 Pro Preview for CHANGELOG composition...');
     Logger.info('File context: ${includes.join(", ")}');
 
     final stopwatch = Stopwatch()..start();

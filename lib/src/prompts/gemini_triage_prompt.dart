@@ -6,7 +6,7 @@ import '_ci_config.dart';
 
 /// Issue Triage prompt generator.
 ///
-/// Generates a prompt for Gemini 3.1 Pro to analyze a GitHub issue and perform
+/// Generates a prompt for Gemini 3.1 Pro Preview to analyze a GitHub issue and perform
 /// comprehensive triage: type classification, priority assignment, duplicate
 /// detection, area classification, and helpful comment generation.
 ///
