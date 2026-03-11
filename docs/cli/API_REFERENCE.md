@@ -59,14 +59,14 @@ void main(List<String> args) async {
 - **Methods**:
   - `run() -> Future<void>`
 
-**AutodocCommand** -- Generate/update documentation for proto modules using Gemini 3.1 Pro.
+**AutodocCommand** -- Generate/update documentation for proto modules using Gemini 3.1 Pro Preview.
 - **Fields**:
   - `name`: `String`
   - `description`: `String`
 - **Methods**:
   - `run() -> Future<void>`
 
-**ComposeCommand** -- Run Stage 2 Changelog Composer (Gemini 3.1 Pro).
+**ComposeCommand** -- Run Stage 2 Changelog Composer (Gemini 3.1 Pro Preview).
 - **Fields**:
   - `name`: `String`
   - `description`: `String`

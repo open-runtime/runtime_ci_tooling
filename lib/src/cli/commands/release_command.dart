@@ -234,7 +234,7 @@ ${StepSummary.artifactLink()}
 
   /// Inline compose stage (from _runCompose).
   Future<void> _runCompose(String repoRoot, GlobalOptions global, VersionOptions versionOpts) async {
-    Logger.header('Stage 2: Changelog Composer (Gemini 3.1 Pro)');
+    Logger.header('Stage 2: Changelog Composer (Gemini 3.1 Pro Preview)');
 
     if (!GeminiUtils.geminiAvailable(warnOnly: true)) {
       Logger.warn('Skipping changelog composition (Gemini unavailable).');
@@ -299,7 +299,7 @@ ${StepSummary.artifactLink()}
     includes.add('@CHANGELOG.md');
     includes.add('@README.md');
 
-    Logger.info('Running Gemini 3.1 Pro for CHANGELOG composition...');
+    Logger.info('Running Gemini 3.1 Pro Preview for CHANGELOG composition...');
     Logger.info('File context: ${includes.join(", ")}');
 
     final result = Process.runSync(

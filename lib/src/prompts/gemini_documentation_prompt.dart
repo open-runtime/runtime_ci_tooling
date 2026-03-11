@@ -6,7 +6,7 @@ import '_ci_config.dart';
 
 /// Stage 2 Documentation Update prompt generator.
 ///
-/// Generates a prompt that instructs Gemini 3.1 Pro to analyze proto/API changes
+/// Generates a prompt that instructs Gemini 3.1 Pro Preview to analyze proto/API changes
 /// and update README.md sections accordingly. Focuses on keeping documentation
 /// in sync with the codebase without restructuring existing content.
 ///

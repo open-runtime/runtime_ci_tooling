@@ -96,7 +96,7 @@ class DocumentationCommand extends Command<void> {
     }
     includes.add('@README.md');
 
-    Logger.info('Running Gemini 3.1 Pro for documentation updates...');
+    Logger.info('Running Gemini 3.1 Pro Preview for documentation updates...');
     final result = Process.runSync(
       'sh',
       [

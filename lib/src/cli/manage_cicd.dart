@@ -565,7 +565,7 @@ ${_artifactLink()}
 /// separately by Stage 3 (_runReleaseNotes).
 /// Gracefully skips if Gemini is unavailable.
 Future<void> _runCompose(String repoRoot) async {
-  _header('Stage 2: Changelog Composer (Gemini 3.1 Pro)');
+  _header('Stage 2: Changelog Composer (Gemini 3.1 Pro Preview)');
 
   if (!_geminiAvailable(warnOnly: true)) {
     _warn('Skipping changelog composition (Gemini unavailable).');
@@ -629,7 +629,7 @@ Future<void> _runCompose(String repoRoot) async {
   includes.add('@CHANGELOG.md');
   includes.add('@README.md');
 
-  _info('Running Gemini 3.1 Pro for CHANGELOG composition...');
+  _info('Running Gemini 3.1 Pro Preview for CHANGELOG composition...');
   _info('File context: ${includes.join(", ")}');
 
   final result = Process.runSync(
@@ -734,7 +734,7 @@ ${_artifactLink()} | ${_ghLink('CHANGELOG.md', 'CHANGELOG.md')}
 /// Stage 3: Release Notes Author.
 ///
 /// Generates rich, narrative release notes distinct from the CHANGELOG.
-/// Uses Gemini 3.1 Pro to study source code, issues, and diffs to produce:
+/// Uses Gemini 3.1 Pro Preview to study source code, issues, and diffs to produce:
 /// - release_notes.md (GitHub Release body)
 /// - migration_guide.md (for breaking changes)
 /// - linked_issues.json (structured issue linkage)
@@ -845,7 +845,7 @@ Future<void> _runReleaseNotes(String repoRoot) async {
     includes.add('@$kVersionBumpsDir/v$newVersion.md');
   }
 
-  _info('Running Gemini 3.1 Pro for release notes authoring...');
+  _info('Running Gemini 3.1 Pro Preview for release notes authoring...');
   _info('Bump type: $bumpType');
   _info('File context: ${includes.join(", ")}');
 
@@ -1160,7 +1160,7 @@ String _buildFallbackReleaseNotes(String repoRoot, String version, String prevTa
 // Autodoc: Config-driven documentation generation
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Generate/update documentation for proto modules using Gemini 3.1 Pro.
+/// Generate/update documentation for proto modules using Gemini 3.1 Pro Preview.
 ///
 /// Uses autodoc.json for configuration, hash-based change detection for
 /// incremental updates, and parallel Gemini execution.
@@ -2318,7 +2318,7 @@ Future<void> _runDocumentation(String repoRoot) async {
   }
   includes.add('@README.md');
 
-  _info('Running Gemini 3.1 Pro for documentation updates...');
+  _info('Running Gemini 3.1 Pro Preview for documentation updates...');
   final result = Process.runSync(
     'sh',
     [
@@ -3212,9 +3212,9 @@ Commands:
   setup              Install all prerequisites (Node.js, Gemini CLI, gh, jq, tree)
   validate           Validate all configuration files (YAML, JSON, TOML, Dart)
   determine-version  Determine SemVer bump via Gemini + regex (CI: --output-github-actions)
-  explore            Run Stage 1 Explorer Agent (Gemini 3.1 Pro)
-  compose            Run Stage 2 Changelog Composer (Gemini 3.1 Pro)
-  release-notes      Run Stage 3 Release Notes Author (Gemini 3.1 Pro)
+  explore            Run Stage 1 Explorer Agent (Gemini 3.1 Pro Preview)
+  compose            Run Stage 2 Changelog Composer (Gemini 3.1 Pro Preview)
+  release-notes      Run Stage 3 Release Notes Author (Gemini 3.1 Pro Preview)
   documentation      Run documentation update via Gemini
   autodoc            Generate/update module docs (--init, --force, --module, --dry-run)
   create-release     Create git tag, GitHub Release, commit all changes

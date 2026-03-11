@@ -1,6 +1,6 @@
 {
-  "tooling_version": "0.15.0",
-  "updated_at": "2026-03-04T18:46:17.822889Z",
+  "tooling_version": "0.16.0",
+  "updated_at": "2026-03-11T19:12:54.450252Z",
   "templates": {
     "gemini_settings": {
       "hash": "93983f49dd2f40d2ed245271854946d8916b8f0698ed2cfaf12058305baa0b08",
@@ -24,8 +24,8 @@
     },
     "workflow_ci": {
       "hash": "1d5ab4ac372b1d5c9ff1ad9cd2cc634fea66a98d264faa9e487acfc873bf7602",
-      "consumer_hash": "f25b1db7a45db7631808fb1eb3135df963eece9935e0eabd89aff3d6ffe67d73",
-      "updated_at": "2026-03-04T18:46:17.823530Z"
+      "consumer_hash": "4ea52a3ff30066bf5405b79633a1c8139d13969a335e6f09d2040848d9457d0b",
+      "updated_at": "2026-03-11T19:12:54.450920Z"
     },
     "workflow_release": {
       "hash": "0db4e621f478e5f255292bc3d9a0c1a6dcd78ebe73fd91d87b7facd635898f64",
