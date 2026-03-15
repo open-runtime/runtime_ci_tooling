@@ -55,6 +55,7 @@ jobs:
           token: ${{ secrets.<%pat_secret%> || github.token }}
           persist-credentials: true
 
+<%#is_dart%>
       - uses: dart-lang/setup-dart@v1.7.1
         with:
           sdk: "<%dart_sdk%>"
@@ -79,6 +80,38 @@ jobs:
           else
             echo "::notice::Code is already formatted."
           fi
+<%/is_dart%>
+<%#is_typescript%>
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "<%node_version%>"
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm prettier --check .
+
+      - name: Fix and push formatting
+        id: format-push
+        run: |
+          pnpm prettier --write .
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -u
+            git commit -m "bot(format): apply prettier [skip ci]"
+            if git push; then
+              echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+              echo "::notice::Formatting changes committed and pushed."
+            else
+              echo "::warning::Could not push formatting changes (branch may be protected or this is a fork PR)."
+            fi
+          else
+            echo "::notice::Code is already formatted."
+          fi
+<%/is_typescript%>
 
 <%/format_check%>
 <%#single_platform%>
@@ -99,6 +132,7 @@ jobs:
 # --- END USER: pre-test ---
 
       # ── shared:test ── keep in sync with multi_platform ──
+<%#is_dart%>
 <%#managed_test%>
       - name: Test
         shell: bash
@@ -135,6 +169,11 @@ jobs:
             **/test-results/
           retention-days: <%artifact_retention_days%>
 <%/managed_test%>
+<%/is_dart%>
+<%#is_typescript%>
+      - name: Run tests
+        run: pnpm test
+<%/is_typescript%>
 
 # --- BEGIN USER: post-test ---
 # --- END USER: post-test ---
@@ -173,6 +212,7 @@ jobs:
 # --- END USER: pre-test ---
 
       # ── shared:test ──
+<%#is_dart%>
 <%#managed_test%>
       - name: Test
         shell: bash
@@ -209,6 +249,11 @@ jobs:
             **/test-results/
           retention-days: <%artifact_retention_days%>
 <%/managed_test%>
+<%/is_dart%>
+<%#is_typescript%>
+      - name: Run tests
+        run: pnpm test
+<%/is_typescript%>
 
 # --- BEGIN USER: post-test ---
 # --- END USER: post-test ---

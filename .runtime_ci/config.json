@@ -64,6 +64,7 @@
     "gcp_secret_name": ""
   },
   "ci": {
+    "language": "dart",
     "dart_sdk": "3.9.2",
     "line_length": 120,
     "artifact_retention_days": 7,

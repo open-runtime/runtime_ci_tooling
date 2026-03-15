@@ -155,23 +155,32 @@ class WorkflowGenerator {
     return raw is Map<String, dynamic> ? raw : null;
   }
 
+  /// Load the full config.json from a repo's `.runtime_ci/` directory.
+  ///
+  /// Returns null if the config.json doesn't exist.
+  /// Throws [StateError] if the file exists but contains malformed JSON.
+  static Map<String, dynamic>? loadFullConfig(String repoRoot) {
+    final configPath = '$repoRoot/.runtime_ci/config.json';
+    final file = File(configPath);
+    if (!file.existsSync()) return null;
+    try {
+      return json.decode(file.readAsStringSync()) as Map<String, dynamic>;
+    } on FormatException catch (e) {
+      throw StateError('Malformed JSON in $configPath: $e');
+    }
+  }
+
   /// Load the CI config section from a repo's config.json.
   ///
   /// Returns null if the config.json doesn't exist or has no `ci` section.
   /// Throws [StateError] if the file exists but contains malformed JSON.
   static Map<String, dynamic>? loadCiConfig(String repoRoot) {
-    final configPath = '$repoRoot/.runtime_ci/config.json';
-    final file = File(configPath);
-    if (!file.existsSync()) return null;
-    final Map<String, dynamic> config;
-    try {
-      config = json.decode(file.readAsStringSync()) as Map<String, dynamic>;
-    } on FormatException catch (e) {
-      throw StateError('Malformed JSON in $configPath: $e');
-    }
-    final ci = config['ci'];
+    final fullConfig = loadFullConfig(repoRoot);
+    if (fullConfig == null) return null;
+    final ci = fullConfig['ci'];
     if (ci == null) return null;
     if (ci is! Map<String, dynamic>) {
+      final configPath = '$repoRoot/.runtime_ci/config.json';
       throw StateError('Expected "ci" in $configPath to be an object, got ${ci.runtimeType}');
     }
     return ci;
@@ -216,6 +225,15 @@ class WorkflowGenerator {
     final subPackages = ciConfig['sub_packages'] as List? ?? [];
     final gitOrgs = _resolveGitOrgs(ciConfig);
 
+    // Language detection — defaults to 'dart' for backward compatibility.
+    final language = (ciConfig['language'] as String?)?.trim().toLowerCase() ?? 'dart';
+    final isDart = language == 'dart' || language == 'flutter';
+    final isTypescript = language == 'typescript';
+    final isFlutter = language == 'flutter';
+    final nodeVersion = ciConfig['typescript'] is Map<String, dynamic>
+        ? ((ciConfig['typescript'] as Map<String, dynamic>)['node_version']?.toString() ?? '22')
+        : '22';
+
     // Build secrets list for env block (skip non-string values)
     final secretsList = <Map<String, String>>[];
     for (final entry in secrets.entries) {
@@ -259,12 +277,18 @@ class WorkflowGenerator {
 
     return {
       'tooling_version': toolingVersion,
-      'dart_sdk': ciConfig['dart_sdk'] as String,
+      'dart_sdk': isDart ? ciConfig['dart_sdk'] as String : '',
       'line_length': _resolveLineLength(ciConfig['line_length']),
       'pat_secret': ciConfig['personal_access_token_secret'] as String? ?? 'GITHUB_TOKEN',
 
       // Artifact retention defaults to 7 days unless explicitly configured.
       'artifact_retention_days': _resolveArtifactRetentionDays(ciConfig['artifact_retention_days']),
+
+      // Language flags
+      'is_dart': isDart,
+      'is_typescript': isTypescript,
+      'is_flutter': isFlutter,
+      'node_version': nodeVersion,
 
       // Feature flags
       'proto': features['proto'] == true,
@@ -419,25 +443,60 @@ class WorkflowGenerator {
   /// Validate that the CI config has all required fields and correct types.
   static List<String> validate(Map<String, dynamic> ciConfig) {
     final errors = <String>[];
-    final sdk = ciConfig['dart_sdk'];
-    if (sdk == null) {
-      errors.add('ci.dart_sdk is required');
-    } else if (sdk is! String) {
-      errors.add('ci.dart_sdk must be a string, got ${sdk.runtimeType}');
-    } else {
-      final trimmed = sdk.trim();
-      if (trimmed.isEmpty) {
-        errors.add('ci.dart_sdk must be a non-empty string');
-      } else if (trimmed != sdk) {
-        errors.add('ci.dart_sdk must not have leading/trailing whitespace');
-      } else if (trimmed.contains(RegExp(r'[\r\n\t]'))) {
-        errors.add('ci.dart_sdk must not contain newlines/tabs');
+
+    // Language validation
+    final languageRaw = ciConfig['language'];
+    const validLanguages = {'dart', 'flutter', 'typescript'};
+    String language = 'dart';
+    if (languageRaw != null) {
+      if (languageRaw is! String) {
+        errors.add('ci.language must be a string, got ${languageRaw.runtimeType}');
       } else {
-        // dart-lang/setup-dart accepts semver versions or channels like stable/beta/dev.
-        final isChannel = trimmed == 'stable' || trimmed == 'beta' || trimmed == 'dev';
-        final isSemver = RegExp(r'^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$').hasMatch(trimmed);
-        if (!isChannel && !isSemver) {
-          errors.add('ci.dart_sdk must be a Dart SDK channel (stable|beta|dev) or a version like 3.9.2, got "$sdk"');
+        language = languageRaw.trim().toLowerCase();
+        if (!validLanguages.contains(language)) {
+          errors.add('ci.language must be one of ${validLanguages.join(', ')}, got "$languageRaw"');
+          language = 'dart'; // Fall back to dart for remaining validation
+        }
+      }
+    }
+    final isDartLanguage = language == 'dart' || language == 'flutter';
+    final isTypescriptLanguage = language == 'typescript';
+
+    // dart_sdk is required for Dart/Flutter, not for TypeScript
+    final sdk = ciConfig['dart_sdk'];
+    if (isDartLanguage) {
+      if (sdk == null) {
+        errors.add('ci.dart_sdk is required');
+      } else if (sdk is! String) {
+        errors.add('ci.dart_sdk must be a string, got ${sdk.runtimeType}');
+      } else {
+        final trimmed = sdk.trim();
+        if (trimmed.isEmpty) {
+          errors.add('ci.dart_sdk must be a non-empty string');
+        } else if (trimmed != sdk) {
+          errors.add('ci.dart_sdk must not have leading/trailing whitespace');
+        } else if (trimmed.contains(RegExp(r'[\r\n\t]'))) {
+          errors.add('ci.dart_sdk must not contain newlines/tabs');
+        } else {
+          // dart-lang/setup-dart accepts semver versions or channels like stable/beta/dev.
+          final isChannel = trimmed == 'stable' || trimmed == 'beta' || trimmed == 'dev';
+          final isSemver = RegExp(r'^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$').hasMatch(trimmed);
+          if (!isChannel && !isSemver) {
+            errors.add('ci.dart_sdk must be a Dart SDK channel (stable|beta|dev) or a version like 3.9.2, got "$sdk"');
+          }
+        }
+      }
+    }
+
+    // TypeScript-specific validation
+    if (isTypescriptLanguage) {
+      final tsConfig = ciConfig['typescript'];
+      if (tsConfig != null && tsConfig is! Map<String, dynamic>) {
+        errors.add('ci.typescript must be an object, got ${tsConfig.runtimeType}');
+      } else if (tsConfig is Map<String, dynamic>) {
+        final nodeVersion = tsConfig['node_version'];
+        if (nodeVersion != null && nodeVersion is! String && nodeVersion is! int) {
+          errors.add('ci.typescript.node_version must be a string or int, got ${nodeVersion.runtimeType}');
         }
       }
     }
@@ -776,9 +835,19 @@ class WorkflowGenerator {
     final secrets = ciConfig['secrets'] as Map<String, dynamic>? ?? {};
     final subPackages = ciConfig['sub_packages'] as List? ?? [];
 
+    final language = (ciConfig['language'] as String?)?.trim().toLowerCase() ?? 'dart';
     final platforms = ciConfig['platforms'] as List? ?? ['ubuntu'];
 
-    Logger.info('  Dart SDK: ${ciConfig['dart_sdk']}');
+    Logger.info('  Language: $language');
+    if (language == 'dart' || language == 'flutter') {
+      Logger.info('  Dart SDK: ${ciConfig['dart_sdk']}');
+    }
+    if (language == 'typescript') {
+      final tsConfig = ciConfig['typescript'] is Map<String, dynamic>
+          ? ciConfig['typescript'] as Map<String, dynamic>
+          : <String, dynamic>{};
+      Logger.info('  Node version: ${tsConfig['node_version'] ?? '22'}');
+    }
     Logger.info('  PAT secret: ${ciConfig['personal_access_token_secret']}');
     Logger.info('  Platforms: ${platforms.join(', ')}');
     Logger.info('  Artifact retention days: ${_resolveArtifactRetentionDays(ciConfig['artifact_retention_days'])}');

@@ -1,4 +1,5 @@
 {{=<% %>=}}
+<%#is_dart%>
       # ── shared:analysis-cache ──
 <%#analysis_cache%>
       - name: Cache Dart analysis
@@ -43,3 +44,12 @@
           fi
 
 <%/sub_packages%>
+<%/is_dart%>
+<%#is_typescript%>
+      # ── shared:analyze ──
+      - name: Type check
+        run: pnpm tsc --noEmit
+      - name: Lint
+        run: pnpm eslint . || true
+
+<%/is_typescript%>
