@@ -16,6 +16,10 @@ import '../utils/workflow_generator.dart';
 /// backward compatibility). Each sub-package may also override the language
 /// via its own `language` field.
 class AnalyzeCommand extends Command<void> {
+  AnalyzeCommand() {
+    argParser.addOption('scope', help: 'Comma-separated list of package names to include (from packages config)');
+  }
+
   @override
   final String name = 'analyze';
 
@@ -39,6 +43,9 @@ class AnalyzeCommand extends Command<void> {
     // Check for multi-package configuration (packages is top-level, not ci).
     final packages = (fullConfig?['packages'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
 
+    final scopeFilter = argResults?['scope'] as String?;
+    final scopeSet = scopeFilter?.split(',').map((s) => s.trim()).toSet();
+
     Logger.header('Running ${language.displayName} analysis');
 
     final failures = <String>[];
@@ -50,6 +57,9 @@ class AnalyzeCommand extends Command<void> {
         final pkgLanguage = resolveLanguage(pkgLanguageId);
         final pkgName = pkg['name'] as String? ?? '<unnamed>';
         final pkgPath = pkg['path'] as String? ?? '.';
+        if (scopeSet != null && !scopeSet.contains(pkgName)) {
+          continue; // Skip packages not in scope
+        }
         final features = pkg['features'] as Map<String, dynamic>? ?? {};
 
         // Skip packages that have analysis explicitly disabled.

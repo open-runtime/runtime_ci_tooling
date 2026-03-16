@@ -18,12 +18,14 @@ import '../utils/autodoc_scaffold.dart'
         validateAutodocPath,
         validateAutodocSubPackage;
 import '../utils/gemini_utils.dart';
+import '../utils/language_support.dart';
 import '../utils/logger.dart';
 import '../utils/process_runner.dart';
 import '../utils/repo_utils.dart';
 import '../utils/step_summary.dart';
 import '../utils/sub_package_utils.dart';
 import '../utils/version_detection.dart';
+import '../utils/workflow_generator.dart';
 
 const String _kGeminiProModel = 'gemini-3.1-pro-preview';
 
@@ -98,6 +100,22 @@ class AutodocCommand extends Command<void> {
     final rawModules = (autodocConfig['modules'] as List).cast<Map<String, dynamic>>();
     final maxConcurrent = (autodocConfig['max_concurrent'] as int?) ?? 4;
     final templates = (autodocConfig['templates'] as Map<String, dynamic>?) ?? {};
+
+    // ── Resolve language from CI config ──────────────────────────────────
+    final fullConfig = WorkflowGenerator.loadFullConfig(repoRoot);
+    final ciConfig = fullConfig?['ci'] as Map<String, dynamic>?;
+    final languageId = ciConfig?['language'] as String? ?? 'dart';
+    final language = resolveLanguage(languageId);
+
+    // TypeScript-specific template overrides. When the repo language is
+    // TypeScript, swap the Dart prompt scripts for their TS equivalents.
+    // The map keys must match the `generate` entries in autodoc.json
+    // (e.g., "api_reference", "quickstart", "examples").
+    const _tsTemplateOverrides = <String, String>{
+      'api_reference': 'lib/src/prompts/autodoc_ts_api_reference_prompt.dart',
+      'quickstart': 'lib/src/prompts/autodoc_ts_quickstart_prompt.dart',
+      'examples': 'lib/src/prompts/autodoc_ts_examples_prompt.dart',
+    };
 
     // Validate module paths — skip modules with unsafe paths (traversal, absolute, etc.)
     final modules = <Map<String, dynamic>>[];
@@ -229,7 +247,11 @@ class AutodocCommand extends Command<void> {
       // Queue Gemini tasks for each doc type
       for (final docType in generateTypes) {
         final templateKey = docType;
-        final templatePath = templates[templateKey] as String?;
+        // Use TypeScript-specific prompt templates when the repo language is
+        // TypeScript and an override exists for this doc type.
+        final templatePath = language.id == 'typescript' && _tsTemplateOverrides.containsKey(templateKey)
+            ? _tsTemplateOverrides[templateKey]!
+            : templates[templateKey] as String?;
         if (templatePath == null) {
           Logger.warn('  No template for doc type: $docType');
           continue;
@@ -253,6 +275,7 @@ class AutodocCommand extends Command<void> {
               subPackages: subPackages,
               moduleSubPackage: moduleSubPackage,
             ),
+            language: language,
             verbose: global.verbose,
           ),
         );
@@ -329,6 +352,7 @@ ${StepSummary.artifactLink()}
     required String? moduleSubPackage,
     required String subPackageDiffContext,
     required String hierarchicalAutodocInstructions,
+    required LanguageSupport language,
     bool verbose = false,
   }) async {
     final outputFileName = switch (docType) {
@@ -385,13 +409,9 @@ Write the generated documentation to this exact file path using write_file:
   $absOutputFile
 
 Be extremely thorough and detailed. Read ALL proto files and ALL generated
-Dart code in the included context directories before writing.
+${language.id == 'typescript' ? 'TypeScript' : 'Dart'} code in the included context directories before writing.
 
-CRITICAL Dart naming rules for protobuf-generated code:
-- Proto field names with underscores (e.g., batch_id, send_at, mail_settings)
-  become camelCase in Dart (e.g., batchId, sendAt, mailSettings).
-- Always use camelCase for Dart field access in code examples.
-- Message/Enum names stay PascalCase as defined in the proto.
+${language.id == 'typescript' ? _tsPass1NamingRules : _dartPass1NamingRules}
 
 Cover EVERY message, service, enum, and field defined in the proto files.
 Do not skip any -- completeness is more important than brevity.
@@ -426,43 +446,21 @@ Do not skip any -- completeness is more important than brevity.
 
     final pass2Prompt = File('$outputPath/.${docType}_pass2.txt');
     pass2Prompt.writeAsStringSync('''
-You are a senior technical reviewer for Dart/protobuf documentation.
+You are a senior technical reviewer for ${language.id == 'typescript' ? 'TypeScript' : 'Dart'}/protobuf documentation.
 
 Your task is to review and improve the file at:
   $absOutputFile
 
 This documentation was auto-generated for the **$moduleName** module.
 The proto definitions are in: ${sourceDir.replaceFirst('$repoRoot/', '')}
-${libDir.isNotEmpty ? 'Generated Dart code is in: ${libDir.replaceFirst('$repoRoot/', '')}' : ''}
+${libDir.isNotEmpty ? 'Generated ${language.id == 'typescript' ? 'TypeScript' : 'Dart'} code is in: ${libDir.replaceFirst('$repoRoot/', '')}' : ''}
 ${moduleSubPackage == null ? '' : 'This module belongs to sub-package: "$moduleSubPackage".'}
 ${subPackageDiffContext.isEmpty ? '' : subPackageDiffContext}
 ${hierarchicalAutodocInstructions.isEmpty ? '' : hierarchicalAutodocInstructions}
 
 ## Review Checklist
 
-### 1. Dart Naming Conventions (CRITICAL)
-Protobuf-generated Dart code converts snake_case field names to camelCase:
-  - batch_id -> batchId
-  - send_at -> sendAt
-  - mail_settings -> mailSettings
-  - tracking_settings -> trackingSettings
-  - click_tracking -> clickTracking
-  - open_tracking -> openTracking
-  - sandbox_mode -> sandboxMode
-  - dynamic_template_data -> dynamicTemplateData
-  - content_id -> contentId
-  - custom_args -> customArgs
-  - ip_pool_name -> ipPoolName
-  - reply_to -> replyTo
-  - reply_to_list -> replyToList
-  - template_id -> templateId
-  - enable_text -> enableText
-  - substitution_tag -> substitutionTag
-  - group_id -> groupId
-  - groups_to_display -> groupsToDisplay
-
-Fix ALL instances where snake_case is used for Dart field access in code blocks.
-Message and enum names remain PascalCase (e.g., SendMailRequest, MailFrom).
+${language.id == 'typescript' ? _tsPass2NamingRules(config.repoName) : _dartPass2NamingRules(config.repoName)}
 
 ### 2. Completeness
 Read ALL proto definitions in the source directory. Ensure the documentation
@@ -470,15 +468,12 @@ covers every service RPC, every message type, every enum, and every field.
 If anything is missing, add it with proper examples.
 
 ### 3. Code Correctness
-- Every code block must use valid Dart syntax
-- Import paths must be real: package:${config.repoName}/...
-- Cascade notation (..field = value) must use the correct camelCase field name
-- No fabricated class names, methods, or fields
+${language.id == 'typescript' ? _tsPass2CodeCorrectness(config.repoName) : _dartPass2CodeCorrectness(config.repoName)}
 
 ### 4. Detail and Quality
 - Add examples for any under-documented features
 - Include proto field comments as documentation in the code examples
-- Show the builder pattern (cascade ..) for constructing messages
+${language.id == 'typescript' ? '- Show the create(Schema, {...}) pattern for constructing messages\n- Show toBinary/fromBinary/toJson/fromJson patterns' : '- Show the builder pattern (cascade ..) for constructing messages'}
 - Cover edge cases and optional fields
 
 ## Instructions
@@ -709,3 +704,98 @@ Write the corrected file to the same path: $absOutputFile
     Logger.info('Updated hierarchical docs index: $kAutodocIndexPath');
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Language-specific prompt fragments
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Pass 1 naming rules for Dart protobuf-generated code.
+const _dartPass1NamingRules = '''
+CRITICAL Dart naming rules for protobuf-generated code:
+- Proto field names with underscores (e.g., batch_id, send_at, mail_settings)
+  become camelCase in Dart (e.g., batchId, sendAt, mailSettings).
+- Always use camelCase for Dart field access in code examples.
+- Message/Enum names stay PascalCase as defined in the proto.''';
+
+/// Pass 1 naming rules for TypeScript protobuf-es generated code.
+const _tsPass1NamingRules = '''
+CRITICAL TypeScript naming rules for protobuf-es generated code:
+- Proto field names with underscores (e.g., batch_id, send_at, mail_settings)
+  become camelCase in TypeScript (e.g., batchId, sendAt, mailSettings).
+- Always use camelCase for TypeScript field access in code examples.
+- Message/Enum names stay PascalCase as defined in the proto.
+- Use the Schema suffix for message descriptors (e.g., MessageNameSchema).
+- Use protobuf-es functions: create(), toBinary(), fromBinary(), toJson(), fromJson().
+- Import from @open-runtime/<package>/... using the package.json exports map.''';
+
+/// Pass 2 naming conventions section for Dart.
+String _dartPass2NamingRules(String repoName) => '''
+### 1. Dart Naming Conventions (CRITICAL)
+Protobuf-generated Dart code converts snake_case field names to camelCase:
+  - batch_id -> batchId
+  - send_at -> sendAt
+  - mail_settings -> mailSettings
+  - tracking_settings -> trackingSettings
+  - click_tracking -> clickTracking
+  - open_tracking -> openTracking
+  - sandbox_mode -> sandboxMode
+  - dynamic_template_data -> dynamicTemplateData
+  - content_id -> contentId
+  - custom_args -> customArgs
+  - ip_pool_name -> ipPoolName
+  - reply_to -> replyTo
+  - reply_to_list -> replyToList
+  - template_id -> templateId
+  - enable_text -> enableText
+  - substitution_tag -> substitutionTag
+  - group_id -> groupId
+  - groups_to_display -> groupsToDisplay
+
+Fix ALL instances where snake_case is used for Dart field access in code blocks.
+Message and enum names remain PascalCase (e.g., SendMailRequest, MailFrom).''';
+
+/// Pass 2 naming conventions section for TypeScript.
+String _tsPass2NamingRules(String repoName) => '''
+### 1. TypeScript Naming Conventions (CRITICAL)
+Protobuf-es generated TypeScript converts snake_case field names to camelCase:
+  - batch_id -> batchId
+  - send_at -> sendAt
+  - mail_settings -> mailSettings
+  - tracking_settings -> trackingSettings
+  - click_tracking -> clickTracking
+  - open_tracking -> openTracking
+  - sandbox_mode -> sandboxMode
+  - dynamic_template_data -> dynamicTemplateData
+  - content_id -> contentId
+  - custom_args -> customArgs
+  - ip_pool_name -> ipPoolName
+  - reply_to -> replyTo
+  - reply_to_list -> replyToList
+  - template_id -> templateId
+  - enable_text -> enableText
+  - substitution_tag -> substitutionTag
+  - group_id -> groupId
+  - groups_to_display -> groupsToDisplay
+
+Fix ALL instances where snake_case is used for TypeScript field access in code blocks.
+Message and enum names remain PascalCase (e.g., SendMailRequest, MailFrom).
+Schema descriptors use the Schema suffix (e.g., SendMailRequestSchema).
+Use protobuf-es functions: create(), toBinary(), fromBinary(), toJson(), fromJson().''';
+
+/// Pass 2 code correctness checklist for Dart.
+String _dartPass2CodeCorrectness(String repoName) =>
+    '''
+- Every code block must use valid Dart syntax
+- Import paths must be real: package:$repoName/...
+- Cascade notation (..field = value) must use the correct camelCase field name
+- No fabricated class names, methods, or fields''';
+
+/// Pass 2 code correctness checklist for TypeScript.
+String _tsPass2CodeCorrectness(String repoName) =>
+    '''
+- Every code block must use valid TypeScript syntax
+- Import paths must use the package.json exports map: @open-runtime/$repoName/...
+- Object literal field names must use the correct camelCase name
+- Schema imports must use the Schema suffix (e.g., MessageNameSchema)
+- Use create(Schema, {...}) not new MessageName() for message construction
+- No fabricated type names, methods, or fields''';

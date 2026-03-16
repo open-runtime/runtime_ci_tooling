@@ -37,6 +37,11 @@ class TestCommand extends Command<void> {
   static const int _maxLogBufferBytes = 2 * 1024 * 1024; // 2MB
   /// Maximum bytes for pub get output (typically small).
   static const int _maxPubGetBufferBytes = 512 * 1024; // 512KB
+
+  TestCommand() {
+    argParser.addOption('scope', help: 'Comma-separated list of package names to include (from packages config)');
+  }
+
   @override
   final String name = 'test';
 
@@ -50,7 +55,9 @@ class TestCommand extends Command<void> {
       Logger.error('Could not find ${config.repoName} repo root.');
       await exitWithCode(1);
     }
-    await runWithRoot(repoRoot);
+    final scopeFilter = argResults?['scope'] as String?;
+    final scopeSet = scopeFilter?.split(',').map((s) => s.trim()).toSet();
+    await runWithRoot(repoRoot, scopeSet: scopeSet);
   }
 
   /// Run tests with an explicit [repoRoot], preserving the contract from
@@ -61,6 +68,7 @@ class TestCommand extends Command<void> {
     Duration pubGetTimeout = const Duration(minutes: 5),
     _ExitHandler exitHandler = exitWithCode,
     Map<String, String>? environment,
+    Set<String>? scopeSet,
   }) async {
     // ── Resolve language from CI config ────────────────────────────────
     final fullConfig = WorkflowGenerator.loadFullConfig(repoRoot);
@@ -83,6 +91,9 @@ class TestCommand extends Command<void> {
         final pkgLanguage = resolveLanguage(pkg['language'] as String? ?? language.id);
         final pkgPath = pkg['path'] as String;
         final pkgName = pkg['name'] as String? ?? p.basename(pkgPath);
+        if (scopeSet != null && !scopeSet.contains(pkgName)) {
+          continue; // Skip packages not in scope
+        }
         final features = pkg['features'] as Map<String, dynamic>? ?? {};
         if (features['test'] == false) continue;
 

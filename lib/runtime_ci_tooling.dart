@@ -51,3 +51,6 @@ export 'src/utils/tool_installers.dart';
 
 // Language abstraction layer
 export 'src/cli/utils/language_support.dart';
+
+// Test result parsing (multi-framework: vitest, jest)
+export 'src/cli/utils/test_result_parser.dart';

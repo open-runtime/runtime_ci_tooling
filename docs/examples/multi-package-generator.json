@@ -1,0 +1,56 @@
+{
+  "repository": {
+    "name": "copy_with_extension",
+    "owner": "numen31337",
+    "triaged_label": "triaged",
+    "changelog_path": "CHANGELOG.md"
+  },
+  "ci": {
+    "languages": ["dart"],
+    "dart": {
+      "sdk": "3.9.0",
+      "line_length": 80
+    },
+    "features": {
+      "format_check": true,
+      "managed_analyze": true,
+      "managed_test": true,
+      "build_runner": true,
+      "web_test": false
+    },
+    "platforms": ["ubuntu-x64"]
+  },
+  "packages": [
+    {
+      "name": "copy_with_extension",
+      "path": "copy_with_extension",
+      "language": "dart",
+      "features": {
+        "test": false,
+        "analyze": true,
+        "format": true
+      },
+      "description": "Annotation-only package consumed by end users"
+    },
+    {
+      "name": "copy_with_extension_gen",
+      "path": "copy_with_extension_gen",
+      "language": "dart",
+      "features": {
+        "test": true,
+        "analyze": true,
+        "format": true,
+        "build_runner": true
+      },
+      "description": "Code generator that produces copyWith extensions"
+    }
+  ],
+  "labels": {
+    "type": ["bug", "feature-request", "enhancement", "documentation"],
+    "priority": ["P0-critical", "P1-high", "P2-medium", "P3-low"],
+    "area": ["area/annotation", "area/generator", "area/codegen"]
+  },
+  "agents": {
+    "enabled": ["code_analysis", "duplicate", "changelog"]
+  }
+}

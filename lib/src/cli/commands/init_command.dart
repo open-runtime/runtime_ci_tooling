@@ -7,6 +7,7 @@ import '../../triage/utils/config.dart';
 import '../../triage/utils/run_context.dart';
 import '../utils/autodoc_scaffold.dart';
 import '../utils/hook_installer.dart';
+import '../utils/language_support.dart';
 import '../utils/logger.dart';
 
 /// Scan the current repo and generate `.runtime_ci/config.json`,
@@ -16,6 +17,15 @@ import '../utils/logger.dart';
 /// This command runs BEFORE repo root detection -- it uses CWD directly,
 /// since it bootstraps the config that repo root detection depends on.
 class InitCommand extends Command<void> {
+  InitCommand() {
+    argParser.addOption(
+      'language',
+      abbr: 'l',
+      help: 'Project language (auto-detected if not specified)',
+      allowed: ['dart', 'flutter', 'typescript'],
+    );
+  }
+
   @override
   final String name = 'init';
 
@@ -35,10 +45,21 @@ class InitCommand extends Command<void> {
     final configExists = configFile.existsSync();
     var repaired = 0;
 
-    // -- 1. Auto-detect package name from pubspec.yaml --
+    // -- 1. Detect project language --
+    final languageOverride = argResults?['language'] as String?;
+    final detectedLanguage = languageOverride ?? _detectLanguage(repoRoot);
+    final language = resolveLanguage(detectedLanguage);
+    if (languageOverride != null) {
+      Logger.success('Using specified language: ${language.displayName}');
+    } else {
+      Logger.success('Auto-detected language: ${language.displayName}');
+    }
+
+    // -- 2. Auto-detect package name from manifest --
     String packageName = 'unknown';
     String packageVersion = '0.0.0';
     final pubspecFile = File('$repoRoot/pubspec.yaml');
+    final packageJsonFile = File('$repoRoot/package.json');
     if (pubspecFile.existsSync()) {
       final content = pubspecFile.readAsStringSync();
       final nameMatch = RegExp(r'^name:\s*(\S+)', multiLine: true).firstMatch(content);
@@ -46,11 +67,23 @@ class InitCommand extends Command<void> {
       final versionMatch = RegExp(r'^version:\s*(\S+)', multiLine: true).firstMatch(content);
       if (versionMatch != null) packageVersion = versionMatch.group(1)!;
       Logger.success('Detected package: $packageName v$packageVersion');
+    } else if (packageJsonFile.existsSync()) {
+      try {
+        final content = packageJsonFile.readAsStringSync();
+        final data = json.decode(content) as Map<String, dynamic>;
+        final name = data['name'] as String?;
+        if (name != null && name.isNotEmpty) packageName = name;
+        final version = data['version'] as String?;
+        if (version != null && version.isNotEmpty) packageVersion = version;
+        Logger.success('Detected package: $packageName v$packageVersion');
+      } catch (e) {
+        Logger.warn('Could not parse package.json: $e');
+      }
     } else {
-      Logger.warn('No pubspec.yaml found at repo root. Using defaults.');
+      Logger.warn('No ${language.manifestFile} found at repo root. Using defaults.');
     }
 
-    // -- 2. Auto-detect GitHub owner/org via gh CLI --
+    // -- 3. Auto-detect GitHub owner/org via gh CLI --
     String repoOwner = 'unknown';
     try {
       final ghResult = Process.runSync('gh', [
@@ -88,11 +121,11 @@ class InitCommand extends Command<void> {
       }
     }
 
-    // -- 3. Scan for existing files --
+    // -- 4. Scan for existing files --
     final hasGithub = Directory('$repoRoot/.github').existsSync();
     final hasGemini = Directory('$repoRoot/.gemini').existsSync();
 
-    // -- 4. Auto-generate area labels from lib/ directory structure --
+    // -- 5. Auto-generate area labels from lib/ directory structure --
     final areaLabels = <String>['area/core', 'area/ci-cd', 'area/docs'];
     final libDir = Directory('$repoRoot/lib');
     if (libDir.existsSync()) {
@@ -119,9 +152,10 @@ class InitCommand extends Command<void> {
       }
     }
 
-    // -- 5. Write .runtime_ci/config.json (skip if already exists) --
+    // -- 6. Write .runtime_ci/config.json (skip if already exists) --
     if (!configExists) {
       configDir.createSync(recursive: true);
+      final ciSection = _buildCiSection(detectedLanguage);
       final configData = {
         'repository': {
           'name': packageName,
@@ -130,24 +164,7 @@ class InitCommand extends Command<void> {
           'changelog_path': 'CHANGELOG.md',
           'release_notes_path': '$kReleaseNotesDir',
         },
-        'ci': {
-          'dart_sdk': '3.9.2',
-          'personal_access_token_secret': 'GITHUB_TOKEN',
-          'line_length': 120,
-          'artifact_retention_days': 7,
-          'features': {
-            'proto': false,
-            'lfs': false,
-            'format_check': true,
-            'analysis_cache': true,
-            'managed_analyze': true,
-            'managed_test': true,
-            'build_runner': false,
-            'web_test': false,
-          },
-          'secrets': {},
-          'sub_packages': [],
-        },
+        'ci': ciSection,
         'gcp': {'project': ''},
         'sentry': {
           'organization': '',
@@ -205,7 +222,7 @@ class InitCommand extends Command<void> {
       Logger.info('$kConfigFileName already exists (kept as-is)');
     }
 
-    // -- 6. Generate .runtime_ci/autodoc.json (skip if already exists) --
+    // -- 7. Generate .runtime_ci/autodoc.json (skip if already exists) --
     final autodocFile = File('$repoRoot/$kRuntimeCiDir/autodoc.json');
     final autodocExists = autodocFile.existsSync();
     if (!autodocExists) {
@@ -219,7 +236,7 @@ class InitCommand extends Command<void> {
       Logger.info('$kRuntimeCiDir/autodoc.json already exists (kept as-is)');
     }
 
-    // -- 7. Ensure CHANGELOG.md exists --
+    // -- 8. Ensure CHANGELOG.md exists --
     final changelogFile = File('$repoRoot/CHANGELOG.md');
     final hadChangelog = changelogFile.existsSync();
     if (!hadChangelog) {
@@ -233,11 +250,11 @@ class InitCommand extends Command<void> {
       repaired++;
     }
 
-    // -- 8. Install git pre-commit hook --
+    // -- 9. Install git pre-commit hook --
     final hookInstalled = HookInstaller.install(repoRoot);
     if (hookInstalled) repaired++;
 
-    // -- 9. Ensure .runtime_ci/runs/ is in .gitignore --
+    // -- 10. Ensure .runtime_ci/runs/ is in .gitignore --
     final gitignoreFile = File('$repoRoot/.gitignore');
     if (gitignoreFile.existsSync()) {
       final content = gitignoreFile.readAsStringSync();
@@ -252,7 +269,7 @@ class InitCommand extends Command<void> {
       repaired++;
     }
 
-    // -- 9. Summary --
+    // -- 11. Summary --
     print('');
     Logger.header(configExists && autodocExists ? 'Init Repair Complete' : 'Init Complete');
     if (configExists && autodocExists && repaired == 0) {
@@ -262,6 +279,7 @@ class InitCommand extends Command<void> {
     }
     Logger.info('  Config:    $kConfigFileName${configExists ? " (existing)" : ""}');
     Logger.info('  Autodoc:   $kRuntimeCiDir/autodoc.json${autodocExists ? " (existing)" : ""}');
+    Logger.info('  Language:  ${language.displayName}${languageOverride != null ? " (override)" : " (auto)"}');
     Logger.info('  Package:   $packageName');
     Logger.info('  Owner:     $repoOwner');
     Logger.info('  Areas:     ${areaLabels.join(", ")}');
@@ -273,9 +291,86 @@ class InitCommand extends Command<void> {
     if (!configExists) {
       Logger.info('Next steps:');
       Logger.info('  1. Review .runtime_ci/config.json and customize area labels, cross-repo, etc.');
-      Logger.info('  2. Add runtime_ci_tooling as a dev_dependency in pubspec.yaml');
-      Logger.info('  3. Run: dart run runtime_ci_tooling:manage_cicd setup');
-      Logger.info('  4. Run: dart run runtime_ci_tooling:manage_cicd status');
+      if (detectedLanguage == 'typescript') {
+        Logger.info('  2. Run: npx runtime-ci-tooling setup');
+      } else {
+        Logger.info('  2. Add runtime_ci_tooling as a dev_dependency in pubspec.yaml');
+        Logger.info('  3. Run: dart run runtime_ci_tooling:manage_cicd setup');
+        Logger.info('  4. Run: dart run runtime_ci_tooling:manage_cicd status');
+      }
     }
+  }
+
+  /// Auto-detect the project language from manifest files at [repoRoot].
+  ///
+  /// Detection order:
+  ///   1. `package.json` exists → `"typescript"`
+  ///   2. `pubspec.yaml` exists and contains `sdk: flutter` → `"flutter"`
+  ///   3. `pubspec.yaml` exists → `"dart"`
+  ///   4. Fallback → `"dart"`
+  String _detectLanguage(String repoRoot) {
+    final packageJson = File('$repoRoot/package.json');
+    if (packageJson.existsSync()) return 'typescript';
+
+    final pubspec = File('$repoRoot/pubspec.yaml');
+    if (pubspec.existsSync()) {
+      final content = pubspec.readAsStringSync();
+      // Match `sdk: flutter` in the dependencies or environment section.
+      if (RegExp(r'sdk:\s*flutter').hasMatch(content)) return 'flutter';
+      return 'dart';
+    }
+
+    return 'dart';
+  }
+
+  /// Build the `ci` section of the config based on the detected [language].
+  Map<String, dynamic> _buildCiSection(String language) {
+    final base = <String, dynamic>{
+      'language': language,
+      'personal_access_token_secret': 'GITHUB_TOKEN',
+      'artifact_retention_days': 7,
+      'features': {'lfs': false, 'format_check': true},
+      'secrets': <String, dynamic>{},
+    };
+
+    switch (language) {
+      case 'typescript':
+        base['typescript'] = {'node_version': '22', 'package_manager': 'pnpm'};
+        base['features'] = {
+          ...(base['features'] as Map<String, dynamic>),
+          'analysis_cache': false,
+          'managed_analyze': false,
+          'managed_test': false,
+        };
+      case 'flutter':
+        base['dart_sdk'] = '3.9.2';
+        base['line_length'] = 120;
+        base['features'] = {
+          ...(base['features'] as Map<String, dynamic>),
+          'proto': false,
+          'analysis_cache': true,
+          'managed_analyze': true,
+          'managed_test': true,
+          'build_runner': false,
+          'web_test': false,
+        };
+        base['sub_packages'] = <String>[];
+      case 'dart':
+      default:
+        base['dart_sdk'] = '3.9.2';
+        base['line_length'] = 120;
+        base['features'] = {
+          ...(base['features'] as Map<String, dynamic>),
+          'proto': false,
+          'analysis_cache': true,
+          'managed_analyze': true,
+          'managed_test': true,
+          'build_runner': false,
+          'web_test': false,
+        };
+        base['sub_packages'] = <String>[];
+    }
+
+    return base;
   }
 }
