@@ -26,11 +26,7 @@ void main() {
   // ═══════════════════════════════════════════════════════════════════════════
 
   group('Common config structure', () {
-    final examples = [
-      'multi-package-native.json',
-      'multi-package-generator.json',
-      'multi-package-monorepo.json',
-    ];
+    final examples = ['multi-package-native.json', 'multi-package-generator.json', 'multi-package-monorepo.json'];
 
     for (final example in examples) {
       group(example, () {
@@ -228,10 +224,7 @@ void main() {
         'super_text_layout',
       ];
       for (final name in coreLibNames) {
-        final pkg = pkgs.firstWhere(
-          (p) => p['name'] == name,
-          orElse: () => fail('Missing core package: $name'),
-        );
+        final pkg = pkgs.firstWhere((p) => p['name'] == name, orElse: () => fail('Missing core package: $name'));
         expect(pkg['features']['test'], true, reason: '$name should have tests enabled');
       }
     });
@@ -240,11 +233,7 @@ void main() {
       final examples = pkgs.where((p) => (p['name'] as String).contains('example'));
       expect(examples, isNotEmpty);
       for (final example in examples) {
-        expect(
-          example['features']['test'],
-          false,
-          reason: '${example['name']} is an example and should not run tests',
-        );
+        expect(example['features']['test'], false, reason: '${example['name']} is an example and should not run tests');
       }
     });
 
@@ -261,9 +250,7 @@ void main() {
     });
 
     test('doc/website packages have analyze and format disabled', () {
-      final docs = pkgs.where(
-        (p) => (p['path'] as String).contains('doc/website') || p['name'] == 'website',
-      );
+      final docs = pkgs.where((p) => (p['path'] as String).contains('doc/website') || p['name'] == 'website');
       expect(docs.length, 3);
       for (final doc in docs) {
         expect(doc['features']['analyze'], false, reason: '${doc['name']} docs should skip analyze');
