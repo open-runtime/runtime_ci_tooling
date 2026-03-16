@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] - 2026-03-15
+
+### Added
+- Multi-language CI/CD support via unified `LanguageSupport` abstraction with Dart, Flutter, and TypeScript implementations (#44, #47)
+- Config schema v2: `ci.language` field, per-language config blocks (`ci.dart`, `ci.typescript`), top-level `packages` array for multi-package repos (#45)
+- TypeScript CI workflow blocks: pnpm setup, `tsc --noEmit`, `prettier --check`, `pnpm test` with configurable Node version (#46)
+- Multi-package support in `test` and `analyze` commands — iterates declared packages with per-package language overrides (#48)
+- Language-conditional Mustache blocks in CI workflow templates (`is_dart`, `is_typescript`, `is_flutter`) (#46)
+- `loadFullConfig()` method on `WorkflowGenerator` for accessing top-level config fields
+- Language validation in workflow generator (`dart`, `flutter`, `typescript`)
+
+### Changed
+- `analyze_command` and `test_command` now route through `LanguageSupport` interface instead of hardcoded Dart invocations
+- Workflow generator builds language-aware Mustache context with `is_dart`, `is_typescript`, `node_version` variables
+- Config template includes `packages: []` and language config blocks (backward compatible — defaults to Dart)
+
 ## [0.16.1] - 2026-03-11
 
 ### Changed
