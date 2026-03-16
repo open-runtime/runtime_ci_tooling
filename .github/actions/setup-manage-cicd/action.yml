@@ -1,0 +1,59 @@
+name: Setup manage_cicd
+description: Download and cache the manage_cicd binary for CI
+
+inputs:
+  version:
+    description: 'Version to install (default: latest)'
+    required: false
+    default: 'latest'
+
+runs:
+  using: composite
+  steps:
+    - name: Determine version
+      id: version
+      shell: bash
+      run: |
+        if [ "${{ inputs.version }}" = "latest" ]; then
+          VERSION=$(curl -s https://api.github.com/repos/open-runtime/runtime_ci_tooling/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+        else
+          VERSION="${{ inputs.version }}"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Determine binary name
+      id: binary
+      shell: bash
+      run: |
+        case "${{ runner.os }}" in
+          macOS) OS="darwin" ;;
+          Linux) OS="linux" ;;
+          Windows) OS="windows" ;;
+        esac
+        case "${{ runner.arch }}" in
+          X64) ARCH="x64" ;;
+          ARM64) ARCH="arm64" ;;
+        esac
+        BINARY="manage_cicd-${OS}-${ARCH}"
+        [ "$OS" = "windows" ] && BINARY="${BINARY}.exe"
+        echo "name=$BINARY" >> $GITHUB_OUTPUT
+
+    - name: Cache binary
+      uses: actions/cache@v4
+      id: cache
+      with:
+        path: ~/.local/bin/manage_cicd
+        key: manage-cicd-${{ steps.version.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
+
+    - name: Download binary
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        mkdir -p ~/.local/bin
+        curl -fsSL "https://github.com/open-runtime/runtime_ci_tooling/releases/download/${{ steps.version.outputs.version }}/${{ steps.binary.outputs.name }}" \
+          -o ~/.local/bin/manage_cicd
+        chmod +x ~/.local/bin/manage_cicd
+
+    - name: Add to PATH
+      shell: bash
+      run: echo "${HOME}/.local/bin" >> $GITHUB_PATH

@@ -509,6 +509,70 @@ jobs:
           retention-days: 1
 
   # ============================================================================
+  # Job 5b: Compile AOT Binaries (runs in parallel with release-notes pipeline)
+  # ============================================================================
+  compile-binaries:
+    name: "Compile AOT binary (${{ matrix.target }})"
+    needs: [determine-version]
+    if: needs.determine-version.outputs.should_release == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: manage_cicd-darwin-arm64
+          - os: macos-15-intel
+            target: manage_cicd-darwin-x64
+          - os: ubuntu-latest
+            target: manage_cicd-linux-x64
+          - os: ubuntu-24.04-arm
+            target: manage_cicd-linux-arm64
+          - os: windows-latest
+            target: manage_cicd-windows-x64.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Configure Git for HTTPS with Token
+        shell: bash
+        env:
+          GH_PAT: ${{ secrets.TSAVO_AT_PIECES_PERSONAL_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "git@github.com:"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/open-runtime/".insteadOf "git@github.com:open-runtime/"
+          git config --global url."https://x-access-token:${GH_PAT}@github.com/pieces-app/".insteadOf "git@github.com:pieces-app/"
+
+      - uses: dart-lang/setup-dart@v1.7.1
+        with:
+          sdk: "3.9.2"
+
+      - name: Cache Dart pub dependencies
+        uses: actions/cache@v5.0.3
+        with:
+          path: ${{ runner.os == 'Windows' && format('{0}\\Pub\\Cache', env.LOCALAPPDATA) || '~/.pub-cache' }}
+          key: ${{ runner.os }}-dart-pub-${{ hashFiles('**/pubspec.yaml') }}
+          restore-keys: ${{ runner.os }}-dart-pub-
+
+      - run: dart pub get
+        shell: bash
+        env:
+          GIT_LFS_SKIP_SMUDGE: "1"
+
+      - name: Compile AOT binary
+        shell: bash
+        run: dart compile exe bin/manage_cicd.dart -o ${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v6.0.0
+        with:
+          name: ${{ matrix.target }}
+          path: ${{ matrix.target }}
+          retention-days: 1
+
+  # ============================================================================
   # Job 6: Stage 3 -- Release Notes Author
   # ============================================================================
   release-notes:
@@ -649,7 +713,7 @@ jobs:
   # Job 6: Create Release
   # ============================================================================
   create-release:
-    needs: [determine-version, compose-artifacts, release-notes]
+    needs: [determine-version, compose-artifacts, release-notes, compile-binaries]
     if: needs.determine-version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -703,6 +767,13 @@ jobs:
           name: version-bump-rationale
           path: ./.runtime_ci/version_bumps/
 
+      - name: Download AOT binaries
+        uses: actions/download-artifact@v7.0.0
+        with:
+          pattern: manage_cicd-*
+          path: ./aot-binaries/
+          merge-multiple: false
+
       - name: Download CI/CD audit trails
         continue-on-error: true
         uses: actions/download-artifact@v7.0.0
@@ -710,6 +781,18 @@ jobs:
           pattern: cicd-audit-*
           path: .runtime_ci/runs_incoming/
           merge-multiple: false
+
+      - name: Stage AOT binaries into artifacts
+        run: |
+          mkdir -p ./artifacts
+          # Each binary is in its own subdirectory (artifact name = dir name)
+          for dir in ./aot-binaries/manage_cicd-*/; do
+            if [ -d "$dir" ]; then
+              cp "$dir"* ./artifacts/ 2>/dev/null || true
+            fi
+          done
+          echo "AOT binaries staged:"
+          ls -la ./artifacts/manage_cicd-* 2>/dev/null || echo "(none found)"
 
       - name: Prepare artifacts
         env:

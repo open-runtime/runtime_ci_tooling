@@ -24,6 +24,7 @@
           git config --global url."https://x-access-token:${GH_PAT}@github.com/<%org%>/".insteadOf "git@github.com:<%org%>/"
 <%/git_orgs%>
 
+<%#is_dart%>
       # ── shared:dart-setup ──
       - uses: dart-lang/setup-dart@v1.7.1
         with:
@@ -56,3 +57,25 @@
         run: dart run build_runner build --delete-conflicting-outputs
 
 <%/build_runner%>
+<%/is_dart%>
+<%#is_typescript%>
+      # ── shared:node-setup ──
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "<%node_version%>"
+          cache: pnpm
+
+      # ── shared:pnpm-cache ──
+      - name: Cache pnpm store
+        uses: actions/cache@v5.0.3
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-${{ runner.arch }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-pnpm-
+
+      # ── shared:install ──
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+<%/is_typescript%>
